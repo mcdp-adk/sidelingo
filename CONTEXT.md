@@ -36,3 +36,13 @@ _Avoid_: Popup, overlay, 贴图 (a Snipaste pin holds an image)
 
 **Display mode** (显示模式):
 Which results the window shows: source only, translation only, or side-by-side.
+
+### Providers
+
+**Provider** (服务商):
+The service hosting the model that sidelingo calls for every Round.
+_Avoid_: Backend, API, vendor
+
+**Preset** (预设):
+One of the Provider choices sidelingo offers: OpenAI, OpenRouter, DeepSeek, Ollama Cloud, or Custom; at most one is active.
+_Avoid_: Profile, template
