@@ -34,5 +34,9 @@ The result of Translation.
 
 ### Presentation
 
+**Pin window** (悬浮窗):
+The single, always-on-top sidelingo window that shows the results of the current round.
+_Avoid_: Popup, overlay, 贴图 (a Snipaste pin holds an image)
+
 **Display mode** (显示模式):
 Which results the window shows: source only, translation only, or side-by-side. For a Lookup, "source" and "translation" mean the source-language and target-language explanations.
