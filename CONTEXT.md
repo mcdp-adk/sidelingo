@@ -10,6 +10,10 @@ A Windows desktop companion that turns captured text or images into structured, 
 The text or image handed to sidelingo for one round of processing.
 _Avoid_: Query, selection (a selection is one place an Input can come from)
 
+**Round** (一轮):
+One pass of processing, from an Input through Structuring to a finished Translation or Lookup.
+_Avoid_: Request, job (a Round may involve several model requests)
+
 **Structuring** (整理):
 Turning an Input into well-organized, readable Source text; always applied, whether the Input is plain text or an image.
 _Avoid_: Formatting, Markdown conversion, OCR
