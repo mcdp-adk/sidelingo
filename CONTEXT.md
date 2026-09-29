@@ -42,3 +42,7 @@ Which results the window shows: source only, translation only, or side-by-side.
 **Provider** (服务商):
 The service hosting the model that sidelingo calls for every Round.
 _Avoid_: Backend, API, vendor
+
+**Preset** (预设):
+One of the Provider choices sidelingo offers: OpenAI, OpenRouter, DeepSeek, Ollama Cloud, or Custom; at most one is active.
+_Avoid_: Profile, template
