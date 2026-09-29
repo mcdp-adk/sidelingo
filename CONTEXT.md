@@ -1,6 +1,6 @@
 # sidelingo
 
-A Windows desktop companion that turns captured text or images into structured, readable content, then translates it or explains it as a dictionary entry.
+A Windows desktop companion that turns captured text or images into structured, readable content, then translates it.
 
 ## Language
 
@@ -11,7 +11,7 @@ The text or image handed to sidelingo for one round of processing.
 _Avoid_: Query, selection (a selection is one place an Input can come from)
 
 **Round** (一轮):
-One pass of processing, from an Input through Structuring to a finished Translation or Lookup.
+One pass of processing, from an Input through Structuring to a finished Translation.
 _Avoid_: Request, job (a Round may involve several model requests)
 
 **Structuring** (整理):
@@ -22,16 +22,8 @@ _Avoid_: Formatting, Markdown conversion, OCR
 The structured result of Structuring, in the Input's own language.
 _Avoid_: Original, raw text
 
-**Entry** (词条):
-Source text that is a single word or phrase rather than running text.
-_Avoid_: Term, keyword
-
-**Lookup** (查词):
-Processing an Entry: explaining it in the source language and in the target language independently, rather than translating one explanation into the other.
-_Avoid_: Dictionary mode, word explain
-
 **Translation** (翻译):
-Processing Source text that is not an Entry: rendering it into the target language.
+Rendering Source text into the target language.
 
 **Translated text** (译文):
 The result of Translation.
@@ -43,4 +35,4 @@ The single, always-on-top sidelingo window that shows the results of the current
 _Avoid_: Popup, overlay, 贴图 (a Snipaste pin holds an image)
 
 **Display mode** (显示模式):
-Which results the window shows: source only, translation only, or side-by-side. For a Lookup, "source" and "translation" mean the source-language and target-language explanations.
+Which results the window shows: source only, translation only, or side-by-side.
