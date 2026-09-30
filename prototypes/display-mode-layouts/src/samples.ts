@@ -1,4 +1,7 @@
 // PROTOTYPE, throwaway. Hand-written sample Rounds: Source text (after Structuring) and Translated text.
+import longEn from "./long.en.md?raw";
+import longZh from "./long.zh.md?raw";
+
 export type Sample = { key: string; label: string; fastPath: boolean; src: string; tgt: string };
 
 export const samples: Sample[] = [
@@ -85,21 +88,5 @@ cachectl enable --region eu-west --ttl 3600
     src: `Keep the receipt until the refund shows up in your account.`,
     tgt: `在退款到账之前，请保留收据。`,
   },
-  {
-    key: "mismatch",
-    label: "段数不一致",
-    fastPath: false,
-    src: `The committee met on Tuesday to review the budget.
-
-It approved the proposal with two changes.
-
-First, travel spending is capped at last year's level.
-
-Second, the hiring freeze ends in March.`,
-    tgt: `委员会于周二开会审议预算，并在做出两处修改后批准了该提案。
-
-第一，差旅支出以去年的水平为上限。
-
-第二，招聘冻结将于三月结束。`,
-  },
+  { key: "long", label: "长文（滚动同步）", fastPath: false, src: longEn.trim(), tgt: longZh.trim() },
 ];
