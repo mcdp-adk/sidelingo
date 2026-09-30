@@ -23,7 +23,11 @@ The structured result of Structuring, in the Input's own language.
 _Avoid_: Original, raw text
 
 **Translation** (翻译):
-Rendering Source text into the target language.
+Rendering Source text into the Target language.
+
+**Target language** (目标语言):
+The single language, chosen by the user, that every Translation renders Source text into.
+_Avoid_: Output language, destination language
 
 **Translated text** (译文):
 The result of Translation.
