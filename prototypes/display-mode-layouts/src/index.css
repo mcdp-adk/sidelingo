@@ -1,0 +1,88 @@
+/* PROTOTYPE, throwaway. No Tailwind preflight: Fluent UI owns the base styles. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/cjk/dist/*.js";
+@import "streamdown/styles.css";
+
+/* Streamdown's shadcn-style tokens, mapped onto Fluent tokens set by FluentProvider. */
+@theme inline {
+  --color-background: var(--colorNeutralBackground1);
+  --color-foreground: var(--colorNeutralForeground1);
+  --color-muted: var(--colorNeutralBackground3);
+  --color-muted-foreground: var(--colorNeutralForeground3);
+  --color-border: var(--colorNeutralStroke2);
+  --color-sidebar: var(--colorNeutralBackground2);
+  --color-primary: var(--colorBrandBackground);
+  --color-primary-foreground: var(--colorNeutralForegroundOnBrand);
+  --radius: 6px;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; }
+body { font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+
+.desk { height: 100%; overflow: auto; padding: 16px; background: #6b7a8f; }
+@media (prefers-color-scheme: dark) { .desk { background: #20252d; } }
+
+.pin {
+  position: relative; resize: both; overflow: hidden;
+  min-width: 260px; min-height: 180px;
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.35);
+  container-type: inline-size; container-name: pin;
+  display: flex; flex-direction: column;
+}
+.pin-toolbar {
+  position: absolute; inset: 0 0 auto 0; z-index: 2;
+  display: flex; align-items: center; gap: 4px; padding: 4px 6px;
+  opacity: 0; transition: opacity .15s;
+}
+.pin:hover .pin-toolbar, .pin-toolbar.pinned { opacity: 1; }
+.pin-scroll { flex: 1; overflow: auto; padding: 14px 16px 16px; scrollbar-width: thin; }
+
+/* Markdown density for a small window. */
+.md { font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+.md :where(p, ul, ol, table, pre, blockquote) { margin: 0 0 .6em; }
+.md :where(h1, h2, h3) { margin: .2em 0 .4em; line-height: 1.3; }
+.md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3 { font-size: 1em; }
+
+.lang-tag { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; opacity: .6; margin-bottom: 4px; }
+
+/* A: two columns, stacks when narrow */
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.two-col > .col + .col { border-left: 1px solid var(--colorNeutralStroke2); padding-left: 20px; }
+@container pin (max-width: 560px) {
+  .two-col { grid-template-columns: 1fr; gap: 12px; }
+  .two-col > .col + .col { border-left: 0; padding-left: 0; border-top: 1px solid var(--colorNeutralStroke2); padding-top: 12px; }
+}
+
+/* B: aligned rows, pair stacks when narrow */
+.rows { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; }
+.rows > .cell { padding: 6px 0; border-top: 1px solid var(--colorNeutralStroke3); }
+.rows > .cell.tgt { border-left: 1px solid var(--colorNeutralStroke2); padding-left: 20px; }
+.rows > .cell:nth-child(-n+2) { border-top: 0; }
+@container pin (max-width: 560px) {
+  .rows { grid-template-columns: 1fr; }
+  .rows > .cell.tgt { border-left: 0; padding-left: 10px; border-top: 0; margin-left: 2px; box-shadow: inset 2px 0 var(--colorBrandStroke1); }
+  .rows > .cell:nth-child(2) { border-top: 0; }
+}
+
+/* C: interleaved, always one column */
+.pair { padding: 4px 0 10px; }
+.pair + .pair { border-top: 1px solid var(--colorNeutralStroke3); padding-top: 10px; }
+.pair .src { color: var(--colorNeutralForeground3); font-size: 13px; }
+.pair .tgt { padding-left: 10px; box-shadow: inset 2px 0 var(--colorBrandStroke1); }
+
+/* D: split panes with independent scroll */
+.split { flex: 1; display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
+.split > .pane { overflow: auto; padding: 14px 16px; scrollbar-width: thin; min-height: 0; }
+.split > .pane + .pane { border-top: 1px solid var(--colorNeutralStroke2); }
+@container pin (min-width: 640px) {
+  .split { grid-template-rows: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .split > .pane + .pane { border-top: 0; border-left: 1px solid var(--colorNeutralStroke2); }
+}
+
+.pending { height: 1em; margin: 4px 0; border-radius: 4px; background: var(--colorNeutralBackground4); animation: pulse 1.2s infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.mismatch { font-size: 12px; color: var(--colorPaletteRedForeground1); margin: 4px 0 8px; }

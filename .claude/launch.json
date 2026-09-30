@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "display-mode-layouts",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "prototypes/display-mode-layouts", "dev"],
+      "port": 5174
+    }
+  ]
+}
