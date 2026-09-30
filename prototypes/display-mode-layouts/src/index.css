@@ -23,12 +23,12 @@
 html, body, #root { margin: 0; height: 100%; }
 body { font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif; }
 
-.desk { height: 100%; overflow: auto; padding: 16px; background: #6b7a8f; }
+.desk { height: 100%; overflow: hidden; padding: 16px; background: #6b7a8f; }
 @media (prefers-color-scheme: dark) { .desk { background: #20252d; } }
 
 .pin {
   position: relative; resize: both; overflow: hidden;
-  min-width: 260px; min-height: 180px;
+  min-width: 260px; min-height: 180px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px);
   border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.35);
   container-type: inline-size; container-name: pin;
   display: flex; flex-direction: column;
