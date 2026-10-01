@@ -8,6 +8,7 @@ export interface ProviderConfiguration {
   model: string;
   /** Default omits the field; explicit none remains a sent level. */
   reasoningEffort?: ReasoningEffort | null;
+  key?: string | null;
 }
 
 export interface ChatMessage {
@@ -60,7 +61,11 @@ interface ChunkChoice {
 export function providerClient(transport: Transport): ProviderClient {
   return {
     async listModels(configuration, signal) {
-      const response = await request(transport, `${baseOf(configuration)}/models`, { method: "GET", signal });
+      const response = await request(transport, `${baseOf(configuration)}/models`, {
+        method: "GET",
+        headers: keyHeaders(configuration.key),
+        signal,
+      });
       let document;
       try {
         document = await response.json();
@@ -73,7 +78,7 @@ export function providerClient(transport: Transport): ProviderClient {
       }
       return document.data.map(({ id }: { id: string }) => id);
     },
-    async *streamChat({ preset, baseUrl, model, reasoningEffort }, messages, signal) {
+    async *streamChat({ preset, baseUrl, model, reasoningEffort, key }, messages, signal) {
       if (reasoningEffort != null && !isReasoningEffort(preset, reasoningEffort)) {
         throw new RangeError(`Unsupported reasoning effort for ${PRESET_REGISTRY[preset].label}: ${reasoningEffort}`);
       }
@@ -84,7 +89,7 @@ export function providerClient(transport: Transport): ProviderClient {
           : { [effortField]: effortField === "reasoning" ? { effort: reasoningEffort } : reasoningEffort };
       const response = await request(transport, `${baseOf({ preset, baseUrl })}/chat/completions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...keyHeaders(key) },
         body: JSON.stringify({ model, messages, stream: true, ...effort }),
         signal,
       });
@@ -102,6 +107,10 @@ export function providerClient(transport: Transport): ProviderClient {
 
 function isModel(value: unknown): value is { id: string } {
   return typeof value === "object" && value !== null && "id" in value && typeof value.id === "string";
+}
+
+function keyHeaders(key: string | null | undefined): Record<string, string> {
+  return key ? { Authorization: `Bearer ${key}` } : {};
 }
 
 /** The shared HTTP boundary keeps both client operations' errors consistent. */

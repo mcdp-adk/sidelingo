@@ -16,6 +16,7 @@ import { AutostartSetting } from "./AutostartSetting";
 import { PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
 import { ModelField } from "./ModelField";
+import { KeyField } from "./KeyField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";
 
 const useStyles = makeStyles({
@@ -123,6 +124,12 @@ export function SettingsWindow() {
           )}
           {preset && (
             <>
+              <KeyField
+                key={preset}
+                preset={preset}
+                ciphertext={settings.presets[preset].keyCiphertext}
+                commit={(keyCiphertext) => commit({ presets: { [preset]: { keyCiphertext } } })}
+              />
               <ModelField
                 key={preset}
                 settings={settings}

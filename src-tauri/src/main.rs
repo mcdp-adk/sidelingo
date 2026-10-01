@@ -8,6 +8,7 @@ mod accent_color;
 mod autostart;
 mod clipboard;
 mod pin_window;
+mod secrets;
 mod settings;
 mod settings_window;
 mod tray;
@@ -56,7 +57,9 @@ fn main() {
             settings::read_settings,
             settings::patch_settings,
             settings_window::open_settings,
-            clipboard::copy_text
+            clipboard::copy_text,
+            secrets::protect_secret,
+            secrets::unprotect_secret
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

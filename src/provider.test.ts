@@ -1,6 +1,47 @@
 import { describe, expect, it } from "vitest";
 import { providerClient } from "./provider";
 import type { Preset } from "./presets";
+import { DEFAULT_SETTINGS, resolveProviderConnection } from "./settings";
+
+describe("Named Preset keys", () => {
+  it.each<[Preset, string]>([
+    ["openai", "synthetic-openai-from-environment"],
+    ["openrouter", "synthetic-openrouter-from-environment"],
+    ["deepseek", "synthetic-deepseek-from-environment"],
+    ["ollama-cloud", "synthetic-ollama-from-environment"],
+  ])("uses %s's own environment variable for both Bearer headers", async (preset, expectedKey) => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      activePreset: preset,
+      presets: {
+        ...DEFAULT_SETTINGS.presets,
+        [preset]: { ...DEFAULT_SETTINGS.presets[preset], model: "model" },
+      },
+    };
+    const connection = resolveProviderConnection(settings, {
+      enteredKey: null,
+      environment: {
+        OPENAI_API_KEY: "synthetic-openai-from-environment",
+        OPENROUTER_API_KEY: "synthetic-openrouter-from-environment",
+        DEEPSEEK_API_KEY: "synthetic-deepseek-from-environment",
+        OLLAMA_API_KEY: "synthetic-ollama-from-environment",
+      },
+    });
+    expect(connection).toHaveProperty("configuration");
+    if (!("configuration" in connection)) throw new Error("The supplied key must make the connection ready");
+    const authorizations: (string | null)[] = [];
+    const client = providerClient(async (url, { headers }) => {
+      authorizations.push(new Headers(headers).get("Authorization"));
+      return url.endsWith("/models") ? new Response(JSON.stringify({ data: [] })) : new Response("data: [DONE]\n\n");
+    });
+    const signal = new AbortController().signal;
+    for await (const _ of client.streamChat(connection.configuration, [{ role: "user", content: "hello" }], signal)) {
+      /* Both calls use the actual public producer's result. */
+    }
+    await client.listModels(connection.configuration, signal);
+    expect(authorizations).toEqual([`Bearer ${expectedKey}`, `Bearer ${expectedKey}`]);
+  });
+});
 
 describe("Named Preset endpoints", () => {
   it.each<[Preset, string]>([

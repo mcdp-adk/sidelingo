@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
 import { providerConfiguration } from "./settings";
-import { currentSettings } from "./settings-store";
+import { currentKeySources, currentSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -28,7 +28,7 @@ function publish(next: ShownRound) {
 /** Starts a Round on `input`, cancelling the one in flight; the window keeps its content until the first update. */
 async function startRound(input: Input) {
   const settings = currentSettings();
-  const provider = providerConfiguration(settings);
+  const provider = providerConfiguration(settings, currentKeySources(settings.activePreset));
   if (!provider) return;
   inFlight?.abort();
   const controller = (inFlight = new AbortController());

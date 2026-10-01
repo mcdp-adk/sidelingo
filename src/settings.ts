@@ -1,5 +1,6 @@
 import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
+import type { KeySourcesSnapshot } from "./credentials";
 import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 
 /**
@@ -12,9 +13,11 @@ export const SCHEMA_VERSION = 1;
 export type { Preset } from "./presets";
 
 type PresetSettings = {
-  [P in Preset]: { model: string; reasoningEffort: ReasoningEffort | null } & (P extends "custom"
-    ? { baseUrl: string }
-    : {});
+  [P in Preset]: {
+    model: string;
+    reasoningEffort: ReasoningEffort | null;
+    keyCiphertext: string | null;
+  } & (P extends "custom" ? { baseUrl: string } : {});
 };
 
 export interface Settings {
@@ -29,11 +32,11 @@ export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: SCHEMA_VERSION,
   activePreset: null,
   presets: {
-    openai: { model: "", reasoningEffort: null },
-    openrouter: { model: "", reasoningEffort: null },
-    deepseek: { model: "", reasoningEffort: null },
-    "ollama-cloud": { model: "", reasoningEffort: null },
-    custom: { baseUrl: "", model: "", reasoningEffort: null },
+    openai: { model: "", reasoningEffort: null, keyCiphertext: null },
+    openrouter: { model: "", reasoningEffort: null, keyCiphertext: null },
+    deepseek: { model: "", reasoningEffort: null, keyCiphertext: null },
+    "ollama-cloud": { model: "", reasoningEffort: null, keyCiphertext: null },
+    custom: { baseUrl: "", model: "", reasoningEffort: null, keyCiphertext: null },
   },
   targetLanguage: initialTargetLanguage(navigator.language),
 };
@@ -73,18 +76,24 @@ export function parseSettings(document: unknown): Settings | null {
     const stored = field(presets, preset, isJsonObject, {});
     if (!stored) return null;
     const model = field(stored, "model", isString, DEFAULT_SETTINGS.presets[preset].model);
+    const keyCiphertext = field(
+      stored,
+      "keyCiphertext",
+      (value): value is string | null => value === null || isString(value),
+      null,
+    );
     const reasoningEffort = field(
       stored,
       "reasoningEffort",
       (value): value is ReasoningEffort | null => isReasoningEffort(preset, value),
       DEFAULT_SETTINGS.presets[preset].reasoningEffort,
     );
-    if (model === undefined || reasoningEffort === undefined) return null;
+    if (model === undefined || reasoningEffort === undefined || keyCiphertext === undefined) return null;
     if (preset === "custom") {
       const baseUrl = field(stored, "baseUrl", isString, DEFAULT_SETTINGS.presets.custom.baseUrl);
       if (baseUrl === undefined) return null;
-      values.custom = { model, baseUrl, reasoningEffort };
-    } else values[preset] = { model, reasoningEffort };
+      values.custom = { model, baseUrl, reasoningEffort, keyCiphertext };
+    } else values[preset] = { model, reasoningEffort, keyCiphertext };
   }
   const activePreset = field(document, "activePreset", isPreset, DEFAULT_SETTINGS.activePreset);
   const targetLanguage = field(document, "targetLanguage", isTargetLanguage, DEFAULT_SETTINGS.targetLanguage);
@@ -96,11 +105,13 @@ export function parseSettings(document: unknown): Settings | null {
 
 /**
  * How to reach the active Preset's Provider, or null when a Round can't send anything.
- * Only Custom, which needs no key, is reachable so far; #44 adds the keyed Presets and #45
- * says why nothing was sent.
+ * The connection producer selects credentials before either Provider operation sends.
  */
-export function providerConfiguration(settings: Settings): ProviderConfiguration | null {
-  const resolved = resolveProviderConnection(settings);
+export function providerConfiguration(
+  settings: Settings,
+  keySources?: KeySourcesSnapshot,
+): ProviderConfiguration | null {
+  const resolved = resolveProviderConnection(settings, keySources);
   return "configuration" in resolved && resolved.configuration.model ? resolved.configuration : null;
 }
 
@@ -109,14 +120,15 @@ export type ConnectionFailure = "no-provider" | "missing-key" | "missing-base-ur
 /** Connection readiness shared by Rounds and model lists; a list needs no selected model. */
 export function resolveProviderConnection(
   settings: Settings,
+  keySources?: KeySourcesSnapshot,
 ): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
   const preset = settings.activePreset;
   if (!preset) return { error: "no-provider" };
-  // Credential resolution in #44 unlocks the named Presets. Until then, fail
-  // locally instead of sending unauthenticated requests to real services.
-  if (PRESET_REGISTRY[preset].keyVariable) return { error: "missing-key" };
+  const variable = PRESET_REGISTRY[preset].keyVariable;
+  const key = keySources?.enteredKey || (variable ? keySources?.environment?.[variable] : null);
+  if (variable && !key) return { error: "missing-key" };
   const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
   if (!baseUrl) return { error: "missing-base-url" };
   const { model, reasoningEffort } = settings.presets[preset];
-  return { configuration: { preset, baseUrl, model, reasoningEffort } };
+  return { configuration: { preset, baseUrl, model, reasoningEffort, key } };
 }
