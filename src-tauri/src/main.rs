@@ -12,6 +12,7 @@ fn main() {
             tray::create(app.handle())?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![pin_window::hide_pin_window])
         .on_window_event(pin_window::on_window_event)
         .run(tauri::generate_context!())
         .expect("error while running sidelingo");
