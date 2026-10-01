@@ -15,6 +15,8 @@ export const config: WebdriverIO.Config = {
   maxInstances: 1,
   capabilities: [capabilities()],
   logLevel: "warn",
+  // A session that can't start won't start on a retry either.
+  connectionRetryCount: 0,
   framework: "mocha",
   reporters: ["spec"],
   mochaOpts: { ui: "bdd", timeout: 60_000 },
