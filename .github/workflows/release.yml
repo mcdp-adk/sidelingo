@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check release version
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($env:GITHUB_REF_NAME -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw 'Release tags must be vX.Y.Z without a prerelease suffix.'
+          }
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $tauri = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "([^"]+)"$').Matches.Groups[1].Value
+          if ($package.version -ne $version -or $tauri.version -ne $version -or $cargo -ne $version) {
+            throw 'The tag, package.json, Cargo.toml and tauri.conf.json versions must match.'
+          }
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Install notices generator
+        run: cargo install cargo-about --version 0.9.2 --locked
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: sidelingo ${{ github.ref_name }}
+          releaseBody: Download the Windows installer and its SHA-256 checksum from the assets below. See the README for installation and Windows security prompts.
+          releaseDraft: false
+          prerelease: false
+          uploadUpdaterJson: true
+          uploadUpdaterSignatures: true
+          updaterJsonPreferNsis: true
+          args: -- --locked
+      - name: Publish installer checksum
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $installers = @(Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe)
+          if ($installers.Count -ne 1) { throw 'Expected one Windows NSIS installer.' }
+          $installer = $installers[0]
+          $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $checksum = $installer.FullName + '.sha256'
+          [IO.File]::WriteAllText($checksum, "$hash  $($installer.Name)`n", [Text.UTF8Encoding]::new($false))
+          gh release upload $env:GITHUB_REF_NAME $checksum --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Checksum upload failed.' }

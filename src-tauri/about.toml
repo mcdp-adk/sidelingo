@@ -1,0 +1,16 @@
+# Generate notices for the dependencies shipped in the Windows app.
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-only",
+]
+targets = ["x86_64-pc-windows-msvc"]
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+

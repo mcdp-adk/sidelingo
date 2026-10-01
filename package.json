@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:desktop": "tauri dev --features desktop-dev --config src-tauri/tauri.desktop-dev.conf.json",
     "build": "vite build",
+    "notices": "node scripts/generate-notices.mjs",
     "typecheck": "tsc --build",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
