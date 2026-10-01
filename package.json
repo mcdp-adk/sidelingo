@@ -18,6 +18,7 @@
     "@fluentui/react-icons": "^2.0.343",
     "@streamdown/cjk": "^1.0.4",
     "@tauri-apps/api": "^2.12.1",
+    "@tauri-apps/plugin-http": "^2.8.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "streamdown": "^2.7.0"
