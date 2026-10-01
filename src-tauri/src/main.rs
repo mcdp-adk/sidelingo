@@ -19,6 +19,11 @@ fn main() {
             pin_window::show(app)
         }))
         .plugin(tauri_plugin_http::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .on_page_load(|webview, _| clipboard::webview_loaded(webview))
         .setup(|app| {
             settings::load(app.handle())?;

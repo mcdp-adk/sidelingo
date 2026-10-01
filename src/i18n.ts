@@ -24,6 +24,14 @@ const en = {
   network: "Network",
   general: "General",
   about: "About",
+  version: "Version",
+  copyright: "Copyright © 2026 mcdp-adk",
+  licenseNotice: "Licensed under GPL-3.0-only, with no warranty.",
+  aboutUnavailable: "Application information could not be loaded",
+  license: "License",
+  sourceCode: "Source code",
+  thirdPartyNotices: "Third-party notices",
+  linkNotOpened: "The link could not be opened",
   settingsNotSaved: "Settings were not saved",
 };
 
@@ -46,6 +54,14 @@ const zhHans: typeof en = {
   network: "网络",
   general: "常规",
   about: "关于",
+  version: "版本",
+  copyright: "版权所有 © 2026 mcdp-adk",
+  licenseNotice: "遵循 GPL-3.0-only 许可，不提供任何担保。",
+  aboutUnavailable: "无法加载应用信息",
+  license: "许可证",
+  sourceCode: "源代码",
+  thirdPartyNotices: "第三方许可声明",
+  linkNotOpened: "无法打开链接",
   settingsNotSaved: "设置未保存",
 };
 

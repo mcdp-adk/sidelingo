@@ -11,6 +11,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { strings } from "./i18n";
+import { AboutSection } from "./AboutSection";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
 
@@ -134,6 +135,7 @@ export function SettingsWindow() {
         </section>
         <section className={styles.section} aria-label={strings.about}>
           <h2>{strings.about}</h2>
+          <AboutSection />
         </section>
       </main>
     </div>
