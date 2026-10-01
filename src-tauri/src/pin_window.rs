@@ -1,3 +1,5 @@
+use tauri::utils::config::WindowEffectsConfig;
+use tauri::window::Effect;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window, WindowEvent};
 use windows::core::w;
 use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, WINDOW_EX_STYLE, WS_POPUP};
@@ -42,6 +44,12 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .always_on_top(true)
         .minimizable(false)
         .maximizable(false)
+        // Mica shows through the page's transparent background.
+        .transparent(true)
+        .effects(WindowEffectsConfig {
+            effects: vec![Effect::Mica],
+            ..Default::default()
+        })
         .build()?;
     Ok(())
 }
