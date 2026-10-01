@@ -1,4 +1,4 @@
-import { PRESET_REGISTRY, type Preset } from "./presets";
+import { isReasoningEffort, PRESET_REGISTRY, type Preset, type ReasoningEffort } from "./presets";
 
 /** Where to reach a Provider over the OpenAI Chat Completions protocol. */
 export interface ProviderConfiguration {
@@ -6,6 +6,8 @@ export interface ProviderConfiguration {
   /** Used as entered, with or without `/v1`. */
   baseUrl: string;
   model: string;
+  /** Default omits the field; explicit none remains a sent level. */
+  reasoningEffort?: ReasoningEffort | null;
 }
 
 export interface ChatMessage {
@@ -71,11 +73,19 @@ export function providerClient(transport: Transport): ProviderClient {
       }
       return document.data.map(({ id }: { id: string }) => id);
     },
-    async *streamChat({ preset, baseUrl, model }, messages, signal) {
+    async *streamChat({ preset, baseUrl, model, reasoningEffort }, messages, signal) {
+      if (reasoningEffort != null && !isReasoningEffort(preset, reasoningEffort)) {
+        throw new RangeError(`Unsupported reasoning effort for ${PRESET_REGISTRY[preset].label}: ${reasoningEffort}`);
+      }
+      const effortField = PRESET_REGISTRY[preset].effortField;
+      const effort =
+        reasoningEffort == null
+          ? {}
+          : { [effortField]: effortField === "reasoning" ? { effort: reasoningEffort } : reasoningEffort };
       const response = await request(transport, `${baseOf({ preset, baseUrl })}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, stream: true }),
+        body: JSON.stringify({ model, messages, stream: true, ...effort }),
         signal,
       });
       for await (const data of serverSentData(response.body!)) {
@@ -118,7 +128,7 @@ async function request(transport: Transport, url: string, init: RequestInit): Pr
 }
 
 function baseOf({ preset, baseUrl }: Pick<ProviderConfiguration, "preset" | "baseUrl">): string {
-  return (PRESET_REGISTRY[preset].baseUrl ?? baseUrl).replace(/\/$/, "");
+  return (PRESET_REGISTRY[preset].baseUrl ?? baseUrl).replace(/\/+$/, "");
 }
 
 /** The `data` of each server-sent event line, skipping comments such as `: keep-alive`. */

@@ -1,5 +1,6 @@
 /** Provider protocol data shared by Settings and the Provider client. */
 const commonEfforts = ["none", "low", "medium", "high", "xhigh", "max"] as const;
+export type ReasoningEffort = (typeof commonEfforts)[number];
 
 export const PRESET_REGISTRY = {
   openai: {
@@ -41,3 +42,8 @@ export const PRESET_REGISTRY = {
 
 export type Preset = keyof typeof PRESET_REGISTRY;
 export const PRESETS = Object.keys(PRESET_REGISTRY) as Preset[];
+
+/** Default is null; explicit levels must belong to the Preset's protocol. */
+export function isReasoningEffort(preset: Preset, value: unknown): value is ReasoningEffort | null {
+  return value === null || PRESET_REGISTRY[preset].efforts.some((effort) => effort === value);
+}

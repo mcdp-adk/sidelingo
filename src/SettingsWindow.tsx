@@ -12,7 +12,7 @@ import {
 } from "@fluentui/react-components";
 import { strings } from "./i18n";
 import { AboutSection } from "./AboutSection";
-import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
+import { PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
 import { ModelField } from "./ModelField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";
@@ -121,12 +121,32 @@ export function SettingsWindow() {
             />
           )}
           {preset && (
-            <ModelField
-              key={preset}
-              settings={settings}
-              preset={preset}
-              commit={(model) => commit({ presets: { [preset]: { model } } })}
-            />
+            <>
+              <ModelField
+                key={preset}
+                settings={settings}
+                preset={preset}
+                commit={(model) => commit({ presets: { [preset]: { model } } })}
+              />
+              <Field label={strings.reasoningEffort}>
+                <Select
+                  aria-label={strings.reasoningEffort}
+                  value={settings.presets[preset].reasoningEffort ?? ""}
+                  onChange={(_, data) =>
+                    void commit({
+                      presets: { [preset]: { reasoningEffort: data.value ? (data.value as ReasoningEffort) : null } },
+                    })
+                  }
+                >
+                  <option value="">{strings.defaultEffort}</option>
+                  {PRESET_REGISTRY[preset].efforts.map((effort) => (
+                    <option key={effort} value={effort}>
+                      {effort}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
           )}
         </section>
         <section className={styles.section} aria-label={strings.network}>
