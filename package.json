@@ -43,7 +43,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "webdriverio": "^9.32.0"
   },
   "packageManager": "pnpm@10.34.6"
 }

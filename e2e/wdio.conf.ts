@@ -2,6 +2,7 @@ import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildApp, capabilities, resetDataFolders } from "./app";
+import { SevereServiceError } from "webdriverio";
 
 // msedgedriver must match the installed WebView2 runtime; msedgedriver-tool fetches the matching one.
 const driverDir = resolve(import.meta.dirname, "..", "node_modules", ".cache", "msedgedriver");
@@ -24,10 +25,15 @@ export const config: WebdriverIO.Config = {
   mochaOpts: { ui: "bdd", timeout: 60_000 },
 
   onPrepare() {
-    rmSync(failuresDir, { recursive: true, force: true });
-    buildApp();
-    mkdirSync(driverDir, { recursive: true });
-    execFileSync("msedgedriver-tool", { cwd: driverDir, stdio: "inherit" });
+    try {
+      rmSync(failuresDir, { recursive: true, force: true });
+      buildApp();
+      mkdirSync(driverDir, { recursive: true });
+      execFileSync("msedgedriver-tool", { cwd: driverDir, stdio: "inherit" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new SevereServiceError(`E2E preparation failed: ${message}`);
+    }
   },
 
   // Every spec file starts the app from empty data folders.
