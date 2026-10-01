@@ -8,6 +8,7 @@ mod accent_color;
 mod clipboard;
 mod pin_window;
 mod settings;
+mod settings_window;
 mod tray;
 mod ui_language;
 
@@ -29,9 +30,14 @@ fn main() {
             accent_color::accent_color,
             pin_window::hide_pin_window,
             pin_window::pin_window_ready,
-            settings::read_settings
+            settings::read_settings,
+            settings::patch_settings,
+            settings_window::open_settings
         ])
-        .on_window_event(pin_window::on_window_event)
+        .on_window_event(|window, event| {
+            pin_window::on_window_event(window, event);
+            settings_window::on_window_event(window, event);
+        })
         .run(tauri::generate_context!())
         .expect("error while running sidelingo");
 }

@@ -1,5 +1,8 @@
+import { PRESET_REGISTRY, type Preset } from "./presets";
+
 /** Where to reach a Provider over the OpenAI Chat Completions protocol. */
 export interface ProviderConfiguration {
+  preset: Preset;
   /** Used as entered, with or without `/v1`. */
   baseUrl: string;
   model: string;
@@ -28,8 +31,9 @@ interface ChunkChoice {
 
 export function providerClient(transport: Transport): ProviderClient {
   return {
-    async *streamChat({ baseUrl, model }, messages, signal) {
-      const response = await transport(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+    async *streamChat({ preset, baseUrl, model }, messages, signal) {
+      const endpoint = PRESET_REGISTRY[preset].baseUrl ?? baseUrl;
+      const response = await transport(`${endpoint.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model, messages, stream: true }),

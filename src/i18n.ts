@@ -9,12 +9,36 @@ const en = {
   pinEmptyHint: "Copy text or an image to see it here.",
   close: "Close (Esc)",
   copySelection: "Copy selection",
+  settings: "Settings",
+  settingsShortcut: "Settings (Ctrl+,)",
+  provider: "Provider",
+  preset: "Preset",
+  chooseProvider: "Choose a Provider",
+  custom: "Custom",
+  baseUrl: "Base URL",
+  model: "Model",
+  network: "Network",
+  general: "General",
+  about: "About",
+  settingsNotSaved: "Settings were not saved",
 };
 
 const zhHans: typeof en = {
   pinEmptyHint: "复制文本或图片，结果会显示在这里。",
   close: "关闭 (Esc)",
   copySelection: "复制所选内容",
+  settings: "设置",
+  settingsShortcut: "设置 (Ctrl+,)",
+  provider: "服务商",
+  preset: "预设",
+  chooseProvider: "选择服务商",
+  custom: "自定义",
+  baseUrl: "Base URL",
+  model: "模型",
+  network: "网络",
+  general: "常规",
+  about: "关于",
+  settingsNotSaved: "设置未保存",
 };
 
 /** The WebView's language defaults to the Windows display language. */

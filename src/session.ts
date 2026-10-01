@@ -2,7 +2,8 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
-import { DEFAULT_SETTINGS, parseSettings, providerConfiguration, type Settings } from "./settings";
+import { providerConfiguration } from "./settings";
+import { currentSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -17,7 +18,6 @@ let shown: ShownRound | null = null;
 let lastRoundId = 0;
 /** Cancels the Round in flight. */
 let inFlight: AbortController | null = null;
-let settings: Settings = DEFAULT_SETTINGS;
 const subscribers = new Set<() => void>();
 
 function publish(next: ShownRound) {
@@ -27,6 +27,7 @@ function publish(next: ShownRound) {
 
 /** Starts a Round on `input`, cancelling the one in flight; the window keeps its content until the first update. */
 async function startRound(input: Input) {
+  const settings = currentSettings();
   const provider = providerConfiguration(settings);
   if (!provider) return;
   inFlight?.abort();
@@ -49,8 +50,6 @@ async function startRound(input: Input) {
  * first `show` Input isn't lost.
  */
 export async function startSession(): Promise<void> {
-  // A document the schema rejects is set aside in #55; until then the defaults stand in.
-  settings = parseSettings(await invoke("read_settings")) ?? DEFAULT_SETTINGS;
   await listen<InputEvent>("input", ({ payload }) => {
     // Nothing usable on show keeps the current content.
     if (payload.input) void startRound(payload.input);
