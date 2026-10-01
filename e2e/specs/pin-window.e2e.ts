@@ -10,18 +10,13 @@ async function closeButton() {
   return buttons.at(-1)!;
 }
 
-/** A paragraph of the content clear of the toolbar, which overlays the top. */
-const paragraph = async () => (await $$("p").getElements())[1];
+/** Copied before each launch: one paragraph, a few lines tall, whose middle sits clear of the toolbar overlaying the top. */
+const LINE =
+  "Drag anywhere in this window to move it. A plain click leaves it where it is, and dragging starts only once the pointer has travelled a few pixels. Hold Ctrl to select a passage or a word.";
+const paragraph = () => $("p").getElement();
 
 /** WebDriver's code for the Ctrl key. */
 const CTRL = String.fromCharCode(0xe009);
-
-/** Puts text no selection in the window holds on the clipboard, to see whether a copy replaces it. */
-function sentinel(): string {
-  const text = `sentinel ${Date.now()}`;
-  writeClipboardText(text);
-  return text;
-}
 
 const pointerAction = () => browser.action("pointer");
 type PointerAction = ReturnType<typeof pointerAction>;
@@ -69,10 +64,14 @@ async function waitUntilHidden() {
   await browser.waitUntil(() => !pinVisible(), { timeoutMsg: "the Pin window is still visible" });
 }
 
-/** Relaunches and waits for the Pin window's UI, so key presses reach its listeners. */
-async function launch(options?: Launch) {
+/**
+ * Relaunches showing `text`, copied beforehand, and waits for it, so key presses reach the UI's
+ * listeners. The clipboard then holds the whole text, which no partial selection's copy matches.
+ */
+async function launch(options?: Launch, text = LINE) {
+  writeClipboardText(text);
   await relaunch(options);
-  await toolbar().waitForExist();
+  await expect($("p")).toHaveText(text);
 }
 
 describe("The Pin window", () => {
@@ -120,40 +119,39 @@ describe("The Pin window", () => {
 
   it("selects a passage on Ctrl+drag", async () => {
     await launch();
-    sentinel();
     await drag(await paragraph(), { ctrl: true });
     const copied = (await copy()).trim();
     expect(copied).toContain(" ");
-    expect(await (await paragraph()).getText()).toContain(copied);
+    expect(copied).not.toBe(LINE);
+    expect(LINE).toContain(copied);
   });
 
   it("selects a word on Ctrl+double-click, staying visible", async () => {
     await launch();
-    sentinel();
     await ctrlDoubleClick(await paragraph());
     const copied = (await copy()).trim();
     expect(copied).toMatch(/^\S+$/);
-    expect(await (await paragraph()).getText()).toContain(copied);
+    expect(LINE).toContain(copied);
     expect(pinVisible()).toBe(true);
   });
 
   it("selects nothing on a plain drag", async () => {
     await launch();
-    const before = sentinel();
     await drag(await paragraph());
-    expect(await copy()).toBe(before);
+    expect(await copy()).toBe(LINE);
   });
 
   it("copies the selection from a right-click menu holding only Copy selection", async () => {
     await launch();
     await ctrlDoubleClick(await paragraph());
-    const word = await copy();
-    sentinel();
     await rightClick(await paragraph());
     await $("[role=menu]").waitForDisplayed();
     expect(await $$("[role=menuitem]").map((item) => item.getText())).toEqual(["Copy selection"]);
     await $("[role=menuitem]").click();
-    await browser.waitUntil(() => readClipboardText() === word, { timeoutMsg: "the selection wasn't copied" });
+    await browser.waitUntil(() => readClipboardText() !== LINE, { timeoutMsg: "the selection wasn't copied" });
+    const copied = readClipboardText().trim();
+    expect(copied).toMatch(/^\S+$/);
+    expect(LINE).toContain(copied);
   });
 
   it("offers no right-click menu without a selection", async () => {
@@ -166,15 +164,15 @@ describe("The Pin window", () => {
   it("clears the selection on a click on empty space", async () => {
     await launch();
     await ctrlDoubleClick(await paragraph());
-    const before = sentinel();
-    // Halfway across the content's left padding, beside the paragraph, where there's no text.
+    // Halfway across the content's left padding, beside the paragraph's middle, clear of the toolbar.
     const { x, y } = await (await paragraph()).getLocation();
+    const { height } = await (await paragraph()).getSize();
     await pointerAction()
-      .move({ x: Math.floor(x / 2), y: Math.ceil(y) + 4 })
+      .move({ x: Math.floor(x / 2), y: Math.round(y + height / 2) })
       .down()
       .up()
       .perform();
-    expect(await copy()).toBe(before);
+    expect(await copy()).toBe(LINE);
   });
 
   it("closes only the right-click menu on Esc", async () => {
@@ -188,15 +186,18 @@ describe("The Pin window", () => {
   });
 
   it("scrolls content longer than the window inside it, keeping the window's size", async () => {
-    await launch();
+    await launch({}, Array(12).fill(LINE).join(" "));
     const size = await browser.getWindowSize();
-    const last = (await $$("p").getElements()).at(-1)!;
-    expect(await last.isDisplayed({ withinViewport: true })).toBe(false);
-    await browser
-      .action("wheel")
-      .scroll({ origin: await paragraph(), deltaY: 2000 })
-      .perform();
-    await expect(last).toBeDisplayedInViewport();
+    // The page fills the window.
+    const { height } = await $("body").getSize();
+    const content = await paragraph();
+    const bottom = async () => (await content.getLocation()).y + (await content.getSize()).height;
+    expect(await bottom()).toBeGreaterThan(height);
+    // Over the window's middle, since the paragraph's own middle lies below it.
+    await browser.action("wheel").scroll({ x: 100, y: 120, deltaY: 10_000 }).perform();
+    await browser.waitUntil(async () => (await bottom()) <= height, {
+      timeoutMsg: "the content's end didn't scroll into view",
+    });
     expect(await browser.getWindowSize()).toEqual(size);
   });
 

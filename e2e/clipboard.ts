@@ -12,6 +12,12 @@ $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::I
   );
 }
 
+/** Empties the real Windows clipboard, so it holds nothing to show. */
+export function clearClipboard(): void {
+  runPowerShell(`Add-Type -AssemblyName System.Windows.Forms
+[Windows.Forms.Clipboard]::Clear()`);
+}
+
 /** Reads the real Windows clipboard's text, or "" when it holds none. */
 export function readClipboardText(): string {
   const base64 = runPowerShell(

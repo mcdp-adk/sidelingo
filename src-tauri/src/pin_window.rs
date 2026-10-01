@@ -1,3 +1,5 @@
+use crate::clipboard;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::utils::config::WindowEffectsConfig;
 use tauri::window::Effect;
@@ -18,8 +20,11 @@ const MIN_WIDTH: f64 = 230.0;
 const MIN_HEIGHT: f64 = 120.0;
 /// Tells the front end the Pin window was hidden.
 const HIDDEN: &str = "pin-window-hidden";
+/// Set once the front end listens for Inputs, so the first `show` reaches it.
+static READY: AtomicBool = AtomicBool::new(false);
 
-/// Creates the Pin window. It lives as long as the process and only ever hides.
+/// Creates the Pin window, hidden until its front end is ready. It lives as long
+/// as the process and only ever hides.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default());
 
@@ -50,6 +55,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     let window = window
         .title("sidelingo")
+        .visible(false)
         .inner_size(360.0, 240.0)
         // As narrow as the compact toolbar allows.
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
@@ -103,20 +109,41 @@ fn update_minimum_size(window: &WebviewWindow) -> tauri::Result<()> {
 }
 
 // Every path that shows or hides the Pin window goes through `show` or `hide`,
-// so its visibility has one owner.
+// so its visibility, and following the clipboard with it, has one owner.
 
+/// Shows and focuses the Pin window. Going from hidden to shown follows the
+/// clipboard again and sends its current Input.
 pub fn show(app: &AppHandle) {
+    // Readiness shows the window, so an earlier request has nothing to add.
+    if !READY.load(Ordering::SeqCst) {
+        return;
+    }
     if let Some(window) = app.get_webview_window(LABEL) {
+        let was_hidden = !window.is_visible().unwrap_or(false);
         let _ = window.show();
         let _ = window.set_focus();
+        if was_hidden {
+            clipboard::shown();
+        }
     }
 }
 
 pub fn hide(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
         let _ = window.hide();
+        clipboard::hidden();
         let _ = window.emit(HIDDEN, ());
     }
+}
+
+/// The front end listens for Inputs, so the Pin window can show.
+#[tauri::command]
+pub fn pin_window_ready(app: AppHandle) {
+    READY.store(true, Ordering::SeqCst);
+    show(&app);
 }
 
 /// Esc, the close button, and a double-click on the content.

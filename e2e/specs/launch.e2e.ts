@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { appExe, dataFolders, identifier, ownerIdentifier, relaunch } from "../app";
+import { clearClipboard } from "../clipboard";
 import { inspectWindows } from "../window";
 
 const owner = dataFolders(ownerIdentifier);
@@ -21,6 +22,7 @@ describe("Launching sidelingo", () => {
     const { roaming } = dataFolders(identifier);
     mkdirSync(roaming, { recursive: true });
     writeFileSync(join(roaming, "left-over.json"), "{}");
+    clearClipboard();
 
     await relaunch();
 
