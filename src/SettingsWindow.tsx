@@ -15,6 +15,7 @@ import { AboutSection } from "./AboutSection";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
 import { ModelField } from "./ModelField";
+import { TargetLanguageSetting } from "./TargetLanguageSetting";
 
 const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
@@ -133,6 +134,10 @@ export function SettingsWindow() {
         </section>
         <section className={styles.section} aria-label={strings.general}>
           <h2>{strings.general}</h2>
+          <TargetLanguageSetting
+            value={settings.targetLanguage}
+            commit={(targetLanguage) => commit({ targetLanguage })}
+          />
         </section>
         <section className={styles.section} aria-label={strings.about}>
           <h2>{strings.about}</h2>

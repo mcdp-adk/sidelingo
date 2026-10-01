@@ -1,4 +1,4 @@
-import { TARGET_LANGUAGES, type TargetLanguage } from "./languages";
+import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
 
@@ -31,8 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
     "ollama-cloud": { model: "" },
     custom: { baseUrl: "", model: "" },
   },
-  // The Windows display language takes over in #47.
-  targetLanguage: "en",
+  targetLanguage: initialTargetLanguage(navigator.language),
 };
 
 type JsonObject = Record<string, unknown>;
