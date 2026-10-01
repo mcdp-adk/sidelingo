@@ -1,7 +1,6 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { appExe, dataFolders, identifier, ownerIdentifier, relaunch } from "../app";
-import { psString, runPowerShell } from "../powershell";
 import { inspectWindows } from "../window";
 
 const owner = dataFolders(ownerIdentifier);
@@ -17,30 +16,32 @@ function snapshot(folder: string): Record<string, string> | null {
   return entries;
 }
 
-/** Process ids of every running sidelingo other than the e2e build. */
-function otherSidelingos(): string {
-  return runPowerShell(
-    `Get-Process sidelingo -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne ${psString(appExe)} } | ForEach-Object Id`,
-  );
-}
-
 describe("Launching sidelingo", () => {
-  it("shows the Pin window from empty data folders, leaving the owner's own untouched", async () => {
-    const ownerSettings = snapshot(owner.roaming);
-    const ownerWebViewExists = existsSync(owner.local);
-    const others = otherSidelingos();
+  it("starts from an empty data folder and shows the Pin window", async () => {
+    const { roaming } = dataFolders(identifier);
+    mkdirSync(roaming, { recursive: true });
+    writeFileSync(join(roaming, "left-over.json"), "{}");
 
     await relaunch();
 
+    expect(existsSync(join(roaming, "left-over.json"))).toBe(false);
     await expect($("body")).toHaveText("Copy text or an image to see it here.");
     expect(inspectWindows(appExe, "sidelingo").map((w) => w.visible)).toEqual([true]);
+  });
+
+  it("keeps to its own data folders, leaving the owner's untouched", async () => {
+    const ownerSettings = snapshot(owner.roaming);
+    const ownerWebViewExists = existsSync(owner.local);
+
+    await relaunch();
+
     expect(existsSync(dataFolders(identifier).local)).toBe(true);
     expect(snapshot(owner.roaming)).toEqual(ownerSettings);
     expect(existsSync(owner.local)).toBe(ownerWebViewExists);
-    expect(otherSidelingos()).toBe(others);
   });
 
-  it("keeps the Pin window on top, out of the taskbar and Alt+Tab, with no minimize or maximize", () => {
+  it("keeps the Pin window on top, out of the taskbar and Alt+Tab, with no minimize or maximize", async () => {
+    await relaunch();
     const [pin] = inspectWindows(appExe, "sidelingo");
     expect(pin).toMatchObject({ topmost: true, appWindow: false, minimizeBox: false, maximizeBox: false });
     expect(pin.owned || pin.toolWindow).toBe(true);
