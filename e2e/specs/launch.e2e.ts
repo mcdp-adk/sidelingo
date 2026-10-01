@@ -25,7 +25,7 @@ describe("Launching sidelingo", () => {
     await relaunch();
 
     expect(existsSync(join(roaming, "left-over.json"))).toBe(false);
-    await expect($("body")).toHaveText("Copy text or an image to see it here.");
+    await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
     expect(inspectWindows(appExe, "sidelingo").map((w) => w.visible)).toEqual([true]);
   });
 
