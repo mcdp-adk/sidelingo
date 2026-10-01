@@ -21,12 +21,22 @@ export type Step =
 
 export type Script = Step[] | ((request: RecordedRequest) => Step[]);
 
+export interface ModelReply {
+  ids?: string[];
+  status?: number;
+  message?: string;
+  wait?: Promise<unknown>;
+}
+
 /** Streams back the last line of the last message, so a copied line comes back as its own translation. */
 const echo: Script = ({ body }) => [{ delta: { content: body.messages.at(-1).content.split("\n").at(-1) } }];
 
 /** A local Provider speaking Chat Completions, scripted per test, recording every request. */
 export class FakeProvider {
+  /** Chat completions, kept separate so processing assertions exclude model-list fetches. */
   readonly requests: RecordedRequest[] = [];
+  readonly modelRequests: RecordedRequest[] = [];
+  private modelReply: ModelReply = {};
   private script: Script = echo;
   private readonly server = createServer(async (request, response) => {
     let text = "";
@@ -37,6 +47,21 @@ export class FakeProvider {
       headers: request.headers,
       body: text ? JSON.parse(text) : undefined,
     };
+    if (request.method === "GET" && request.url?.endsWith("/models")) {
+      this.modelRequests.push(recorded);
+      const reply = this.modelReply;
+      if (reply.wait) await reply.wait;
+      if (response.destroyed) return;
+      response.writeHead(reply.status ?? 200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify(
+          reply.message
+            ? { error: { message: reply.message } }
+            : { data: (reply.ids ?? ["fake-model"]).map((id) => ({ id })) },
+        ),
+      );
+      return;
+    }
     this.requests.push(recorded);
     const steps = typeof this.script === "function" ? this.script(recorded) : this.script;
     await stream(response, steps);
@@ -57,7 +82,13 @@ export class FakeProvider {
   /** Forgets the requests so far and replies with `script` from now on, echoing without one. */
   reset(script: Script = echo): void {
     this.requests.length = 0;
+    this.modelRequests.length = 0;
+    this.modelReply = {};
     this.script = script;
+  }
+
+  models(reply: ModelReply): void {
+    this.modelReply = reply;
   }
 
   async close(): Promise<void> {

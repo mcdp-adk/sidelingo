@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm format:check
+      - run: pnpm test:provider
 
   rust:
     runs-on: windows-latest

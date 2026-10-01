@@ -1,6 +1,6 @@
 import { TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
-import { PRESETS, type Preset } from "./presets";
+import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
 
 /**
  * The settings model, shared by both windows: the document's schema, its defaults, its
@@ -91,7 +91,22 @@ export function parseSettings(document: unknown): Settings | null {
  * says why nothing was sent.
  */
 export function providerConfiguration(settings: Settings): ProviderConfiguration | null {
-  if (settings.activePreset !== "custom") return null;
-  const { baseUrl, model } = settings.presets.custom;
-  return baseUrl && model ? { preset: settings.activePreset, baseUrl, model } : null;
+  const resolved = resolveProviderConnection(settings);
+  return "configuration" in resolved && resolved.configuration.model ? resolved.configuration : null;
+}
+
+export type ConnectionFailure = "no-provider" | "missing-key" | "missing-base-url";
+
+/** Connection readiness shared by Rounds and model lists; a list needs no selected model. */
+export function resolveProviderConnection(
+  settings: Settings,
+): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
+  const preset = settings.activePreset;
+  if (!preset) return { error: "no-provider" };
+  // Credential resolution in #44 unlocks the named Presets. Until then, fail
+  // locally instead of sending unauthenticated requests to real services.
+  if (PRESET_REGISTRY[preset].keyVariable) return { error: "missing-key" };
+  const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
+  if (!baseUrl) return { error: "missing-base-url" };
+  return { configuration: { preset, baseUrl, model: settings.presets[preset].model } };
 }

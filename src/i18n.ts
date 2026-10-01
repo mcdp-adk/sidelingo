@@ -33,6 +33,11 @@ const en = {
   thirdPartyNotices: "Third-party notices",
   linkNotOpened: "The link could not be opened",
   settingsNotSaved: "Settings were not saved",
+  fetchingModels: "Fetching models",
+  modelListError: "Can't fetch the model list: ",
+  noProvider: "No Provider configured",
+  missingKey: "No API key configured",
+  missingBaseUrl: "No Base URL entered",
 };
 
 const zhHans: typeof en = {
@@ -63,6 +68,11 @@ const zhHans: typeof en = {
   thirdPartyNotices: "第三方许可声明",
   linkNotOpened: "无法打开链接",
   settingsNotSaved: "设置未保存",
+  fetchingModels: "正在获取模型列表",
+  modelListError: "无法获取模型列表：",
+  noProvider: "尚未配置服务商",
+  missingKey: "尚未配置 API 密钥",
+  missingBaseUrl: "尚未填写 Base URL",
 };
 
 /** The WebView's language defaults to the Windows display language. */

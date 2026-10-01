@@ -14,6 +14,7 @@ import { strings } from "./i18n";
 import { AboutSection } from "./AboutSection";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
+import { ModelField } from "./ModelField";
 
 const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
@@ -119,10 +120,10 @@ export function SettingsWindow() {
             />
           )}
           {preset && (
-            <TextSetting
+            <ModelField
               key={preset}
-              label={strings.model}
-              value={settings.presets[preset].model}
+              settings={settings}
+              preset={preset}
               commit={(model) => commit({ presets: { [preset]: { model } } })}
             />
           )}
