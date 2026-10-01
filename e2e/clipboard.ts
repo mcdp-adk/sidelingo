@@ -69,10 +69,12 @@ public static class SidelingoClipboardWriter {
     try {
       if (!EmptyClipboard()) throw new Win32Exception(Marshal.GetLastWin32Error());
       Put(CF_UNICODETEXT, Encoding.Unicode.GetBytes(text + "\\0"));
-      uint markerFormat = RegisterClipboardFormatW(marker);
-      if (markerFormat == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
-      byte[] markerData = marker == "CanIncludeInClipboardHistory" ? BitConverter.GetBytes(historyValue) : new byte[] { 1 };
-      Put(markerFormat, markerData);
+      if (!String.IsNullOrEmpty(marker)) {
+        uint markerFormat = RegisterClipboardFormatW(marker);
+        if (markerFormat == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        byte[] markerData = marker == "CanIncludeInClipboardHistory" ? BitConverter.GetBytes(historyValue) : new byte[] { 1 };
+        Put(markerFormat, markerData);
+      }
     } finally {
       CloseClipboard();
     }
@@ -116,15 +118,15 @@ public static class SidelingoClipboardWriter {
 }`;
 
 function withNativeClipboardWriter(script: string): string {
-  return `Add-Type @'\n${nativeClipboardWriter}\n'@\n${script}\n[SidelingoClipboardWriter]::DestroyOwnerWindow()`;
+  return `$ErrorActionPreference = 'Stop'\nAdd-Type @'\n${nativeClipboardWriter}\n'@\ntry {\n${script}\n} finally { [SidelingoClipboardWriter]::DestroyOwnerWindow() }`;
 }
 
 /** Puts text on the real Windows clipboard, as another program's copy would. */
 export function writeClipboardText(text: string): void {
   runPowerShell(
-    `Add-Type -AssemblyName System.Windows.Forms
+    withNativeClipboardWriter(`
 $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
-[Windows.Forms.Clipboard]::SetDataObject($text, $true, ${RETRIES}, ${RETRY_DELAY_MS})`,
+[SidelingoClipboardWriter]::Write($text, $null, 0)`),
     Buffer.from(text, "utf8").toString("base64"),
   );
 }
