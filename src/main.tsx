@@ -5,6 +5,7 @@ import { FluentProvider } from "@fluentui/react-components";
 import "./global.css";
 import { uiLanguage } from "./i18n";
 import { PinWindow } from "./PinWindow";
+import { startSession } from "./session";
 import { useSystemTheme } from "./theme";
 
 /** Windows' default accent, for when the system's can't be read. */
@@ -29,3 +30,5 @@ createRoot(document.getElementById("root")!).render(
     <App accent={accent} />
   </StrictMode>,
 );
+
+await startSession();

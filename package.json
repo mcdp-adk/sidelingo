@@ -16,9 +16,11 @@
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",
     "@fluentui/react-icons": "^2.0.343",
+    "@streamdown/cjk": "^1.0.4",
     "@tauri-apps/api": "^2.12.1",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "streamdown": "^2.7.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

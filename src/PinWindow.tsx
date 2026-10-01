@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -17,8 +17,10 @@ import {
   type PositioningVirtualElement,
 } from "@fluentui/react-components";
 import { DismissRegular } from "@fluentui/react-icons";
+import { Streamdown } from "streamdown";
+import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
-import { placeholder } from "./placeholder";
+import { useShownRound } from "./session";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
@@ -26,6 +28,7 @@ const DRAG_THRESHOLD = 4;
 const SCROLLBAR_LINGER = 1000;
 
 const hide = () => invoke("hide_pin_window");
+const plugins = { cjk };
 
 const useStyles = makeStyles({
   root: { position: "relative", height: "100vh" },
@@ -66,6 +69,8 @@ function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
 
 export function PinWindow() {
   const styles = useStyles();
+  const round = useShownRound();
+  const content = useRef<HTMLDivElement>(null);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const [pointerOver, setPointerOver] = useState(false);
   const [scrollbarShown, setScrollbarShown] = useState(false);
@@ -106,6 +111,11 @@ export function PinWindow() {
     };
   }, []);
 
+  // Each new Round starts at the top; updates within a Round leave the scroll where it is.
+  useLayoutEffect(() => {
+    content.current?.scrollTo({ top: 0 });
+  }, [round?.id]);
+
   const showScrollbar = () => {
     setScrollbarShown(true);
     clearTimeout(scrollbarTimer.current);
@@ -144,6 +154,7 @@ export function PinWindow() {
       onContextMenu={onContextMenu}
     >
       <div
+        ref={content}
         className={mergeClasses(styles.content, scrollbarShown && styles.scrollbarShown)}
         onScroll={showScrollbar}
         onMouseMove={showScrollbar}
@@ -153,14 +164,13 @@ export function PinWindow() {
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
-        <Text as="p" block>
-          {strings.pinEmptyHint}
-        </Text>
-        {placeholder.map((paragraph) => (
-          <Text as="p" block key={paragraph}>
-            {paragraph}
+        {round ? (
+          <Streamdown plugins={plugins}>{round.state.source.text}</Streamdown>
+        ) : (
+          <Text as="p" block>
+            {strings.pinEmptyHint}
           </Text>
-        ))}
+        )}
       </div>
       <Toolbar
         className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
