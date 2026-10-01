@@ -2,14 +2,16 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::AppHandle;
 
-use crate::pin_window;
 use crate::ui_language::UiLanguage;
+use crate::{pin_window, settings_window};
 
 const SHOW: &str = "show";
+const SETTINGS: &str = "settings";
 const QUIT: &str = "quit";
 
 struct Labels {
     show: &'static str,
+    settings: &'static str,
     quit: &'static str,
 }
 
@@ -17,10 +19,12 @@ fn labels(language: UiLanguage) -> Labels {
     match language {
         UiLanguage::ZhHans => Labels {
             show: "显示",
+            settings: "设置",
             quit: "退出",
         },
         UiLanguage::En => Labels {
             show: "Show",
+            settings: "Settings",
             quit: "Quit",
         },
     }
@@ -32,6 +36,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         app,
         &[
             &MenuItem::with_id(app, SHOW, labels.show, true, None::<&str>)?,
+            &MenuItem::with_id(app, SETTINGS, labels.settings, true, None::<&str>)?,
             &MenuItem::with_id(app, QUIT, labels.quit, true, None::<&str>)?,
         ],
     )?;
@@ -47,6 +52,15 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW => pin_window::show(app),
+            SETTINGS => {
+                // WebView2 window creation cannot run in a synchronous event handler.
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = settings_window::show(&app) {
+                        eprintln!("failed to open Settings: {error}");
+                    }
+                });
+            }
             QUIT => app.exit(0),
             _ => {}
         })

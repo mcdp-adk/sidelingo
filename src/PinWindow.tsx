@@ -16,7 +16,7 @@ import {
   tokens,
   type PositioningVirtualElement,
 } from "@fluentui/react-components";
-import { DismissRegular } from "@fluentui/react-icons";
+import { DismissRegular, SettingsRegular } from "@fluentui/react-icons";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
@@ -79,6 +79,10 @@ export function PinWindow() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === ",") {
+        e.preventDefault();
+        void invoke("open_settings");
+      }
       // Esc in the right-click menu closes only the menu.
       if (e.key === "Escape" && !(e.target as Element).closest("[role=menu]")) void hide();
     };
@@ -179,6 +183,9 @@ export function PinWindow() {
           if (e.target === e.currentTarget) onDragMouseDown(e);
         }}
       >
+        <Tooltip content={strings.settingsShortcut} relationship="label">
+          <ToolbarButton appearance="subtle" icon={<SettingsRegular />} onClick={() => void invoke("open_settings")} />
+        </Tooltip>
         <Tooltip content={strings.close} relationship="label">
           <ToolbarButton appearance="subtle" icon={<DismissRegular />} onClick={() => void hide()} />
         </Tooltip>

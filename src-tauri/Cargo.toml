@@ -19,6 +19,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-http = "2"
 tauri-plugin-single-instance = "2"
 windows = { version = "0.62", features = [
+    "Win32_Storage_FileSystem",
     "Win32_Globalization",
     "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",

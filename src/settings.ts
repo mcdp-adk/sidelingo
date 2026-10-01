@@ -1,5 +1,6 @@
 import { TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
+import { PRESETS, type Preset } from "./presets";
 
 /**
  * The settings model, shared by both windows: the document's schema, its defaults, its
@@ -8,21 +9,28 @@ import type { ProviderConfiguration } from "./provider";
 
 export const SCHEMA_VERSION = 1;
 
-export const PRESETS = ["openai", "openrouter", "deepseek", "ollama-cloud", "custom"] as const;
-export type Preset = (typeof PRESETS)[number];
+export type { Preset } from "./presets";
+
+type PresetSettings = { [P in Preset]: { model: string } & (P extends "custom" ? { baseUrl: string } : {}) };
 
 export interface Settings {
   schemaVersion: typeof SCHEMA_VERSION;
   /** None until the user chooses a Provider. */
   activePreset: Preset | null;
-  presets: { custom: { baseUrl: string; model: string } };
+  presets: PresetSettings;
   targetLanguage: TargetLanguage;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: SCHEMA_VERSION,
   activePreset: null,
-  presets: { custom: { baseUrl: "", model: "" } },
+  presets: {
+    openai: { model: "" },
+    openrouter: { model: "" },
+    deepseek: { model: "" },
+    "ollama-cloud": { model: "" },
+    custom: { baseUrl: "", model: "" },
+  },
   // The Windows display language takes over in #47.
   targetLanguage: "en",
 };
@@ -56,16 +64,25 @@ export function parseSettings(document: unknown): Settings | null {
   if (document === null || document === undefined) return DEFAULT_SETTINGS;
   if (!isJsonObject(document) || document.schemaVersion !== SCHEMA_VERSION) return null;
   const presets = field(document, "presets", isJsonObject, {});
-  const custom = presets && field(presets, "custom", isJsonObject, {});
-  const defaults = DEFAULT_SETTINGS.presets.custom;
-  const baseUrl = custom && field(custom, "baseUrl", isString, defaults.baseUrl);
-  const model = custom && field(custom, "model", isString, defaults.model);
+  if (!presets) return null;
+  const values = { ...DEFAULT_SETTINGS.presets };
+  for (const preset of PRESETS) {
+    const stored = field(presets, preset, isJsonObject, {});
+    if (!stored) return null;
+    const model = field(stored, "model", isString, DEFAULT_SETTINGS.presets[preset].model);
+    if (model === undefined) return null;
+    if (preset === "custom") {
+      const baseUrl = field(stored, "baseUrl", isString, DEFAULT_SETTINGS.presets.custom.baseUrl);
+      if (baseUrl === undefined) return null;
+      values.custom = { model, baseUrl };
+    } else values[preset] = { model };
+  }
   const activePreset = field(document, "activePreset", isPreset, DEFAULT_SETTINGS.activePreset);
   const targetLanguage = field(document, "targetLanguage", isTargetLanguage, DEFAULT_SETTINGS.targetLanguage);
-  if (baseUrl === undefined || model === undefined || activePreset === undefined || targetLanguage === undefined) {
+  if (activePreset === undefined || targetLanguage === undefined) {
     return null;
   }
-  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: { custom: { baseUrl, model } }, targetLanguage };
+  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage };
 }
 
 /**
@@ -76,5 +93,5 @@ export function parseSettings(document: unknown): Settings | null {
 export function providerConfiguration(settings: Settings): ProviderConfiguration | null {
   if (settings.activePreset !== "custom") return null;
   const { baseUrl, model } = settings.presets.custom;
-  return baseUrl && model ? { baseUrl, model } : null;
+  return baseUrl && model ? { preset: settings.activePreset, baseUrl, model } : null;
 }
