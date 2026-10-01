@@ -1,5 +1,6 @@
 import { appExe, relaunch, type Launch } from "../app";
 import { readClipboardText, writeClipboardText } from "../clipboard";
+import { customSettings, FakeProvider } from "../provider";
 import { inspectWindows, minimumSizes } from "../window";
 
 const pinVisible = () => inspectWindows(appExe, "sidelingo")[0].visible;
@@ -14,6 +15,8 @@ async function closeButton() {
 const LINE =
   "Drag anywhere in this window to move it. A plain click leaves it where it is, and dragging starts only once the pointer has travelled a few pixels. Hold Ctrl to select a passage or a word.";
 const paragraph = () => $("p").getElement();
+/** Translates each copy into itself. */
+let provider: FakeProvider;
 
 /** WebDriver's code for the Ctrl key. */
 const CTRL = String.fromCharCode(0xe009);
@@ -70,11 +73,19 @@ async function waitUntilHidden() {
  */
 async function launch(options?: Launch, text = LINE) {
   writeClipboardText(text);
-  await relaunch(options);
+  await relaunch({ ...options, settings: customSettings(provider) });
   await expect($("p")).toHaveText(text);
 }
 
 describe("The Pin window", () => {
+  before(async () => {
+    provider = await FakeProvider.start();
+  });
+
+  after(async () => {
+    await provider.close();
+  });
+
   it("hides on Esc", async () => {
     await launch();
     await browser.keys("Escape");

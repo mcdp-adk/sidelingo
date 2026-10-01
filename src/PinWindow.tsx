@@ -165,7 +165,8 @@ export function PinWindow() {
         onDoubleClick={onDoubleClick}
       >
         {round ? (
-          <Streamdown plugins={plugins}>{round.state.source.text}</Streamdown>
+          // Display modes come with #50; until then the window shows the Translated text.
+          <Streamdown plugins={plugins}>{round.state.translation.text}</Streamdown>
         ) : (
           <Text as="p" block>
             {strings.pinEmptyHint}

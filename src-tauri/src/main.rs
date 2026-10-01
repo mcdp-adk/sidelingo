@@ -7,6 +7,7 @@ compile_error!("desktop-dev is only available in debug builds");
 mod accent_color;
 mod clipboard;
 mod pin_window;
+mod settings;
 mod tray;
 mod ui_language;
 
@@ -16,7 +17,9 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             pin_window::show(app)
         }))
+        .plugin(tauri_plugin_http::init())
         .setup(|app| {
+            settings::load(app.handle())?;
             clipboard::start(app.handle())?;
             pin_window::create(app.handle())?;
             tray::create(app.handle())?;
@@ -25,7 +28,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             accent_color::accent_color,
             pin_window::hide_pin_window,
-            pin_window::pin_window_ready
+            pin_window::pin_window_ready,
+            settings::read_settings
         ])
         .on_window_event(pin_window::on_window_event)
         .run(tauri::generate_context!())

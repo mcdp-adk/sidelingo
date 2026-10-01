@@ -2,11 +2,15 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { appExe, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
+import { customSettings, FakeProvider } from "../provider";
 import { inspectWindows } from "../window";
 
 const pinWindows = () => inspectWindows(appExe, "sidelingo");
-/** The Source text's first paragraph. */
+/** The Translated text's first paragraph, which the fake Provider makes the copied line itself. */
 const paragraph = () => $("p");
+let provider: FakeProvider;
+/** Launches with the fake Provider set up. */
+const launch = () => relaunch({ settings: customSettings(provider) });
 
 /** A single line, unique to this call, of about `words` words. */
 function line(words = 8): string {
@@ -23,13 +27,21 @@ async function scrollDown() {
   await browser.action("wheel").scroll({ x: 100, y: 120, deltaY: 2000 }).perform();
 }
 
-/** Where the Source text's top sits in the window: negative once scrolled past. */
+/** Where the text's top sits in the window: negative once scrolled past. */
 const paragraphTop = async () => (await paragraph().getLocation()).y;
 
 describe("Following the clipboard", () => {
+  before(async () => {
+    provider = await FakeProvider.start();
+  });
+
+  after(async () => {
+    await provider.close();
+  });
+
   it("shows a line copied while the window is visible", async () => {
     clearClipboard();
-    await relaunch();
+    await launch();
     await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
 
     const copied = line();
@@ -40,7 +52,7 @@ describe("Following the clipboard", () => {
   it("replaces the line with a different copied one, scrolled back to the top", async () => {
     const first = line(300);
     writeClipboardText(first);
-    await relaunch();
+    await launch();
     await expectShown(first);
     await scrollDown();
     await browser.waitUntil(async () => (await paragraphTop()) < 0, { timeoutMsg: "the content didn't scroll" });
@@ -54,13 +66,13 @@ describe("Following the clipboard", () => {
   it("shows the line copied before a manual launch", async () => {
     const copied = line();
     writeClipboardText(copied);
-    await relaunch();
+    await launch();
     await expectShown(copied);
   });
 
   it("shows the existing, hidden window with the clipboard's current line when launched again", async () => {
     writeClipboardText(line());
-    await relaunch();
+    await launch();
     await paragraph().waitForExist();
     await browser.keys("Escape");
     await browser.waitUntil(() => !pinWindows()[0].visible, { timeoutMsg: "the Pin window is still visible" });
