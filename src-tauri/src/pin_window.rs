@@ -1,8 +1,11 @@
 use tauri::utils::config::WindowEffectsConfig;
 use tauri::window::Effect;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window, WindowEvent};
-use windows::core::w;
-use windows::Win32::UI::WindowsAndMessaging::{CreateWindowExW, WINDOW_EX_STYLE, WS_POPUP};
+#[cfg(not(feature = "desktop-dev"))]
+use windows::{
+    core::w,
+    Win32::UI::WindowsAndMessaging::{CreateWindowExW, WINDOW_EX_STYLE, WS_POPUP},
+};
 
 const LABEL: &str = "pin";
 const MIN_WIDTH: f64 = 230.0;
@@ -13,35 +16,40 @@ const HIDDEN: &str = "pin-window-hidden";
 
 /// Creates the Pin window. It lives as long as the process and only ever hides.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    // Windows leaves an owned window out of the taskbar and Alt+Tab. tao's
-    // `skip_taskbar` only drops the taskbar button, and a WS_EX_TOOLWINDOW style
-    // set by hand is lost whenever tao rewrites the window's styles.
-    let owner = unsafe {
-        CreateWindowExW(
-            WINDOW_EX_STYLE::default(),
-            w!("STATIC"),
-            None,
-            WS_POPUP,
-            0,
-            0,
-            0,
-            0,
-            None,
-            None,
-            None,
-            None,
-        )
-    }
-    .map_err(|e| tauri::Error::Anyhow(e.into()))?;
+    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default());
 
-    WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default())
+    #[cfg(not(feature = "desktop-dev"))]
+    let window = {
+        // Windows leaves an owned window out of the taskbar and Alt+Tab. tao's
+        // `skip_taskbar` only drops the taskbar button, and a WS_EX_TOOLWINDOW style
+        // set by hand is lost whenever tao rewrites the window's styles.
+        let owner = unsafe {
+            CreateWindowExW(
+                WINDOW_EX_STYLE::default(),
+                w!("STATIC"),
+                None,
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        .map_err(|e| tauri::Error::Anyhow(e.into()))?;
+        window.owner_raw(owner)
+    };
+
+    window
         .title("sidelingo")
-        .owner_raw(owner)
         .inner_size(360.0, 240.0)
         // As narrow as the compact toolbar allows.
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .decorations(false)
-        .always_on_top(true)
+        .always_on_top(!cfg!(feature = "desktop-dev"))
         .minimizable(false)
         .maximizable(false)
         // Mica shows through the page's transparent background.

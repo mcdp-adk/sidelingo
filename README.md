@@ -10,6 +10,16 @@ pnpm typecheck
 pnpm tauri dev
 ```
 
+For interactive desktop development, including GUI automation, use:
+
+```bash
+pnpm dev:desktop
+```
+
+This mode uses an unowned window that appears in the taskbar and Alt+Tab and does not stay on top. It shares the regular UI and interactions, with a separate application identifier and independent application data. The `desktop-dev` Cargo feature is limited to debug builds.
+
+Use regular mode (`pnpm tauri dev`) for the final verdict on always-on-top behavior, taskbar and Alt+Tab exclusion, and tray behavior. Desktop development mode does not replace those acceptance checks. The regular development, end-to-end test, and release commands keep their existing behavior.
+
 ### End-to-end tests
 
 The suite drives a debug build through WebDriver. It needs two tools on `PATH`:

@@ -1,6 +1,9 @@
 // Prevents an additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(all(feature = "desktop-dev", not(debug_assertions)))]
+compile_error!("desktop-dev is only available in debug builds");
+
 mod accent_color;
 mod pin_window;
 mod tray;
