@@ -15,7 +15,7 @@ export interface RoundConfiguration {
 
 /** A Round's progress, from its first update to its last. */
 export interface RoundState {
-  stage: "structuring" | "translating";
+  stage: "structuring" | "translating" | "done";
   source: { text: string };
   translation: { text: string };
 }
@@ -141,4 +141,5 @@ export async function* run(
     translated += delta;
     yield { stage: "translating", source, translation: { text: translated } };
   }
+  yield { stage: "done", source, translation: { text: translated } };
 }
