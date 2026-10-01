@@ -19,3 +19,4 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 - Changes reach `main` through a PR unless the owner asks for a direct commit.
 - Every ticked acceptance criterion has evidence, and an issue closes only with every criterion ticked.
 - A PR for an issue starts with `Closes #N` when it finishes the issue, or `Refs #N` when it doesn't.
+- A PR that changes code merges only after `pnpm test:e2e` passes locally, with the run shown in the PR; CI can't run the suite.
