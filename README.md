@@ -24,3 +24,5 @@ pnpm test:e2e
 ```
 
 It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into `src-tauri/target/e2e`, so it never touches your own sidelingo's data or a running copy. It also writes the Windows clipboard.
+
+A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run.
