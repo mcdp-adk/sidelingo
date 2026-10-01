@@ -13,6 +13,8 @@ desktop-dev = []
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["bmp", "png"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon"] }

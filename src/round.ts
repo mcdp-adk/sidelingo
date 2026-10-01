@@ -5,7 +5,7 @@ import * as structuring from "./prompts/structuring";
 import * as translation from "./prompts/translation";
 
 /** What one copy hands sidelingo; the Rust ↔ TypeScript interface's Input. */
-export type Input = { kind: "text"; text: string };
+export type Input = { kind: "text"; text: string } | { kind: "image"; dataUrl: string };
 
 /** What a Round runs with, fixed when it starts. */
 export interface RoundConfiguration {
@@ -15,7 +15,7 @@ export interface RoundConfiguration {
 
 /** A Round's progress, from its first update to its last. */
 export interface RoundState {
-  stage: "structuring" | "translating";
+  stage: "structuring" | "translating" | "no-text";
   source: { text: string };
   translation: { text: string };
 }
@@ -38,13 +38,15 @@ function translationMessages(sourceText: string, targetLanguage: TargetLanguage)
   ];
 }
 
-function structuringMessages(inputText: string): ChatMessage[] {
-  const tokens = { input: inputText };
+function structuringMessages(input: Input): ChatMessage[] {
   return [
-    { role: "system", content: fill(structuring.system, tokens) },
+    { role: "system", content: structuring.system },
     {
       role: "user",
-      content: [{ type: "text", text: fill(structuring.prompt, tokens) }],
+      content:
+        input.kind === "text"
+          ? [{ type: "text", text: fill(structuring.prompt, { input: input.text.trim() }) }]
+          : [{ type: "image_url", image_url: { url: input.dataUrl } }],
     },
   ];
 }
@@ -109,7 +111,7 @@ async function* withoutReasoning(deltas: AsyncGenerator<string>): AsyncGenerator
 }
 
 /**
- * Runs Structuring for text with a line break, then streams one Translation of the whole
+ * Runs Structuring for images and text with a line break, then streams one Translation of the whole
  * Source text. A single line goes straight to Translation. Aborting `signal` cancels every call.
  */
 export async function* run(
@@ -117,20 +119,24 @@ export async function* run(
   configuration: RoundConfiguration,
   signal: AbortSignal,
 ): AsyncGenerator<RoundState> {
-  const text = input.text.trim();
+  const text = input.kind === "text" ? input.text.trim() : "";
   let sourceText = text;
-  const multiline = /[\r\n]/.test(text);
-  if (multiline) {
+  const needsStructuring = input.kind === "image" || /[\r\n]/.test(text);
+  if (needsStructuring) {
     sourceText = "";
     let source = { text: sourceText };
     const translation = { text: "" };
     yield { stage: "structuring", source, translation };
     for await (const delta of withoutReasoning(
-      client.streamChat(configuration.provider, structuringMessages(text), signal),
+      client.streamChat(configuration.provider, structuringMessages(input), signal),
     )) {
       sourceText += delta;
       source = { text: sourceText };
       yield { stage: "structuring", source, translation };
+    }
+    if (input.kind === "image" && sourceText.trim() === "NO_TEXT") {
+      yield { stage: "no-text", source: { text: "" }, translation: { text: "" } };
+      return;
     }
   }
   const source = { text: sourceText };

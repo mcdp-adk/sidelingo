@@ -10,13 +10,19 @@ export interface ProviderConfiguration {
 
 export interface ChatMessage {
   role: "system" | "user";
-  content: string | TextContentPart[];
+  content: string | (TextContentPart | ImageContentPart)[];
 }
 
 /** A text part in a multimodal chat message. */
 export interface TextContentPart {
   type: "text";
   text: string;
+}
+
+/** A vision Input carried by the Chat Completions protocol. */
+export interface ImageContentPart {
+  type: "image_url";
+  image_url: { url: string };
 }
 
 /** The `fetch` the client sends through: `tauri-plugin-http`'s in the app. */

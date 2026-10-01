@@ -9,6 +9,9 @@ import {
   MenuItem,
   MenuList,
   MenuPopover,
+  MessageBar,
+  MessageBarBody,
+  MessageBarTitle,
   Text,
   Toolbar,
   ToolbarButton,
@@ -175,7 +178,13 @@ export function PinWindow() {
         onDoubleClick={onDoubleClick}
       >
         {round ? (
-          round.state.translation.text ? (
+          round.state.stage === "no-text" ? (
+            <MessageBar intent="info">
+              <MessageBarBody>
+                <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
+              </MessageBarBody>
+            </MessageBar>
+          ) : round.state.translation.text ? (
             <Streamdown plugins={plugins}>{round.state.translation.text}</Streamdown>
           ) : (
             <>

@@ -78,6 +78,17 @@ public static class SidelingoClipboardWriter {
     }
   }
 
+  public static void WriteBitmap(byte[] dib, uint format, string text) {
+    OpenWithRetry();
+    try {
+      if (!EmptyClipboard()) throw new Win32Exception(Marshal.GetLastWin32Error());
+      Put(format, dib);
+      if (text != null) Put(CF_UNICODETEXT, Encoding.Unicode.GetBytes(text + "\\0"));
+    } finally {
+      CloseClipboard();
+    }
+  }
+
   public static void WriteTextAndHold(string text, int durationMs) {
     OpenWithRetry();
     try {
@@ -115,6 +126,69 @@ export function writeClipboardText(text: string): void {
 $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd()))
 [Windows.Forms.Clipboard]::SetDataObject($text, $true, ${RETRIES}, ${RETRY_DELAY_MS})`,
     Buffer.from(text, "utf8").toString("base64"),
+  );
+}
+
+/** A synthetic packed DIB: red at its top-left, blue at its bottom-right. */
+export function writeClipboardBitmap(
+  width: number,
+  height: number,
+  { format = "dib", text, noise = false }: { format?: "dib" | "dibv5"; text?: string; noise?: boolean } = {},
+): void {
+  const v5 = format === "dibv5";
+  const headerSize = v5 ? 124 : 40;
+  const channels = v5 ? 4 : 3;
+  const stride = Math.ceil((width * channels) / 4) * 4;
+  const dib = Buffer.alloc(headerSize + stride * height);
+  dib.writeUInt32LE(headerSize, 0);
+  dib.writeInt32LE(width, 4);
+  dib.writeInt32LE(height, 8);
+  dib.writeUInt16LE(1, 12);
+  dib.writeUInt16LE(channels * 8, 14);
+  dib.writeUInt32LE(v5 ? 3 : 0, 16);
+  dib.writeUInt32LE(stride * height, 20);
+  if (v5) {
+    dib.writeUInt32LE(0x00ff0000, 40);
+    dib.writeUInt32LE(0x0000ff00, 44);
+    dib.writeUInt32LE(0x000000ff, 48);
+    dib.writeUInt32LE(0xff000000, 52);
+    dib.writeUInt32LE(0x73524742, 56); // LCS_sRGB
+  }
+  let random = 42;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offset = headerSize + (height - 1 - y) * stride + x * channels;
+      for (let channel = 0; channel < 3; channel++) {
+        random ^= random << 13;
+        random ^= random >>> 17;
+        random ^= random << 5;
+        dib[offset + channel] = noise ? random & 255 : channel === (y < height / 2 ? 2 : 0) ? 255 : 0;
+      }
+      if (v5) dib[offset + 3] = 255;
+    }
+  }
+  // Keep independent color/orientation checks possible even for the noisy payload fixture.
+  dib.set([0, 0, 255], headerSize + (height - 1) * stride);
+  dib.set([255, 0, 0], headerSize + (width - 1) * channels);
+  const script = withNativeClipboardWriter(
+    `$dib = [Convert]::FromBase64String([Console]::In.ReadToEnd())\n[SidelingoClipboardWriter]::WriteBitmap($dib, ${v5 ? 17 : 8}, ${text === undefined ? "$null" : psString(text)})`,
+  );
+  runPowerShell(script, dib.toString("base64"));
+}
+
+/** Decodes the received PNG through Windows' image library, independently of the app's codec. */
+export function inspectPng(base64: string): { width: number; height: number; topLeft: string; bottomRight: string } {
+  return JSON.parse(
+    runPowerShell(
+      `Add-Type -AssemblyName System.Drawing
+$bytes = [Convert]::FromBase64String([Console]::In.ReadToEnd())
+$stream = New-Object IO.MemoryStream(,$bytes)
+$image = [Drawing.Bitmap]::FromStream($stream)
+try {
+  @{ width = $image.Width; height = $image.Height; topLeft = $image.GetPixel(0, 0).Name; bottomRight = $image.GetPixel($image.Width - 1, $image.Height - 1).Name } | ConvertTo-Json -Compress
+} finally { $image.Dispose(); $stream.Dispose() }`,
+      base64,
+    ),
   );
 }
 

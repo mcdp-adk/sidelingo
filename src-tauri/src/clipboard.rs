@@ -4,10 +4,13 @@
 //! and every Input reaches the front end from that thread, so a `show` and the
 //! copies around it arrive in the order they happened.
 
+use std::io::Cursor;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::{mpsc, OnceLock};
 use std::time::{Duration, Instant};
 
+use base64::{engine::general_purpose::STANDARD, Engine};
+use image::{codecs::bmp::BmpDecoder, imageops::FilterType, DynamicImage, ImageFormat};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use windows::core::w;
@@ -18,7 +21,7 @@ use windows::Win32::System::DataExchange::{
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
-use windows::Win32::System::Ole::CF_UNICODETEXT;
+use windows::Win32::System::Ole::{CF_DIB, CF_DIBV5, CF_UNICODETEXT};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, KillTimer, PostMessageW,
     RegisterClassW, SetTimer, HWND_MESSAGE, MSG, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP,
@@ -33,6 +36,8 @@ const COALESCE_TIMER: usize = 1;
 /// How long a clipboard held by another program is waited for.
 const OPEN_RETRY: Duration = Duration::from_millis(500);
 const OPEN_RETRY_INTERVAL: Duration = Duration::from_millis(20);
+/// Bounds image payloads while preserving the copied image's aspect ratio.
+const MAX_IMAGE_EDGE: u32 = 2048;
 const WM_SHOWN: u32 = WM_APP;
 const WM_HIDDEN: u32 = WM_APP + 1;
 
@@ -43,7 +48,13 @@ static WINDOW: AtomicIsize = AtomicIsize::new(0);
 #[derive(Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 enum Input {
-    Text { text: String },
+    Text {
+        text: String,
+    },
+    Image {
+        #[serde(rename = "dataUrl")]
+        data_url: String,
+    },
 }
 
 #[derive(Clone, Serialize)]
@@ -168,17 +179,57 @@ fn emit(origin: Origin, input: Option<Input>) {
     }
 }
 
-/// The clipboard's Input: Unicode text that is non-empty after trimming.
+/// Usable text wins over a bitmap, as in copies from Word and Excel.
 fn read(hwnd: HWND) -> Option<Input> {
     open(hwnd)?;
     if unsafe { is_excluded() } {
         let _ = unsafe { CloseClipboard() };
         return None;
     }
-    let text = unsafe { read_text() };
+    let text = unsafe { read_text() }.filter(|text| !text.trim().is_empty());
+    let dib = if text.is_none() {
+        unsafe { read_bitmap() }
+    } else {
+        None
+    };
     let _ = unsafe { CloseClipboard() };
-    text.filter(|text| !text.trim().is_empty())
-        .map(|text| Input::Text { text })
+    if let Some(text) = text {
+        return Some(Input::Text { text });
+    }
+    // Image work happens after closing the clipboard, so another program can copy meanwhile.
+    let decoder = BmpDecoder::new_without_file_header(Cursor::new(dib?)).ok()?;
+    let mut image = DynamicImage::from_decoder(decoder).ok()?;
+    if image.width().max(image.height()) > MAX_IMAGE_EDGE {
+        image = image.resize(MAX_IMAGE_EDGE, MAX_IMAGE_EDGE, FilterType::Triangle);
+    }
+    let mut png = Cursor::new(Vec::new());
+    image.write_to(&mut png, ImageFormat::Png).ok()?;
+    Some(Input::Image {
+        data_url: format!(
+            "data:image/png;base64,{}",
+            STANDARD.encode(png.into_inner())
+        ),
+    })
+}
+
+/// Copies a packed DIB while the clipboard is open. Windows can synthesize these formats.
+unsafe fn read_bitmap() -> Option<Vec<u8>> {
+    // Prefer Windows' synthesized DIB: the codec's V5 bitfields path assumes
+    // extra mask bytes after the header, which packed clipboard V5 images omit.
+    for format in [CF_DIB, CF_DIBV5] {
+        let Ok(handle) = GetClipboardData(format.0.into()) else {
+            continue;
+        };
+        let global = HGLOBAL(handle.0);
+        let data = GlobalLock(global) as *const u8;
+        if data.is_null() {
+            continue;
+        }
+        let bytes = std::slice::from_raw_parts(data, GlobalSize(global)).to_vec();
+        let _ = GlobalUnlock(global);
+        return Some(bytes);
+    }
+    None
 }
 
 /// Whether the clipboard owner marked this content private or opted out of history.
