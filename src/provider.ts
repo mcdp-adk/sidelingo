@@ -10,7 +10,13 @@ export interface ProviderConfiguration {
 
 export interface ChatMessage {
   role: "system" | "user";
-  content: string;
+  content: string | TextContentPart[];
+}
+
+/** A text part in a multimodal chat message. */
+export interface TextContentPart {
+  type: "text";
+  text: string;
 }
 
 /** The `fetch` the client sends through: `tauri-plugin-http`'s in the app. */

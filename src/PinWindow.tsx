@@ -58,6 +58,12 @@ const useStyles = makeStyles({
     "::-webkit-scrollbar": { width: "6px" },
     "::-webkit-scrollbar-thumb": { borderRadius: tokens.borderRadiusCircular },
   },
+  status: {
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+  },
+  source: { color: tokens.colorNeutralForeground3 },
   scrollbarShown: { "::-webkit-scrollbar-thumb": { backgroundColor: tokens.colorNeutralForeground3 } },
 });
 
@@ -169,8 +175,20 @@ export function PinWindow() {
         onDoubleClick={onDoubleClick}
       >
         {round ? (
-          // Display modes come with #50; until then the window shows the Translated text.
-          <Streamdown plugins={plugins}>{round.state.translation.text}</Streamdown>
+          round.state.translation.text ? (
+            <Streamdown plugins={plugins}>{round.state.translation.text}</Streamdown>
+          ) : (
+            <>
+              <Text as="p" block className={styles.status}>
+                {round.state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
+              </Text>
+              {round.state.source.text && (
+                <div className={styles.source}>
+                  <Streamdown plugins={plugins}>{round.state.source.text}</Streamdown>
+                </div>
+              )}
+            </>
+          )
         ) : (
           <Text as="p" block>
             {strings.pinEmptyHint}

@@ -7,6 +7,8 @@ function uiLanguageOf(tag: string): UiLanguage {
 
 const en = {
   pinEmptyHint: "Copy text or an image to see it here.",
+  structuringStatus: "Structuring…",
+  translationStatus: "Translating…",
   close: "Close (Esc)",
   copySelection: "Copy selection",
   settings: "Settings",
@@ -25,6 +27,8 @@ const en = {
 
 const zhHans: typeof en = {
   pinEmptyHint: "复制文本或图片，结果会显示在这里。",
+  structuringStatus: "正在整理…",
+  translationStatus: "正在翻译…",
   close: "关闭 (Esc)",
   copySelection: "复制所选内容",
   settings: "设置",

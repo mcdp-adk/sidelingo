@@ -17,7 +17,7 @@ export type Step =
   /** An SSE comment line, such as `keep-alive`. */
   | { comment: string }
   /** Holds the stream until the promise settles. */
-  | { wait: Promise<unknown> };
+  | { wait: Promise<unknown>; onReached?: () => void };
 
 export type Script = Step[] | ((request: RecordedRequest) => Step[]);
 
@@ -72,8 +72,10 @@ async function stream(response: ServerResponse, steps: Step[]) {
   for (const step of steps) {
     // The app may have cancelled the request.
     if (response.destroyed) return;
-    if ("wait" in step) await step.wait;
-    else if ("comment" in step) response.write(`: ${step.comment}\n\n`);
+    if ("wait" in step) {
+      step.onReached?.();
+      await step.wait;
+    } else if ("comment" in step) response.write(`: ${step.comment}\n\n`);
     else
       response.write(
         `data: ${JSON.stringify({ object: "chat.completion.chunk", choices: [{ index: 0, delta: step.delta }] })}\n\n`,
@@ -100,8 +102,10 @@ export function customSettings(
 }
 
 /** A promise the test settles when it chooses, to hold a stream at a step. */
-export function gate(): { wait: Promise<void>; open: () => void } {
+export function gate(): { wait: Promise<void>; open: () => void; reached: Promise<void>; signalReached: () => void } {
   let open!: () => void;
+  let signalReached!: () => void;
   const wait = new Promise<void>((resolve) => (open = resolve));
-  return { wait, open };
+  const reached = new Promise<void>((resolve) => (signalReached = resolve));
+  return { wait, open, reached, signalReached };
 }
