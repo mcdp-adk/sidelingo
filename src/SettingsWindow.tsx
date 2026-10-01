@@ -12,6 +12,7 @@ import {
 } from "@fluentui/react-components";
 import { strings } from "./i18n";
 import { AboutSection } from "./AboutSection";
+import { AutostartSetting } from "./AutostartSetting";
 import { PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 import { patchSettings, useSettings } from "./settings-store";
 import { ModelField } from "./ModelField";
@@ -158,6 +159,7 @@ export function SettingsWindow() {
             value={settings.targetLanguage}
             commit={(targetLanguage) => commit({ targetLanguage })}
           />
+          <AutostartSetting />
         </section>
         <section className={styles.section} aria-label={strings.about}>
           <h2>{strings.about}</h2>

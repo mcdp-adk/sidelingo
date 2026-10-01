@@ -5,6 +5,7 @@
 compile_error!("desktop-dev is only available in debug builds");
 
 mod accent_color;
+mod autostart;
 mod clipboard;
 mod pin_window;
 mod settings;
@@ -14,10 +15,23 @@ mod ui_language;
 
 fn main() {
     tauri::Builder::default()
-        // Registered first, so a second launch shows this one's Pin window and quits early.
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            pin_window::show(app)
+        // A second manual launch shows this one's Pin window and quits early.
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            if !arguments
+                .iter()
+                .any(|argument| argument == autostart::LAUNCH_ARGUMENT)
+            {
+                pin_window::show(app)
+            }
         }))
+        // Settle the borderless client area before restoring its inner size.
+        .plugin(pin_window::init())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(pin_window::STATE_FLAGS)
+                .with_filter(|label| label == pin_window::LABEL)
+                .build(),
+        )
         .plugin(tauri_plugin_http::init())
         .plugin(
             tauri_plugin_opener::Builder::new()
@@ -26,6 +40,7 @@ fn main() {
         )
         .on_page_load(|webview, _| clipboard::webview_loaded(webview))
         .setup(|app| {
+            autostart::setup(app.handle())?;
             settings::load(app.handle())?;
             clipboard::start(app.handle())?;
             pin_window::create(app.handle())?;
@@ -33,6 +48,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            autostart::read_autostart,
+            autostart::set_autostart,
             accent_color::accent_color,
             pin_window::hide_pin_window,
             pin_window::pin_window_ready,

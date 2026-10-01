@@ -30,16 +30,19 @@ export function buildApp(): void {
 }
 
 export interface Launch {
+  /** Ordinary arguments delivered to the application executable. */
+  args?: string[];
   /** The WebView's language, standing in for the Windows display language. */
   language?: string;
   /** A settings document to seed before launch; without one the data folders start empty. */
   settings?: unknown;
 }
 
-export function capabilities({ language = "en-US" }: Launch = {}): WebdriverIO.Capabilities {
+export function capabilities({ language = "en-US", args = [] }: Launch = {}): WebdriverIO.Capabilities {
   return {
     "tauri:options": {
       application: appExe,
+      args,
       // msedgedriver passes these to the WebView2 browser process; `args` would go to the app itself.
       webviewOptions: { additionalBrowserArguments: [`--lang=${language}`] },
     },
