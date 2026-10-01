@@ -1,0 +1,8 @@
+# Generated
+pnpm-lock.yaml
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Prose keeps its authors' wrapping and tables.
+*.md
