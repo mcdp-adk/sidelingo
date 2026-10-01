@@ -13,8 +13,8 @@ use tauri::{AppHandle, Emitter};
 use windows::core::w;
 use windows::Win32::Foundation::{HGLOBAL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::DataExchange::{
-    AddClipboardFormatListener, CloseClipboard, GetClipboardData, OpenClipboard,
-    RemoveClipboardFormatListener,
+    AddClipboardFormatListener, CloseClipboard, GetClipboardData, IsClipboardFormatAvailable,
+    OpenClipboard, RegisterClipboardFormatW, RemoveClipboardFormatListener,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
@@ -171,10 +171,45 @@ fn emit(origin: Origin, input: Option<Input>) {
 /// The clipboard's Input: Unicode text that is non-empty after trimming.
 fn read(hwnd: HWND) -> Option<Input> {
     open(hwnd)?;
+    if unsafe { is_excluded() } {
+        let _ = unsafe { CloseClipboard() };
+        return None;
+    }
     let text = unsafe { read_text() };
     let _ = unsafe { CloseClipboard() };
     text.filter(|text| !text.trim().is_empty())
         .map(|text| Input::Text { text })
+}
+
+/// Whether the clipboard owner marked this content private or opted out of history.
+unsafe fn is_excluded() -> bool {
+    format_is_available(w!("ExcludeClipboardContentFromMonitorProcessing"))
+        || format_is_available(w!("Clipboard Viewer Ignore"))
+        || clipboard_dword(w!("CanIncludeInClipboardHistory")) == Some(0)
+}
+
+unsafe fn format_is_available(name: windows::core::PCWSTR) -> bool {
+    let format = RegisterClipboardFormatW(name);
+    format != 0 && IsClipboardFormatAvailable(format).is_ok()
+}
+
+/// Reads a registered clipboard format containing a serialized DWORD.
+unsafe fn clipboard_dword(name: windows::core::PCWSTR) -> Option<u32> {
+    let format = RegisterClipboardFormatW(name);
+    if format == 0 {
+        return None;
+    }
+    let global = HGLOBAL(GetClipboardData(format).ok()?.0);
+    if GlobalSize(global) < std::mem::size_of::<u32>() {
+        return None;
+    }
+    let data = GlobalLock(global) as *const u32;
+    if data.is_null() {
+        return None;
+    }
+    let value = data.read_unaligned();
+    let _ = GlobalUnlock(global);
+    Some(value)
 }
 
 /// Opens the clipboard, waiting briefly while another program, such as
