@@ -1,7 +1,15 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { appExe, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
+import {
+  clearClipboard,
+  writeClipboardFiles,
+  writeClipboardHtml,
+  writeClipboardRtf,
+  writeClipboardText,
+  writeClipboardTextAndHold,
+  writeClipboardTextWithMarker,
+} from "../clipboard";
 import { customSettings, FakeProvider } from "../provider";
 import { inspectWindows } from "../window";
 
@@ -47,6 +55,75 @@ describe("Following the clipboard", () => {
     const copied = line();
     writeClipboardText(copied);
     await expectShown(copied);
+  });
+
+  it("ignores text marked private by the clipboard owner", async () => {
+    provider.reset();
+    const copied = line();
+    writeClipboardText(copied);
+    await launch();
+    await expectShown(copied);
+    await browser.waitUntil(() => provider.requests.length === 1);
+
+    for (const marker of [
+      "ExcludeClipboardContentFromMonitorProcessing",
+      "CanIncludeInClipboardHistory",
+      "Clipboard Viewer Ignore",
+    ]) {
+      writeClipboardTextWithMarker(marker);
+      await browser.pause(350);
+      await expectShown(copied);
+      expect(provider.requests).toHaveLength(1);
+    }
+
+    writeClipboardTextWithMarker("CanIncludeInClipboardHistory", 1);
+    await browser.pause(350);
+    await expectShown("private copy CanIncludeInClipboardHistory");
+    expect(provider.requests).toHaveLength(2);
+  });
+
+  it("keeps the current result for clipboard data with no usable text", async () => {
+    provider.reset();
+    const copied = line();
+    writeClipboardText(copied);
+    await launch();
+    await expectShown(copied);
+    await browser.waitUntil(() => provider.requests.length === 1);
+
+    for (const write of [
+      writeClipboardHtml,
+      writeClipboardRtf,
+      writeClipboardFiles,
+      () => writeClipboardText(" \t\r\n "),
+    ]) {
+      write();
+      await browser.pause(350);
+      await expectShown(copied);
+      expect(provider.requests).toHaveLength(1);
+    }
+  });
+
+  it("silently drops a clipboard held past the retry window and reads one released in time", async () => {
+    provider.reset();
+    const copied = line();
+    writeClipboardText(copied);
+    await launch();
+    await expectShown(copied);
+    await browser.waitUntil(() => provider.requests.length === 1);
+
+    const heldTooLong = writeClipboardTextAndHold(line(), 900);
+    await heldTooLong.ready;
+    await heldTooLong.finished;
+    await browser.pause(150);
+    await expectShown(copied);
+    expect(provider.requests).toHaveLength(1);
+
+    const released = line();
+    const releasedInTime = writeClipboardTextAndHold(released, 350);
+    await releasedInTime.ready;
+    await releasedInTime.finished;
+    await expectShown(released);
+    await browser.waitUntil(() => provider.requests.length === 2);
   });
 
   it("replaces the line with a different copied one, scrolled back to the top", async () => {
