@@ -30,6 +30,7 @@ public static class TopLevel {
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int left, top, right, bottom; }
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, ref Rect rect);
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, ref Rect rect);
+  [DllImport("user32.dll", SetLastError = true)] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
   [StructLayout(LayoutKind.Sequential)] public struct MinMaxInfo { public int rx, ry, maxW, maxH, maxX, maxY, minTrackW, minTrackH, maxTrackW, maxTrackH; }
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, ref MinMaxInfo info);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -73,6 +74,46 @@ $found = @(foreach ($hwnd in $windows) {
 ConvertTo-Json -InputObject $found -Compress
 `);
   return JSON.parse(json);
+}
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Measures the actual top-level window, independently of WebView2's child viewport. */
+export function windowBounds(exe: string, title: string): WindowBounds[] {
+  return JSON.parse(
+    runPowerShell(`${findWindowsScript(exe, title)}
+$previous = [TopLevel]::SetThreadDpiAwarenessContext([TopLevel]::PerMonitorAwareV2)
+if ($previous -eq [IntPtr]::Zero) { throw "Couldn't set the measurement thread's DPI awareness." }
+try {
+  $found = @(foreach ($hwnd in $windows) {
+    $rect = New-Object TopLevel+Rect
+    if (-not [TopLevel]::GetWindowRect($hwnd, [ref]$rect)) { throw "Couldn't read the native window rectangle." }
+    @{ x = $rect.left; y = $rect.top; width = $rect.right - $rect.left; height = $rect.bottom - $rect.top }
+  })
+  ConvertTo-Json -InputObject $found -Compress
+} finally { [void][TopLevel]::SetThreadDpiAwarenessContext($previous) }
+`),
+  );
+}
+
+/** Moves/resizes only this executable's named top-level window through the OS window API. */
+export function setWindowBounds(exe: string, title: string, bounds: WindowBounds): void {
+  runPowerShell(`${findWindowsScript(exe, title)}
+$previous = [TopLevel]::SetThreadDpiAwarenessContext([TopLevel]::PerMonitorAwareV2)
+if ($previous -eq [IntPtr]::Zero) { throw "Couldn't set the geometry thread's DPI awareness." }
+try {
+  if ($windows.Count -ne 1) { throw "Expected exactly one native window." }
+  # Keep its topmost state and avoid activation; only position and size change.
+  if (-not [TopLevel]::SetWindowPos($windows[0], [IntPtr]::Zero, ${bounds.x}, ${bounds.y}, ${bounds.width}, ${bounds.height}, 0x14)) {
+    throw "Couldn't move/resize the native window."
+  }
+} finally { [void][TopLevel]::SetThreadDpiAwarenessContext($previous) }
+`);
 }
 
 /**
