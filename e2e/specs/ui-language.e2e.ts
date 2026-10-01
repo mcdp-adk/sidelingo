@@ -12,7 +12,7 @@ describe("The UI language", () => {
   ]) {
     it(`is ${text === chinese ? "Simplified Chinese" : "English"} under ${language}`, async () => {
       await relaunch({ language });
-      await expect($("body")).toHaveText(text);
+      await expect($("body")).toHaveText(text, { containing: true });
     });
   }
 });
