@@ -6,6 +6,9 @@ authors = ["mcdp-adk"]
 license = "GPL-3.0-only"
 edition = "2021"
 
+[features]
+desktop-dev = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

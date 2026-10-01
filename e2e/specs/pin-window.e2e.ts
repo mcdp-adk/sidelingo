@@ -200,8 +200,12 @@ describe("The Pin window", () => {
     expect(await browser.getWindowSize()).toEqual(size);
   });
 
-  it("can't be resized narrower than 230 px", async () => {
+  it("has a minimum content width of at least 230 logical px", async () => {
     await launch();
-    expect(minimumSizes(appExe, "sidelingo").map((size) => size.width)).toEqual([230]);
+    const widths = minimumSizes(appExe, "sidelingo").map((size) => size.width);
+    expect(widths).toHaveLength(1);
+    // Whole physical pixels can round the logical minimum up by less than 1 px.
+    expect(widths[0]).toBeGreaterThanOrEqual(230);
+    expect(widths[0]).toBeLessThan(231);
   });
 });

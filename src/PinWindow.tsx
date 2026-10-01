@@ -112,8 +112,8 @@ export function PinWindow() {
     scrollbarTimer.current = setTimeout(() => setScrollbarShown(false), SCROLLBAR_LINGER);
   };
 
-  const onMouseDown = (e: MouseEvent<HTMLElement>) => {
-    if (e.button !== 0 || e.ctrlKey || onScrollbar(e)) return;
+  const onDragMouseDown = (e: MouseEvent<HTMLElement>) => {
+    if (e.button !== 0 || e.ctrlKey) return;
     // Without Ctrl a press only moves the window, so it neither selects text nor clears a selection.
     e.preventDefault();
     pressedAt.current = { x: e.screenX, y: e.screenY };
@@ -147,7 +147,9 @@ export function PinWindow() {
         className={mergeClasses(styles.content, scrollbarShown && styles.scrollbarShown)}
         onScroll={showScrollbar}
         onMouseMove={showScrollbar}
-        onMouseDown={onMouseDown}
+        onMouseDown={(e) => {
+          if (!onScrollbar(e)) onDragMouseDown(e);
+        }}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
@@ -160,7 +162,12 @@ export function PinWindow() {
           </Text>
         ))}
       </div>
-      <Toolbar className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}>
+      <Toolbar
+        className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onDragMouseDown(e);
+        }}
+      >
         <Tooltip content={strings.close} relationship="label">
           <ToolbarButton appearance="subtle" icon={<DismissRegular />} onClick={() => void hide()} />
         </Tooltip>
