@@ -19,6 +19,12 @@ fn main() {
             pin_window::show(app)
         }))
         .plugin(tauri_plugin_http::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
+        .on_page_load(|webview, _| clipboard::webview_loaded(webview))
         .setup(|app| {
             settings::load(app.handle())?;
             clipboard::start(app.handle())?;
@@ -32,9 +38,13 @@ fn main() {
             pin_window::pin_window_ready,
             settings::read_settings,
             settings::patch_settings,
-            settings_window::open_settings
+            settings_window::open_settings,
+            clipboard::copy_text
         ])
         .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                clipboard::webview_closed(window.label());
+            }
             pin_window::on_window_event(window, event);
             settings_window::on_window_event(window, event);
         })

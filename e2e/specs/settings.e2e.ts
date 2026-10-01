@@ -3,18 +3,7 @@ import { join } from "node:path";
 import { capabilities, dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider } from "../provider";
-
-async function openSettings(): Promise<{ pin: string; settings: string }> {
-  const pin = await browser.getWindowHandle();
-  await $("[role=toolbar]").moveTo();
-  await expect($("button[aria-label='Settings (Ctrl+,)']")).toBeDisplayed();
-  await browser.keys(["Control", ","]);
-  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
-  const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
-  await browser.switchToWindow(settings);
-  await expect($("h1")).toHaveText("Settings");
-  return { pin, settings };
-}
+import { openSettings, replaceTextField } from "../settings";
 
 describe("Provider settings", () => {
   let provider: FakeProvider;
@@ -51,7 +40,7 @@ describe("Provider settings", () => {
     await expect($("p")).toHaveText(first);
     const { pin, settings } = await openSettings();
     await $("select[aria-label='Preset']").selectByAttribute("value", "custom");
-    await $("input[aria-label='Model']").setValue("next-model");
+    await replaceTextField("Model", "next-model");
     // Moving between WebDriver contexts does not blur the webview's focused field.
     await browser.switchToWindow(pin);
     const draft = `uncommitted-${Date.now()}`;
@@ -85,12 +74,12 @@ describe("Provider settings", () => {
     await preset().selectByAttribute("value", "custom");
     await $("input[aria-label='Base URL']").setValue(provider.baseUrl);
     await browser.keys("Enter");
-    await $("input[aria-label='Model']").setValue("free-form/model@custom");
+    await replaceTextField("Model", "free-form/model@custom");
     await browser.keys("Enter");
     for (const id of ["openai", "openrouter", "deepseek", "ollama-cloud"]) {
       await preset().selectByAttribute("value", id);
       await expect($("input[aria-label='Base URL']")).not.toExist();
-      await $("input[aria-label='Model']").setValue(`${id}-saved`);
+      await replaceTextField("Model", `${id}-saved`);
       await browser.keys("Enter");
     }
     await preset().selectByAttribute("value", "custom");
@@ -120,7 +109,7 @@ describe("Provider settings", () => {
     unlinkSync(settingsFile);
     mkdirSync(settingsFile);
     try {
-      await $("input[aria-label='Model']").setValue("unsaved-model");
+      await replaceTextField("Model", "unsaved-model");
       await browser.keys("Enter");
       const message = () => $("[role=group]");
       await expect(message()).toHaveText(/Settings were not saved[\s\S]+0x80070005/i);

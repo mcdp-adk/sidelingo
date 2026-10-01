@@ -19,7 +19,10 @@
     "active": true,
     "targets": ["nsis"],
     "createUpdaterArtifacts": true,
-    "resources": { "resources/THIRD-PARTY-NOTICES.html": "THIRD-PARTY-NOTICES.html" },
+    "resources": {
+      "../LICENSE": "LICENSE.txt",
+      "resources/THIRD-PARTY-NOTICES.html": "THIRD-PARTY-NOTICES.html"
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser",

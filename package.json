@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "tauri": "tauri",
+    "test:provider": "vitest run src/provider.test.ts",
     "test:e2e": "wdio run e2e/wdio.conf.ts"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "@streamdown/cjk": "^1.0.4",
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-http": "^2.8.0",
+    "@tauri-apps/plugin-opener": "^2.7.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "streamdown": "^2.7.0"
@@ -40,7 +42,8 @@
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   },
   "packageManager": "pnpm@10.34.6"
 }

@@ -19,7 +19,7 @@ import {
   tokens,
   type PositioningVirtualElement,
 } from "@fluentui/react-components";
-import { DismissRegular, SettingsRegular } from "@fluentui/react-icons";
+import { CopyRegular, DocumentCopyRegular, DismissRegular, SettingsRegular } from "@fluentui/react-icons";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
@@ -210,6 +210,22 @@ export function PinWindow() {
           if (e.target === e.currentTarget) onDragMouseDown(e);
         }}
       >
+        <Tooltip content={strings.copySource} relationship="label">
+          <ToolbarButton
+            appearance="subtle"
+            icon={<DocumentCopyRegular />}
+            disabled={!round?.state.source.text || round.state.stage === "structuring"}
+            onClick={() => round && void invoke("copy_text", { text: round.state.source.text })}
+          />
+        </Tooltip>
+        <Tooltip content={strings.copyTranslation} relationship="label">
+          <ToolbarButton
+            appearance="subtle"
+            icon={<CopyRegular />}
+            disabled={!round?.state.translation.text || round.state.stage !== "done"}
+            onClick={() => round && void invoke("copy_text", { text: round.state.translation.text })}
+          />
+        </Tooltip>
         <Tooltip content={strings.settingsShortcut} relationship="label">
           <ToolbarButton appearance="subtle" icon={<SettingsRegular />} onClick={() => void invoke("open_settings")} />
         </Tooltip>
