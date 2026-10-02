@@ -1,6 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import { englishName, type TargetLanguage } from "./languages";
-import { providerClient, type ChatMessage, type ProviderConfiguration } from "./provider";
+import { ProviderError, providerClient, type ChatMessage, type ProviderConfiguration } from "./provider";
 import * as structuring from "./prompts/structuring";
 import * as translation from "./prompts/translation";
 
@@ -13,11 +13,28 @@ export interface RoundConfiguration {
   targetLanguage: TargetLanguage;
 }
 
+export type RoundStage = "structuring" | "translating" | "done" | "no-text";
+export type RoundOutcome = "running" | "done" | "no-text" | "failed";
+
+export interface RoundError {
+  stage: "structuring" | "translating";
+  category: ProviderError["category"];
+  status?: number;
+  detail: string;
+}
+
+export interface RoundPane {
+  text: string;
+  status: "waiting" | "streaming" | "done" | "failed" | "skipped";
+  error?: RoundError;
+}
+
 /** A Round's progress, from its first update to its last. */
 export interface RoundState {
-  stage: "structuring" | "translating" | "done" | "no-text";
-  source: { text: string };
-  translation: { text: string };
+  stage: RoundStage;
+  outcome: RoundOutcome;
+  source: RoundPane;
+  translation: RoundPane;
 }
 
 const client = providerClient(fetch);
@@ -124,28 +141,77 @@ export async function* run(
   const needsStructuring = input.kind === "image" || /[\r\n]/.test(text);
   if (needsStructuring) {
     sourceText = "";
-    let source = { text: sourceText };
-    const translation = { text: "" };
-    yield { stage: "structuring", source, translation };
-    for await (const delta of withoutReasoning(
-      client.streamChat(configuration.provider, structuringMessages(input), signal),
-    )) {
-      sourceText += delta;
-      source = { text: sourceText };
-      yield { stage: "structuring", source, translation };
+    let source: RoundPane = { text: sourceText, status: "streaming" };
+    const translation: RoundPane = { text: "", status: "waiting" };
+    yield { stage: "structuring", outcome: "running", source, translation };
+    try {
+      for await (const delta of withoutReasoning(
+        client.streamChat(configuration.provider, structuringMessages(input), signal),
+      )) {
+        sourceText += delta;
+        source = { text: sourceText, status: "streaming" };
+        yield { stage: "structuring", outcome: "running", source, translation };
+      }
+      if (!sourceText.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
+    } catch (reason) {
+      if (signal.aborted) return;
+      const error = roundError(reason, "structuring");
+      yield {
+        stage: "structuring",
+        outcome: "failed",
+        source: { text: sourceText, status: "failed", error },
+        translation: { text: "", status: "skipped", error },
+      };
+      return;
     }
+    source = { text: sourceText, status: "done" };
     if (input.kind === "image" && sourceText.trim() === "NO_TEXT") {
-      yield { stage: "no-text", source: { text: "" }, translation: { text: "" } };
+      yield {
+        stage: "no-text",
+        outcome: "no-text",
+        source: { text: "", status: "done" },
+        translation: { text: "", status: "skipped" },
+      };
       return;
     }
   }
-  const source = { text: sourceText };
+  const source: RoundPane = { text: sourceText, status: "done" };
   let translated = "";
+  let translation: RoundPane = { text: translated, status: "streaming" };
   const messages = translationMessages(sourceText, configuration.targetLanguage);
-  yield { stage: "translating", source, translation: { text: translated } };
-  for await (const delta of withoutReasoning(client.streamChat(configuration.provider, messages, signal))) {
-    translated += delta;
-    yield { stage: "translating", source, translation: { text: translated } };
+  yield { stage: "translating", outcome: "running", source, translation };
+  try {
+    for await (const delta of withoutReasoning(client.streamChat(configuration.provider, messages, signal))) {
+      translated += delta;
+      translation = { text: translated, status: "streaming" };
+      yield { stage: "translating", outcome: "running", source, translation };
+    }
+    if (!translated.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
+  } catch (reason) {
+    if (signal.aborted) return;
+    const error = roundError(reason, "translating");
+    yield {
+      stage: "translating",
+      outcome: "failed",
+      source,
+      translation: { text: translated, status: "failed", error },
+    };
+    return;
   }
-  yield { stage: "done", source, translation: { text: translated } };
+  yield {
+    stage: "done",
+    outcome: "done",
+    source,
+    translation: { text: translated, status: "done" },
+  };
+}
+
+function roundError(reason: unknown, stage: RoundError["stage"]): RoundError {
+  if (!(reason instanceof ProviderError)) throw reason;
+  return {
+    stage,
+    category: reason.category,
+    ...(reason.status === undefined ? {} : { status: reason.status }),
+    detail: reason.message,
+  };
 }

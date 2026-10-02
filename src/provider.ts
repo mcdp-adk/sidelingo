@@ -37,7 +37,7 @@ export type Transport = (url: string, init: RequestInit & ClientOptions) => Prom
 /** A cause the UI can name, with the Provider's detail preserved in message. */
 export class ProviderError extends Error {
   constructor(
-    readonly category: "network" | "provider-http" | "empty-response",
+    readonly category: "network" | "provider-http" | "provider-error" | "empty-response",
     message: string,
     readonly status?: number,
   ) {
@@ -102,9 +102,13 @@ export function providerClient(transport: Transport): ProviderClient {
         },
         proxy,
       );
-      for await (const data of serverSentData(response.body!)) {
+      for await (const data of serverSentData(response.body!, signal)) {
         if (data === "[DONE]") return;
         const chunk = JSON.parse(data);
+        if (chunk?.error !== undefined) {
+          const message = typeof chunk.error?.message === "string" ? chunk.error.message : data;
+          throw new ProviderError("provider-error", message);
+        }
         // Only the content counts; `reasoning_content` and `reasoning` are the model thinking aloud.
         for (const choice of (chunk.choices ?? []) as ChunkChoice[]) {
           if (choice.delta?.content) yield choice.delta.content;
@@ -130,7 +134,7 @@ async function request(transport: Transport, url: string, init: RequestInit, pro
     response = await transport(url, { ...init, connectTimeout: 10_000, ...(proxy ? { proxy } : {}) });
   } catch (reason) {
     if (init.signal?.aborted) throw reason;
-    throw new ProviderError("network", reason instanceof Error ? reason.message : String(reason));
+    throw networkError(reason);
   }
   if (!response.ok) {
     const body = await response.text();
@@ -146,16 +150,28 @@ async function request(transport: Transport, url: string, init: RequestInit, pro
   return response;
 }
 
+function networkError(reason: unknown): ProviderError {
+  return new ProviderError("network", reason instanceof Error ? reason.message : String(reason));
+}
+
 function baseOf({ preset, baseUrl }: Pick<ProviderConfiguration, "preset" | "baseUrl">): string {
   return (PRESET_REGISTRY[preset].baseUrl ?? baseUrl).replace(/\/+$/, "");
 }
 
 /** The `data` of each server-sent event line, skipping comments such as `: keep-alive`. */
-async function* serverSentData(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+async function* serverSentData(body: ReadableStream<Uint8Array>, signal: AbortSignal): AsyncGenerator<string> {
   const decoder = new TextDecoder();
   let buffered = "";
   const reader = body.getReader();
-  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+  const next = async () => {
+    try {
+      return await reader.read();
+    } catch (reason) {
+      if (signal.aborted) throw reason;
+      throw networkError(reason);
+    }
+  };
+  for (let read = await next(); !read.done; read = await next()) {
     buffered += decoder.decode(read.value, { stream: true });
     const lines = buffered.split(/\r?\n/);
     buffered = lines.pop()!;

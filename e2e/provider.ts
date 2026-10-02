@@ -14,6 +14,8 @@ export interface RecordedRequest {
 export type Step =
   /** A `choices[0].delta` chunk. */
   | { delta: { content?: string; reasoning_content?: string; reasoning?: string } }
+  /** A Provider error object sent inside an HTTP 200 SSE response. */
+  | { error: { message: string } }
   /** An SSE comment line, such as `keep-alive`. */
   | { comment: string }
   /** Drops the actual connection before the reply finishes. */
@@ -127,6 +129,8 @@ async function stream(response: ServerResponse, steps: Step[]) {
     } else if ("drop" in step) {
       response.destroy();
       return;
+    } else if ("error" in step) {
+      response.write(`data: ${JSON.stringify({ error: step.error })}\n\n`);
     } else if ("comment" in step) response.write(`: ${step.comment}\n\n`);
     else
       response.write(

@@ -26,6 +26,7 @@ import { CopyRegular, DocumentCopyRegular, DismissRegular, SettingsRegular } fro
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
+import type { RoundError } from "./round";
 import { useShownRound } from "./session";
 import { DISPLAY_MODES, type DisplayMode } from "./settings";
 import { patchSettings, useSettings } from "./settings-store";
@@ -46,6 +47,19 @@ const modeLabels: Record<DisplayMode, string> = {
 };
 const selectMode = (displayMode: DisplayMode) =>
   void patchSettings({ displayMode }).catch((reason) => console.error("Display mode was not saved:", reason));
+
+function errorTitle(error: RoundError): string {
+  const stage = error.stage === "structuring" ? strings.structuringFailed : strings.translationFailed;
+  const category =
+    error.category === "network"
+      ? strings.networkError
+      : error.category === "provider-http"
+        ? strings.providerHttpError
+        : error.category === "provider-error"
+          ? strings.providerError
+          : strings.emptyResponseError;
+  return `${stage}: ${category}${error.status === undefined ? "" : ` ${error.status}`}`;
+}
 
 const useStyles = makeStyles({
   root: { position: "relative", height: "100vh", overflow: "hidden" },
@@ -94,6 +108,7 @@ const useStyles = makeStyles({
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
   },
+  errorDetail: { whiteSpace: "pre-wrap" },
   source: { color: tokens.colorNeutralForeground3 },
   scrollbarShown: { "::-webkit-scrollbar-thumb": { backgroundColor: tokens.colorNeutralForeground3 } },
 });
@@ -256,6 +271,8 @@ export function PinWindow() {
 
   const pane = (kind: "source" | "translation") => {
     const index = kind === "source" ? 0 : 1;
+    const state = round?.state;
+    const result = state?.[kind];
     return (
       <div
         key={kind}
@@ -283,26 +300,35 @@ export function PinWindow() {
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
-        {round ? (
-          round.state.stage === "no-text" ? (
+        {round && state && result ? (
+          state.outcome === "no-text" ? (
             <MessageBar intent="info">
               <MessageBarBody>
                 <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
               </MessageBarBody>
             </MessageBar>
-          ) : kind === "source" ? (
-            <Streamdown plugins={plugins}>{round.state.source.text}</Streamdown>
-          ) : round.state.translation.text ? (
-            <Streamdown plugins={plugins}>{round.state.translation.text}</Streamdown>
           ) : (
             <>
-              <Text as="p" block className={styles.status}>
-                {round.state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
-              </Text>
-              {mode !== "both" && round.state.source.text && (
+              {result.text && <Streamdown plugins={plugins}>{result.text}</Streamdown>}
+              {!result.text && state.outcome === "running" && (
+                <Text as="p" block className={styles.status}>
+                  {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
+                </Text>
+              )}
+              {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
                 <div className={styles.source}>
-                  <Streamdown plugins={plugins}>{round.state.source.text}</Streamdown>
+                  <Streamdown plugins={plugins}>{state.source.text}</Streamdown>
                 </div>
+              )}
+              {result.error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>
+                    <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
+                    <Text as="p" block className={styles.errorDetail}>
+                      {result.error.detail}
+                    </Text>
+                  </MessageBarBody>
+                </MessageBar>
               )}
             </>
           )
@@ -378,7 +404,7 @@ export function PinWindow() {
             <ToolbarButton
               appearance="subtle"
               icon={<DocumentCopyRegular />}
-              disabled={!round?.state.source.text || round.state.stage === "structuring"}
+              disabled={!round?.state.source.text || round.state.source.status !== "done"}
               onClick={() => round && void invoke("copy_text", { text: round.state.source.text })}
             />
           </Tooltip>
@@ -386,7 +412,7 @@ export function PinWindow() {
             <ToolbarButton
               appearance="subtle"
               icon={<CopyRegular />}
-              disabled={!round?.state.translation.text || round.state.stage !== "done"}
+              disabled={!round?.state.translation.text || round.state.translation.status !== "done"}
               onClick={() => round && void invoke("copy_text", { text: round.state.translation.text })}
             />
           </Tooltip>
