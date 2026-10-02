@@ -33,6 +33,11 @@ public static class TopLevel {
   [DllImport("user32.dll", SetLastError = true)] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
   [StructLayout(LayoutKind.Sequential)] public struct MinMaxInfo { public int rx, ry, maxW, maxH, maxX, maxY, minTrackW, minTrackH, maxTrackW, maxTrackH; }
   [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr wParam, ref MinMaxInfo info);
+  public static MinMaxInfo Minimum(IntPtr hwnd) {
+    var info = new MinMaxInfo();
+    SendMessage(hwnd, 0x24, IntPtr.Zero, ref info);
+    return info;
+  }
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
   public static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
   [DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
@@ -116,6 +121,24 @@ try {
 `);
 }
 
+/** The OS minimum outer tracking size, in physical pixels, for a real user resize. */
+export function minimumTrackingSizes(exe: string, title: string): { width: number; height: number }[] {
+  return JSON.parse(
+    runPowerShell(`${findWindowsScript(exe, title)}
+$previous = [TopLevel]::SetThreadDpiAwarenessContext([TopLevel]::PerMonitorAwareV2)
+if ($previous -eq [IntPtr]::Zero) { throw "Couldn't set the measurement thread's DPI awareness." }
+try {
+  $found = @(foreach ($hwnd in $windows) {
+    $info = [TopLevel]::Minimum($hwnd)
+    if ($info.minTrackW -le 0 -or $info.minTrackH -le 0) { throw "Couldn't read the native minimum tracking size." }
+    @{ width = $info.minTrackW; height = $info.minTrackH }
+  })
+  ConvertTo-Json -InputObject $found -Compress
+} finally { [void][TopLevel]::SetThreadDpiAwarenessContext($previous) }
+`),
+  );
+}
+
 /**
  * The minimum client size, in logical pixels, of the windows titled `title` belonging to `exe`.
  * Windows' WM_GETMINMAXINFO gives the outer tracking size, so subtract the measured nonclient area.
@@ -129,8 +152,7 @@ if ($previousDpiContext -eq [IntPtr]::Zero) {
 }
 try {
   $found = @(foreach ($hwnd in $windows) {
-    $info = New-Object TopLevel+MinMaxInfo
-    [void][TopLevel]::SendMessage($hwnd, 0x24, [IntPtr]::Zero, [ref]$info)
+    $info = [TopLevel]::Minimum($hwnd)
     $outer = New-Object TopLevel+Rect
     $client = New-Object TopLevel+Rect
     if (-not [TopLevel]::GetWindowRect($hwnd, [ref]$outer) -or -not [TopLevel]::GetClientRect($hwnd, [ref]$client)) {

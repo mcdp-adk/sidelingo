@@ -107,7 +107,6 @@ describe("The Pin window", () => {
 
   it("stays visible on a double-click on the toolbar", async () => {
     await launch();
-    // The toolbar's middle is empty; its buttons sit at the ends.
     await toolbar().doubleClick();
     await browser.pause(500);
     expect(pinVisible()).toBe(true);

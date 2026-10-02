@@ -9,6 +9,8 @@ import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type Reasonin
  */
 
 export const SCHEMA_VERSION = 1;
+export const DISPLAY_MODES = ["source", "translation", "both"] as const;
+export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
 export type { Preset } from "./presets";
 
@@ -27,6 +29,7 @@ export interface Settings {
   presets: PresetSettings;
   targetLanguage: TargetLanguage;
   hotkey: string | null;
+  displayMode: DisplayMode;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   targetLanguage: initialTargetLanguage(navigator.language),
   hotkey: "Win+Alt+Q",
+  displayMode: "translation",
 };
 
 type JsonObject = Record<string, unknown>;
@@ -105,10 +109,16 @@ export function parseSettings(document: unknown): Settings | null {
     (value): value is string | null => value === null || isString(value),
     DEFAULT_SETTINGS.hotkey,
   );
-  if (activePreset === undefined || targetLanguage === undefined || hotkey === undefined) {
+  const displayMode = field(
+    document,
+    "displayMode",
+    (value): value is DisplayMode => DISPLAY_MODES.includes(value as DisplayMode),
+    DEFAULT_SETTINGS.displayMode,
+  );
+  if (activePreset === undefined || targetLanguage === undefined || hotkey === undefined || displayMode === undefined) {
     return null;
   }
-  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage, hotkey };
+  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage, hotkey, displayMode };
 }
 
 /**
