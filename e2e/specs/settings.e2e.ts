@@ -72,19 +72,26 @@ describe("Provider settings", () => {
     await expect(preset()).toHaveValue("");
     await expect($("input[aria-label='Model']")).not.toExist();
     await preset().selectByAttribute("value", "custom");
+    await expect($$("input[aria-label='Key']")).toBeElementsArrayOfSize(1);
     await $("input[aria-label='Base URL']").setValue(provider.baseUrl);
     await browser.keys("Enter");
     await replaceTextField("Model", "free-form/model@custom");
     await browser.keys("Enter");
     for (const id of ["openai", "openrouter", "deepseek", "ollama-cloud"]) {
       await preset().selectByAttribute("value", id);
+      await expect(preset()).toHaveValue(id);
+      // Selection saves asynchronously; edit only after the new Preset's
+      // empty Model field replaces the previous populated one.
+      await expect($("input[aria-label='Model']")).toHaveValue("");
       await expect($("input[aria-label='Base URL']")).not.toExist();
+      await expect($$("input[aria-label='Key']")).toBeElementsArrayOfSize(1);
       await replaceTextField("Model", `${id}-saved`);
       await browser.keys("Enter");
     }
     await preset().selectByAttribute("value", "custom");
     await expect($("input[aria-label='Base URL']")).toHaveValue(provider.baseUrl);
     await expect($("input[aria-label='Model']")).toHaveValue("free-form/model@custom");
+    await expect($$("input[aria-label='Key']")).toBeElementsArrayOfSize(1);
     expect(await $("option[value='']").getAttribute("disabled")).not.toBeNull();
 
     // Preserve the application's data; relaunch() intentionally resets it for a new test.
@@ -93,9 +100,11 @@ describe("Provider settings", () => {
     await expect(preset()).toHaveValue("custom");
     await expect($("input[aria-label='Base URL']")).toHaveValue(provider.baseUrl);
     await expect($("input[aria-label='Model']")).toHaveValue("free-form/model@custom");
+    await expect($$("input[aria-label='Key']")).toBeElementsArrayOfSize(1);
     for (const id of ["openai", "openrouter", "deepseek", "ollama-cloud"]) {
       await preset().selectByAttribute("value", id);
       await expect($("input[aria-label='Model']")).toHaveValue(`${id}-saved`);
+      await expect($$("input[aria-label='Key']")).toBeElementsArrayOfSize(1);
     }
   });
 

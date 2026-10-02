@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Field,
   Input,
@@ -18,6 +19,7 @@ import { patchSettings, useSettings } from "./settings-store";
 import { ModelField } from "./ModelField";
 import { KeyField } from "./KeyField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";
+import { HotkeySetting } from "./HotkeySetting";
 
 const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
@@ -70,10 +72,32 @@ export function SettingsWindow() {
   const settings = useSettings();
   const [error, setError] = useState<string | null>(null);
   const page = useRef<HTMLElement>(null);
+  const general = useRef<HTMLElement>(null);
+  const hotkeyRecorder = useRef<HTMLButtonElement>(null);
+  const initialNotificationTarget = useRef<Promise<"hotkey" | null> | null>(null);
   const preset = settings.activePreset;
   useEffect(() => {
-    const unlisten = listen("settings-window-opened", () => page.current?.scrollTo({ top: 0 }));
+    let active = true;
+    const arrive = (target: "hotkey" | null, resetScroll: boolean) => {
+      if (!active) return;
+      if (target === "hotkey") {
+        general.current?.scrollIntoView({ block: "start" });
+        hotkeyRecorder.current?.focus({ preventScroll: true });
+      } else if (resetScroll) {
+        page.current?.scrollTo({ top: 0 });
+      }
+    };
+    const unlisten = listen("settings-window-opened", () => {
+      void invoke<"hotkey" | null>("take_notification_target")
+        .then((target) => arrive(target, true))
+        .catch(console.error);
+    });
+    // Share the one-shot read across StrictMode's effect replay so activation
+    // on first window creation is not consumed by a discarded effect.
+    initialNotificationTarget.current ??= invoke<"hotkey" | null>("take_notification_target");
+    void initialNotificationTarget.current.then((target) => arrive(target, false)).catch(console.error);
     return () => {
+      active = false;
       void unlisten.then((stop) => stop());
     };
   }, []);
@@ -125,13 +149,13 @@ export function SettingsWindow() {
           {preset && (
             <>
               <KeyField
-                key={preset}
+                key={`key-${preset}`}
                 preset={preset}
                 ciphertext={settings.presets[preset].keyCiphertext}
                 commit={(keyCiphertext) => commit({ presets: { [preset]: { keyCiphertext } } })}
               />
               <ModelField
-                key={preset}
+                key={`model-${preset}`}
                 settings={settings}
                 preset={preset}
                 commit={(model) => commit({ presets: { [preset]: { model } } })}
@@ -160,11 +184,19 @@ export function SettingsWindow() {
         <section className={styles.section} aria-label={strings.network}>
           <h2>{strings.network}</h2>
         </section>
-        <section className={styles.section} aria-label={strings.general}>
+        <section ref={general} className={styles.section} aria-label={strings.general}>
           <h2>{strings.general}</h2>
           <TargetLanguageSetting
             value={settings.targetLanguage}
             commit={(targetLanguage) => commit({ targetLanguage })}
+          />
+          <HotkeySetting
+            recorderRef={hotkeyRecorder}
+            value={settings.hotkey}
+            onSaveError={setError}
+            commit={async (hotkey) => {
+              await patchSettings({ hotkey });
+            }}
           />
           <AutostartSetting />
         </section>

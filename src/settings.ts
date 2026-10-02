@@ -26,6 +26,7 @@ export interface Settings {
   activePreset: Preset | null;
   presets: PresetSettings;
   targetLanguage: TargetLanguage;
+  hotkey: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
     custom: { baseUrl: "", model: "", reasoningEffort: null, keyCiphertext: null },
   },
   targetLanguage: initialTargetLanguage(navigator.language),
+  hotkey: "Win+Alt+Q",
 };
 
 type JsonObject = Record<string, unknown>;
@@ -97,10 +99,16 @@ export function parseSettings(document: unknown): Settings | null {
   }
   const activePreset = field(document, "activePreset", isPreset, DEFAULT_SETTINGS.activePreset);
   const targetLanguage = field(document, "targetLanguage", isTargetLanguage, DEFAULT_SETTINGS.targetLanguage);
-  if (activePreset === undefined || targetLanguage === undefined) {
+  const hotkey = field(
+    document,
+    "hotkey",
+    (value): value is string | null => value === null || isString(value),
+    DEFAULT_SETTINGS.hotkey,
+  );
+  if (activePreset === undefined || targetLanguage === undefined || hotkey === undefined) {
     return null;
   }
-  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage };
+  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage, hotkey };
 }
 
 /**

@@ -4,11 +4,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FluentProvider } from "@fluentui/react-components";
 import "./global.css";
-import { uiLanguage } from "./i18n";
+import { strings, uiLanguage } from "./i18n";
 import { PinWindow } from "./PinWindow";
 import { SettingsWindow } from "./SettingsWindow";
 import { startSession } from "./session";
-import { startSettingsStore } from "./settings-store";
+import { currentSettings, startSettingsStore } from "./settings-store";
 import { useSystemTheme } from "./theme";
 
 /** Windows' default accent, for when the system's can't be read. */
@@ -36,4 +36,15 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-if (!isSettingsWindow) await startSession();
+if (!isSettingsWindow) {
+  const hotkey = currentSettings().hotkey;
+  await invoke("register_hotkey", { hotkey }).catch((reason) => {
+    console.error(reason);
+    void invoke("show_native_notification", {
+      title: strings.hotkeyRegistrationFailed,
+      body: `${hotkey}\n${String(reason)}`,
+      target: "hotkey",
+    }).catch((error) => console.error("Could not show hotkey registration notification:", error));
+  });
+  await startSession();
+}

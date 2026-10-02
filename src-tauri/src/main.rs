@@ -8,6 +8,7 @@ mod accent_color;
 mod autostart;
 mod clipboard;
 mod data_folder;
+mod hotkey;
 mod notifications;
 mod pin_window;
 mod secrets;
@@ -46,6 +47,7 @@ fn main() {
             autostart::setup(app.handle())?;
             settings::load(app.handle())?;
             notifications::NotificationState::start(app.handle());
+            hotkey::start(app.handle())?;
             clipboard::start(app.handle())?;
             pin_window::create(app.handle())?;
             tray::create(app.handle())?;
@@ -67,7 +69,9 @@ fn main() {
             settings_window::open_settings,
             clipboard::copy_text,
             secrets::protect_secret,
-            secrets::unprotect_secret
+            secrets::unprotect_secret,
+            hotkey::register_hotkey,
+            hotkey::read_hotkey_error
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
