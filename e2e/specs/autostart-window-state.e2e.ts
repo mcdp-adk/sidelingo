@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { appExe, capabilities, identifier, relaunch } from "../app";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { appExe, capabilities, dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { psString, runPowerShell } from "../powershell";
 import { customSettings, FakeProvider } from "../provider";
 import { openSettings } from "../settings";
-import { inspectWindows, setWindowBounds, windowBounds } from "../window";
+import { inspectWindows, monitorBounds, setWindowBounds, windowBounds } from "../window";
 
 const runKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const approvalKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
@@ -105,7 +107,7 @@ try { if ($key) { $key.DeleteValue(${psString(identifier)}, $false) } } finally 
     expect(inspectWindows(appExe, "sidelingo").map((window) => window.visible)).toEqual([true]);
   });
 
-  it("reopens the Pin window at its last position and size across hides and a restart", async () => {
+  it("reopens the Pin window at its last position and size across hides, a restart, and off-screen recovery", async () => {
     clearClipboard();
     await relaunch();
     await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
@@ -124,5 +126,44 @@ try { if ($key) { $key.DeleteValue(${psString(identifier)}, $false) } } finally 
     await browser.reloadSession(capabilities());
     await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
     expect(windowBounds(appExe, "sidelingo")).toEqual([expected]);
+
+    // Seed only the e2e identifier's AppConfig; the normal application state is untouched.
+    await browser.deleteSession();
+    const monitors = monitorBounds();
+    const primary = monitors.find((monitor) => monitor.primary);
+    expect(primary).toBeDefined();
+    const x = Math.max(...monitors.map((monitor) => monitor.x + monitor.width)) + 1000;
+    const y = Math.max(...monitors.map((monitor) => monitor.y + monitor.height)) + 1000;
+    const offscreen = { x, y, width: 720, height: 480 };
+    expect(
+      monitors.every(
+        (monitor) =>
+          offscreen.x + offscreen.width <= monitor.x ||
+          offscreen.x >= monitor.x + monitor.width ||
+          offscreen.y + offscreen.height <= monitor.y ||
+          offscreen.y >= monitor.y + monitor.height,
+      ),
+    ).toBe(true);
+    const statePath = join(dataFolders(identifier).roaming, ".window-state.json");
+    const savedState = JSON.parse(readFileSync(statePath, "utf8")) as {
+      pin: { x: number; y: number; prev_x: number; prev_y: number };
+      [label: string]: unknown;
+    };
+    savedState.pin.x = offscreen.x;
+    savedState.pin.y = offscreen.y;
+    savedState.pin.prev_x = offscreen.x;
+    savedState.pin.prev_y = offscreen.y;
+    writeFileSync(statePath, JSON.stringify(savedState));
+    await browser.reloadSession(capabilities());
+    await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
+    const restoredWindows = windowBounds(appExe, "sidelingo");
+    expect(restoredWindows).toHaveLength(1);
+    const [restored] = restoredWindows;
+    expect(restored.width).toBe(expected.width);
+    expect(restored.height).toBe(expected.height);
+    expect(restored.x + restored.width).toBeGreaterThan(primary!.x);
+    expect(restored.x).toBeLessThan(primary!.x + primary!.width);
+    expect(restored.y + restored.height).toBeGreaterThan(primary!.y);
+    expect(restored.y).toBeLessThan(primary!.y + primary!.height);
   });
 });

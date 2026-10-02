@@ -88,6 +88,59 @@ export interface WindowBounds {
   height: number;
 }
 
+export interface MonitorBounds extends WindowBounds {
+  primary: boolean;
+}
+
+/** Reads the current physical monitor rectangles and identifies Windows' primary monitor. */
+export function monitorBounds(): MonitorBounds[] {
+  const json = runPowerShell(`
+Add-Type @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class DisplayMonitors {
+  [StructLayout(LayoutKind.Sequential)] public struct Rect { public int left, top, right, bottom; }
+  [StructLayout(LayoutKind.Sequential)] public struct Info { public uint size; public Rect monitor; public Rect work; public uint flags; }
+  public delegate bool EnumProc(IntPtr monitor, IntPtr hdc, ref Rect rect, IntPtr data);
+  public static readonly IntPtr PerMonitorAwareV2 = new IntPtr(-4);
+  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+  [DllImport("user32.dll", SetLastError = true)] static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, EnumProc callback, IntPtr data);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "GetMonitorInfoW", SetLastError = true)] static extern bool GetMonitorInfo(IntPtr monitor, ref Info info);
+  public static List<Info> All() {
+    var previous = SetThreadDpiAwarenessContext(PerMonitorAwareV2);
+    if (previous == IntPtr.Zero) throw new InvalidOperationException("Couldn't set monitor measurement DPI awareness.");
+    try {
+      var monitors = new List<Info>();
+      EnumProc callback = (IntPtr monitor, IntPtr hdc, ref Rect rect, IntPtr data) => {
+        var info = new Info();
+        info.size = (uint)Marshal.SizeOf(typeof(Info));
+        if (!GetMonitorInfo(monitor, ref info)) throw new InvalidOperationException("Couldn't read monitor bounds.");
+        monitors.Add(info);
+        return true;
+      };
+      if (!EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, callback, IntPtr.Zero)) throw new InvalidOperationException("Couldn't enumerate monitors.");
+      return monitors;
+    } finally {
+      SetThreadDpiAwarenessContext(previous);
+    }
+  }
+}
+'@
+$found = @([DisplayMonitors]::All() | ForEach-Object {
+  [pscustomobject]@{
+    x = $_.monitor.left
+    y = $_.monitor.top
+    width = $_.monitor.right - $_.monitor.left
+    height = $_.monitor.bottom - $_.monitor.top
+    primary = ($_.flags -band 1) -ne 0
+  }
+})
+ConvertTo-Json -InputObject $found -Compress
+`);
+  return JSON.parse(json);
+}
+
 /** Measures the actual top-level window, independently of WebView2's child viewport. */
 export function windowBounds(exe: string, title: string): WindowBounds[] {
   return JSON.parse(
