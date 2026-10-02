@@ -20,9 +20,16 @@ export interface SessionState {
   hasInput: boolean;
   paused: boolean;
   overlong: boolean;
+  configurationFailure: "no-provider" | "missing-model" | "missing-base-url" | null;
 }
 
-let snapshot: SessionState = { round: null, hasInput: false, paused: false, overlong: false };
+let snapshot: SessionState = {
+  round: null,
+  hasInput: false,
+  paused: false,
+  overlong: false,
+  configurationFailure: null,
+};
 let currentInput: Input | null = null;
 /** Only the last fully successful Round is reusable; nothing is written to disk. */
 let lastSuccessful: { input: Input; round: ShownRound } | null = null;
@@ -33,7 +40,10 @@ let lastRoundId = 0;
 let inFlight: AbortController | null = null;
 const subscribers = new Set<() => void>();
 
-function publish(round: ShownRound | null, controls: Partial<Pick<SessionState, "paused" | "overlong">> = {}) {
+function publish(
+  round: ShownRound | null,
+  controls: Partial<Pick<SessionState, "paused" | "overlong" | "configurationFailure">> = {},
+) {
   snapshot = { ...snapshot, ...controls, round, hasInput: currentInput !== null };
   for (const notify of subscribers) notify();
 }
@@ -57,8 +67,18 @@ async function startRound(input: Input) {
       generation = configurationGeneration;
     }
     const settings = currentSettings();
-    const provider = providerConfiguration(settings, currentKeySources(settings.activePreset), currentProxyPassword());
-    if (!provider) return;
+    const resolved = providerConfiguration(settings, currentKeySources(settings.activePreset), currentProxyPassword());
+    if ("error" in resolved) {
+      if (
+        resolved.error === "no-provider" ||
+        resolved.error === "missing-model" ||
+        resolved.error === "missing-base-url"
+      ) {
+        publish(snapshot.round, { configurationFailure: resolved.error });
+      }
+      return;
+    }
+    const provider = resolved.configuration;
     const id = ++lastRoundId;
     let completed: ShownRound | null = null;
     for await (const state of run(input, { provider, targetLanguage: settings.targetLanguage }, controller.signal)) {
@@ -101,11 +121,11 @@ export async function startSession(): Promise<void> {
     inFlight = null;
     currentInput = payload.input;
     if (payload.origin === "show" && lastSuccessful && sameInput(lastSuccessful.input, payload.input)) {
-      publish(lastSuccessful.round, { overlong: false });
+      publish(lastSuccessful.round, { overlong: false, configurationFailure: null });
     } else if (payload.input.kind === "text" && payload.input.text.length > 10_000) {
-      publish(null, { overlong: true });
+      publish(null, { overlong: true, configurationFailure: null });
     } else {
-      publish(snapshot.round, { overlong: false });
+      publish(snapshot.round, { overlong: false, configurationFailure: null });
       void startRound(payload.input);
     }
   });
@@ -123,7 +143,7 @@ export function regenerate(): void {
   lastSuccessful = null;
   inFlight?.abort();
   inFlight = null;
-  publish(snapshot.round, { overlong: false });
+  publish(snapshot.round, { overlong: false, configurationFailure: null });
   void startRound(currentInput);
 }
 

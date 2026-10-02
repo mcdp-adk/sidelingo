@@ -168,16 +168,17 @@ export function parseSettings(document: unknown): Settings | null {
 }
 
 /**
- * How to reach the active Preset's Provider, or null when a Round can't send anything.
+ * How to reach the active Preset's Provider, or why a Round can't send anything.
  * The connection producer selects credentials before either Provider operation sends.
  */
 export function providerConfiguration(
   settings: Settings,
   keySources?: KeySourcesSnapshot,
   proxyPassword: string | null = null,
-): ProviderConfiguration | null {
-  const resolved = resolveProviderConnection(settings, keySources, proxyPassword);
-  return "configuration" in resolved && resolved.configuration.model ? resolved.configuration : null;
+): { configuration: ProviderConfiguration } | { error: ConnectionFailure | "missing-model" } {
+  const preset = settings.activePreset;
+  if (preset && !settings.presets[preset].model) return { error: "missing-model" };
+  return resolveProviderConnection(settings, keySources, proxyPassword);
 }
 
 export type ConnectionFailure = "no-provider" | "missing-key" | "missing-base-url";

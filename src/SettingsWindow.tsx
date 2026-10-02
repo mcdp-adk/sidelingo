@@ -51,6 +51,7 @@ export function SettingsWindow() {
         general.current?.scrollIntoView({ block: "start" });
         hotkeyRecorder.current?.focus({ preventScroll: true });
       } else if (resetScroll) {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         page.current?.scrollTo({ top: 0 });
       }
     };

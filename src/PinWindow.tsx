@@ -146,7 +146,7 @@ function interactiveTarget(target: EventTarget): boolean {
 
 export function PinWindow() {
   const styles = useStyles();
-  const { round, hasInput, paused, overlong } = useSession();
+  const { round, hasInput, paused, overlong, configurationFailure } = useSession();
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
@@ -334,6 +334,24 @@ export function PinWindow() {
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
+        {configurationFailure && (
+          <MessageBar intent="info" layout="multiline">
+            <MessageBarBody>
+              <MessageBarTitle>
+                {configurationFailure === "no-provider"
+                  ? strings.chooseProvider
+                  : configurationFailure === "missing-model"
+                    ? strings.missingModel
+                    : strings.missingBaseUrl}
+              </MessageBarTitle>
+            </MessageBarBody>
+            <MessageBarActions>
+              <Button size="small" onClick={() => void invoke("open_settings")}>
+                {strings.openSettings}
+              </Button>
+            </MessageBarActions>
+          </MessageBar>
+        )}
         {overlong ? (
           <MessageBar intent="info">
             <MessageBarBody>
@@ -377,11 +395,11 @@ export function PinWindow() {
               )}
             </>
           )
-        ) : (
+        ) : !configurationFailure ? (
           <Text as="p" block>
             {strings.pinEmptyHint}
           </Text>
-        )}
+        ) : null}
       </div>
     );
   };

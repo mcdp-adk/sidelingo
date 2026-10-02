@@ -29,10 +29,12 @@ const en = {
   copySource: "Copy source",
   copyTranslation: "Copy translation",
   settings: "Settings",
+  openSettings: "Open settings",
   settingsShortcut: "Settings (Ctrl+,)",
   provider: "Provider",
   preset: "Preset",
   chooseProvider: "Choose a Provider",
+  missingModel: "Enter a model",
   custom: "Custom",
   baseUrl: "Base URL",
   model: "Model",
@@ -84,7 +86,7 @@ const en = {
   modelListError: "Can't fetch the model list: ",
   noProvider: "No Provider configured",
   missingKey: "No API key configured",
-  missingBaseUrl: "No Base URL entered",
+  missingBaseUrl: "Enter a Base URL",
 };
 
 const zhHans: typeof en = {
@@ -111,10 +113,12 @@ const zhHans: typeof en = {
   copySource: "复制原文",
   copyTranslation: "复制译文",
   settings: "设置",
+  openSettings: "打开设置",
   settingsShortcut: "设置 (Ctrl+,)",
   provider: "服务商",
   preset: "预设",
   chooseProvider: "选择服务商",
+  missingModel: "请输入模型",
   custom: "自定义",
   baseUrl: "Base URL",
   model: "模型",
@@ -166,7 +170,7 @@ const zhHans: typeof en = {
   modelListError: "无法获取模型列表：",
   noProvider: "尚未配置服务商",
   missingKey: "尚未配置 API 密钥",
-  missingBaseUrl: "尚未填写 Base URL",
+  missingBaseUrl: "请输入 Base URL",
 };
 
 /** The WebView's language defaults to the Windows display language. */
