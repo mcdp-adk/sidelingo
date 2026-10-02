@@ -7,6 +7,8 @@ compile_error!("desktop-dev is only available in debug builds");
 mod accent_color;
 mod autostart;
 mod clipboard;
+mod data_folder;
+mod notifications;
 mod pin_window;
 mod secrets;
 mod settings;
@@ -43,6 +45,7 @@ fn main() {
         .setup(|app| {
             autostart::setup(app.handle())?;
             settings::load(app.handle())?;
+            notifications::NotificationState::start(app.handle());
             clipboard::start(app.handle())?;
             pin_window::create(app.handle())?;
             tray::create(app.handle())?;
@@ -55,7 +58,12 @@ fn main() {
             pin_window::hide_pin_window,
             pin_window::pin_window_ready,
             settings::read_settings,
+            settings::set_aside_broken_settings,
             settings::patch_settings,
+            notifications::show_native_notification,
+            notifications::take_notification_target,
+            data_folder::data_folder_path,
+            data_folder::open_data_folder,
             settings_window::open_settings,
             clipboard::copy_text,
             secrets::protect_secret,

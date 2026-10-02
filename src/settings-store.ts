@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
 import { PRESETS, type Preset } from "./presets";
 import { readEnteredKeys, type EnteredKeys, type KeySourcesSnapshot } from "./credentials";
+import { strings } from "./i18n";
 
 let settings: Settings = DEFAULT_SETTINGS;
 let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;
@@ -25,6 +26,8 @@ function accept(document: unknown): Promise<void> {
   return pending;
 }
 
+type SettingsRead = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
+
 /** Both windows subscribe before reading, so a concurrent patch cannot be missed. */
 export async function startSettingsStore(): Promise<void> {
   let changed = false;
@@ -32,9 +35,39 @@ export async function startSettingsStore(): Promise<void> {
     changed = true;
     void accept(payload);
   });
-  const document = await invoke("read_settings");
-  if (!changed) void accept(document);
-  // Initialization waits for the newest document, including one arriving during decryption.
+  const stored = await invoke<SettingsRead>("read_settings");
+  if (!changed) {
+    let document: unknown;
+    let brokenReason: "invalidJson" | "schema" | undefined;
+    if (stored.status === "invalidJson") {
+      brokenReason = "invalidJson";
+    } else if (stored.status === "document") {
+      document = stored.document;
+      if (document === null || parseSettings(document) === null) {
+        brokenReason = "schema";
+        document = undefined;
+      }
+    }
+    let quarantined = false;
+    if (brokenReason) {
+      quarantined = await invoke<boolean>("set_aside_broken_settings", {
+        reason: brokenReason,
+        expectedDocument: stored.status === "document" ? stored.document : null,
+      }).catch((error) => {
+        console.error("Could not set aside broken settings:", error);
+        return false;
+      });
+    }
+    if (!changed) accept(document);
+    if (quarantined && !changed) {
+      void invoke("show_native_notification", {
+        title: strings.settingsRecoveredTitle,
+        body: strings.settingsRecoveredBody,
+        target: null,
+      }).catch((error) => console.error("Could not show settings recovery notification:", error));
+    }
+  }
+  // Initialization waits for the newest document, including one arriving during quarantine or decryption.
   let latest: Promise<void>;
   do {
     latest = pending;

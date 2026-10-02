@@ -36,6 +36,8 @@ export interface Launch {
   language?: string;
   /** A settings document to seed before launch; without one the data folders start empty. */
   settings?: unknown;
+  /** Raw settings file contents for startup recovery scenarios. */
+  settingsText?: string;
 }
 
 export function capabilities({ language = "en-US", args = [] }: Launch = {}): WebdriverIO.Capabilities {
@@ -50,11 +52,14 @@ export function capabilities({ language = "en-US", args = [] }: Launch = {}): We
 }
 
 /** Empties the e2e build's data folders, then seeds them. */
-export function resetDataFolders({ settings }: Launch = {}): void {
+export function resetDataFolders({ settings, settingsText }: Launch = {}): void {
   const { roaming, local } = dataFolders(identifier);
   // The WebView2 browser process can hold its folder for a moment after the app quits.
   for (const folder of [roaming, local]) rmSync(folder, { recursive: true, force: true, maxRetries: 20 });
-  if (settings !== undefined) {
+  if (settingsText !== undefined) {
+    mkdirSync(roaming, { recursive: true });
+    writeFileSync(join(roaming, "settings.json"), settingsText);
+  } else if (settings !== undefined) {
     mkdirSync(roaming, { recursive: true });
     writeFileSync(join(roaming, "settings.json"), JSON.stringify(settings));
   }

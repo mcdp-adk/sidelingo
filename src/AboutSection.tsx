@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { resolveResource } from "@tauri-apps/api/path";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { Link, MessageBar, MessageBarBody, MessageBarTitle, makeStyles, tokens } from "@fluentui/react-components";
+import {
+  Button,
+  Link,
+  MessageBar,
+  MessageBarBody,
+  MessageBarTitle,
+  makeStyles,
+  tokens,
+} from "@fluentui/react-components";
 import { strings } from "./i18n";
 
 const sourceUrl = "https://github.com/mcdp-adk/sidelingo";
 const useStyles = makeStyles({
   links: { display: "flex", flexWrap: "wrap", gap: tokens.spacingHorizontalL },
+  dataFolderPath: { overflowWrap: "anywhere" },
 });
 
 function fileUrl(path: string): string {
@@ -19,11 +29,15 @@ function fileUrl(path: string): string {
 export function AboutSection() {
   const styles = useStyles();
   const [version, setVersion] = useState<string | null>(null);
+  const [dataFolder, setDataFolder] = useState<string | null>(null);
   const [resources, setResources] = useState<{ license: string; notices: string } | null>(null);
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   useEffect(() => {
     void getVersion()
       .then(setVersion)
+      .catch((reason) => setError({ title: strings.aboutUnavailable, detail: String(reason) }));
+    void invoke<string>("data_folder_path")
+      .then(setDataFolder)
       .catch((reason) => setError({ title: strings.aboutUnavailable, detail: String(reason) }));
     void Promise.all([resolveResource("LICENSE.txt"), resolveResource("THIRD-PARTY-NOTICES.html")])
       .then(([license, notices]) => setResources({ license, notices }))
@@ -46,6 +60,14 @@ export function AboutSection() {
       )}
       <p>{strings.copyright}</p>
       <p>{strings.licenseNotice}</p>
+      {dataFolder && (
+        <>
+          <p>
+            {strings.dataFolder}: <code className={styles.dataFolderPath}>{dataFolder}</code>
+          </p>
+          <Button onClick={() => void open(() => invoke("open_data_folder"))}>{strings.openFolder}</Button>
+        </>
+      )}
       <div className={styles.links}>
         {resources && (
           <Link
