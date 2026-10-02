@@ -1,6 +1,7 @@
 import { readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
+import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
 
 const root = resolve(import.meta.dirname, "..");
 const e2eConfig = join(root, "src-tauri", "tauri.e2e.conf.json");
@@ -30,6 +31,8 @@ export function buildApp(): void {
 }
 
 export interface Launch {
+  /** Synthetic values inherited by this app only; null removes a variable for this launch. */
+  environment?: LaunchEnvironment;
   /** Ordinary arguments delivered to the application executable. */
   args?: string[];
   /** The WebView's language, standing in for the Windows display language. */
@@ -68,6 +71,7 @@ export function resetDataFolders({ settings, settingsText }: Launch = {}): void 
 /** Quits the app and launches it again from fresh data folders. */
 export async function relaunch(launch: Launch = {}): Promise<void> {
   await browser.deleteSession();
+  await useLaunchEnvironment(launch.environment);
   resetDataFolders(launch);
   // reloadSession's own attempt to end the already ended session is logged and ignored.
   await browser.reloadSession(capabilities(launch));

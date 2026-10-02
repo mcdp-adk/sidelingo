@@ -5,7 +5,7 @@ import { Combobox, Field, Option, Spinner } from "@fluentui/react-components";
 import { strings } from "./i18n";
 import { providerClient } from "./provider";
 import { resolveProviderConnection, type ConnectionFailure, type Preset, type Settings } from "./settings";
-import { currentKeySources } from "./settings-store";
+import { currentKeySources, currentProxyPassword } from "./settings-store";
 
 const client = providerClient(fetch);
 const connectionMessages: Record<ConnectionFailure, string> = {
@@ -30,7 +30,8 @@ export function ModelField({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectionEvent = useRef<unknown>(null);
-  const resolved = resolveProviderConnection(settings, currentKeySources(preset));
+  const proxyPassword = currentProxyPassword();
+  const resolved = resolveProviderConnection(settings, currentKeySources(preset), proxyPassword);
   const key = "configuration" in resolved ? resolved.configuration.key : null;
   const baseUrl = "configuration" in resolved ? resolved.configuration.baseUrl : null;
   const connectionError = "error" in resolved ? resolved.error : null;
@@ -73,7 +74,17 @@ export function ModelField({
       void unlisten.then((stop) => stop());
     };
     // A changed model does not change the connection or refresh its list.
-  }, [preset, baseUrl, connectionError, key]);
+  }, [
+    preset,
+    baseUrl,
+    connectionError,
+    key,
+    settings.proxy.mode,
+    settings.proxy.url,
+    settings.proxy.username,
+    settings.proxy.passwordCiphertext,
+    proxyPassword,
+  ]);
 
   const save = () => {
     if (draft !== value) void commit(draft);

@@ -3,11 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
 import { PRESETS, type Preset } from "./presets";
-import { readEnteredKeys, type EnteredKeys, type KeySourcesSnapshot } from "./credentials";
+import { readEnteredKeys, unprotectSecret, type EnteredKeys, type KeySourcesSnapshot } from "./credentials";
 import { strings } from "./i18n";
 
 let settings: Settings = DEFAULT_SETTINGS;
 let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;
+let proxyPassword: string | null = null;
 let revision = 0;
 let pending = Promise.resolve();
 const subscribers = new Set<() => void>();
@@ -16,13 +17,16 @@ function accept(document: unknown): Promise<void> {
   const current = ++revision;
   const parsed = parseSettings(document);
   const next = parsed ?? DEFAULT_SETTINGS;
-  pending = readEnteredKeys(next).then((keys) => {
-    // A later document must not be replaced by an older, slower decryption.
-    if (current !== revision) return;
-    settings = next;
-    enteredKeys = keys;
-    for (const notify of subscribers) notify();
-  });
+  pending = Promise.all([readEnteredKeys(next), unprotectSecret(next.proxy.passwordCiphertext)]).then(
+    ([keys, password]) => {
+      // A later document must not be replaced by an older, slower decryption.
+      if (current !== revision) return;
+      settings = next;
+      enteredKeys = keys;
+      proxyPassword = password;
+      for (const notify of subscribers) notify();
+    },
+  );
   return pending;
 }
 
@@ -70,7 +74,7 @@ export async function startSettingsStore(): Promise<void> {
   await waitForSettings();
 }
 
-/** Waits for the newest document's settings and decrypted keys to publish together. */
+/** Waits for the newest document's settings and decrypted credentials to publish together. */
 export async function waitForSettings(): Promise<void> {
   let latest: Promise<void>;
   do {
@@ -89,6 +93,10 @@ export function currentEnteredKey(preset: Preset | null): string | null {
 
 export function currentKeySources(preset: Preset | null): KeySourcesSnapshot {
   return { enteredKey: currentEnteredKey(preset) };
+}
+
+export function currentProxyPassword(): string | null {
+  return proxyPassword;
 }
 
 export function useSettings(): Settings {

@@ -1,6 +1,7 @@
 import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
 import type { KeySourcesSnapshot } from "./credentials";
+import type { Proxy } from "@tauri-apps/plugin-http";
 import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 
 /**
@@ -27,6 +28,7 @@ export interface Settings {
   /** None until the user chooses a Provider. */
   activePreset: Preset | null;
   presets: PresetSettings;
+  proxy: { mode: "system" | "manual"; url: string; username: string; passwordCiphertext: string | null };
   targetLanguage: TargetLanguage;
   hotkey: string | null;
   displayMode: DisplayMode;
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLanguage: initialTargetLanguage(navigator.language),
   hotkey: "Win+Alt+Q",
   displayMode: "translation",
+  proxy: { mode: "system", url: "", username: "", passwordCiphertext: null },
 };
 
 type JsonObject = Record<string, unknown>;
@@ -102,6 +105,22 @@ export function parseSettings(document: unknown): Settings | null {
     } else values[preset] = { model, reasoningEffort, keyCiphertext };
   }
   const activePreset = field(document, "activePreset", isPreset, DEFAULT_SETTINGS.activePreset);
+  const storedProxy = field(document, "proxy", isJsonObject, {});
+  if (!storedProxy) return null;
+  const mode = field(
+    storedProxy,
+    "mode",
+    (value): value is "system" | "manual" => value === "system" || value === "manual",
+    "system",
+  );
+  const url = field(storedProxy, "url", isString, "");
+  const username = field(storedProxy, "username", isString, "");
+  const passwordCiphertext = field(
+    storedProxy,
+    "passwordCiphertext",
+    (value): value is string | null => value === null || isString(value),
+    null,
+  );
   const targetLanguage = field(document, "targetLanguage", isTargetLanguage, DEFAULT_SETTINGS.targetLanguage);
   const hotkey = field(
     document,
@@ -115,10 +134,27 @@ export function parseSettings(document: unknown): Settings | null {
     (value): value is DisplayMode => DISPLAY_MODES.includes(value as DisplayMode),
     DEFAULT_SETTINGS.displayMode,
   );
-  if (activePreset === undefined || targetLanguage === undefined || hotkey === undefined || displayMode === undefined) {
+  if (
+    activePreset === undefined ||
+    targetLanguage === undefined ||
+    hotkey === undefined ||
+    displayMode === undefined ||
+    mode === undefined ||
+    url === undefined ||
+    username === undefined ||
+    passwordCiphertext === undefined
+  ) {
     return null;
   }
-  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: values, targetLanguage, hotkey, displayMode };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    activePreset,
+    presets: values,
+    proxy: { mode, url, username, passwordCiphertext },
+    targetLanguage,
+    hotkey,
+    displayMode,
+  };
 }
 
 /**
@@ -128,8 +164,9 @@ export function parseSettings(document: unknown): Settings | null {
 export function providerConfiguration(
   settings: Settings,
   keySources?: KeySourcesSnapshot,
+  proxyPassword: string | null = null,
 ): ProviderConfiguration | null {
-  const resolved = resolveProviderConnection(settings, keySources);
+  const resolved = resolveProviderConnection(settings, keySources, proxyPassword);
   return "configuration" in resolved && resolved.configuration.model ? resolved.configuration : null;
 }
 
@@ -139,6 +176,7 @@ export type ConnectionFailure = "no-provider" | "missing-key" | "missing-base-ur
 export function resolveProviderConnection(
   settings: Settings,
   keySources?: KeySourcesSnapshot,
+  proxyPassword: string | null = null,
 ): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
   const preset = settings.activePreset;
   if (!preset) return { error: "no-provider" };
@@ -148,5 +186,14 @@ export function resolveProviderConnection(
   const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
   if (!baseUrl) return { error: "missing-base-url" };
   const { model, reasoningEffort } = settings.presets[preset];
-  return { configuration: { preset, baseUrl, model, reasoningEffort, key } };
+  return {
+    configuration: { preset, baseUrl, model, reasoningEffort, key, proxy: proxyConfiguration(settings, proxyPassword) },
+  };
+}
+
+/** The selected global proxy, carrying this connection's decrypted password. */
+function proxyConfiguration(settings: Settings, password: string | null): Proxy | undefined {
+  if (settings.proxy.mode === "system") return undefined;
+  const { url, username } = settings.proxy;
+  return { all: { url, ...(username || password ? { basicAuth: { username, password: password ?? "" } } : {}) } };
 }

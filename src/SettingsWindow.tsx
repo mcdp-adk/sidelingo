@@ -3,7 +3,6 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Field,
-  Input,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
@@ -20,6 +19,8 @@ import { ModelField } from "./ModelField";
 import { KeyField } from "./KeyField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";
 import { HotkeySetting } from "./HotkeySetting";
+import { TextSetting } from "./TextSetting";
+import { NetworkSettings } from "./NetworkSettings";
 
 const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
@@ -32,40 +33,6 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalXXXL,
   },
 });
-
-function TextSetting({
-  label,
-  value,
-  commit,
-}: {
-  label: string;
-  value: string;
-  commit: (value: string) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState(value);
-  useEffect(() => {
-    setDraft(value);
-  }, [value]);
-  const save = () => {
-    if (draft !== value) void commit(draft);
-  };
-  return (
-    <Field label={label}>
-      <Input
-        aria-label={label}
-        value={draft}
-        onChange={(_, data) => setDraft(data.value)}
-        onBlur={save}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            save();
-          }
-        }}
-      />
-    </Field>
-  );
-}
 
 export function SettingsWindow() {
   const styles = useStyles();
@@ -183,6 +150,7 @@ export function SettingsWindow() {
         </section>
         <section className={styles.section} aria-label={strings.network}>
           <h2>{strings.network}</h2>
+          <NetworkSettings settings={settings} commit={commit} />
         </section>
         <section ref={general} className={styles.section} aria-label={strings.general}>
           <h2>{strings.general}</h2>

@@ -1,4 +1,5 @@
 import { isReasoningEffort, PRESET_REGISTRY, type Preset, type ReasoningEffort } from "./presets";
+import type { ClientOptions, Proxy } from "@tauri-apps/plugin-http";
 
 /** Where to reach a Provider over the OpenAI Chat Completions protocol. */
 export interface ProviderConfiguration {
@@ -9,6 +10,8 @@ export interface ProviderConfiguration {
   /** Default omits the field; explicit none remains a sent level. */
   reasoningEffort?: ReasoningEffort | null;
   key?: string | null;
+  /** Absent follows the System proxy; a Manual proxy is fixed with the Round. */
+  proxy?: Proxy;
 }
 
 export interface ChatMessage {
@@ -29,7 +32,7 @@ export interface ImageContentPart {
 }
 
 /** The `fetch` the client sends through: `tauri-plugin-http`'s in the app. */
-export type Transport = (url: string, init: RequestInit) => Promise<Response>;
+export type Transport = (url: string, init: RequestInit & ClientOptions) => Promise<Response>;
 
 /** A cause the UI can name, with the Provider's detail preserved in message. */
 export class ProviderError extends Error {
@@ -61,11 +64,12 @@ interface ChunkChoice {
 export function providerClient(transport: Transport): ProviderClient {
   return {
     async listModels(configuration, signal) {
-      const response = await request(transport, `${baseOf(configuration)}/models`, {
-        method: "GET",
-        headers: keyHeaders(configuration.key),
-        signal,
-      });
+      const response = await request(
+        transport,
+        `${baseOf(configuration)}/models`,
+        { method: "GET", headers: keyHeaders(configuration.key), signal },
+        configuration.proxy,
+      );
       let document;
       try {
         document = await response.json();
@@ -78,7 +82,7 @@ export function providerClient(transport: Transport): ProviderClient {
       }
       return document.data.map(({ id }: { id: string }) => id);
     },
-    async *streamChat({ preset, baseUrl, model, reasoningEffort, key }, messages, signal) {
+    async *streamChat({ preset, baseUrl, model, reasoningEffort, key, proxy }, messages, signal) {
       if (reasoningEffort != null && !isReasoningEffort(preset, reasoningEffort)) {
         throw new RangeError(`Unsupported reasoning effort for ${PRESET_REGISTRY[preset].label}: ${reasoningEffort}`);
       }
@@ -87,12 +91,17 @@ export function providerClient(transport: Transport): ProviderClient {
         reasoningEffort == null
           ? {}
           : { [effortField]: effortField === "reasoning" ? { effort: reasoningEffort } : reasoningEffort };
-      const response = await request(transport, `${baseOf({ preset, baseUrl })}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...keyHeaders(key) },
-        body: JSON.stringify({ model, messages, stream: true, ...effort }),
-        signal,
-      });
+      const response = await request(
+        transport,
+        `${baseOf({ preset, baseUrl })}/chat/completions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...keyHeaders(key) },
+          body: JSON.stringify({ model, messages, stream: true, ...effort }),
+          signal,
+        },
+        proxy,
+      );
       for await (const data of serverSentData(response.body!)) {
         if (data === "[DONE]") return;
         const chunk = JSON.parse(data);
@@ -114,10 +123,11 @@ function keyHeaders(key: string | null | undefined): Record<string, string> {
 }
 
 /** The shared HTTP boundary keeps both client operations' errors consistent. */
-async function request(transport: Transport, url: string, init: RequestInit): Promise<Response> {
+async function request(transport: Transport, url: string, init: RequestInit, proxy?: Proxy): Promise<Response> {
   let response;
   try {
-    response = await transport(url, init);
+    // Limit connection setup only: long reasoning and streamed responses have no total timeout.
+    response = await transport(url, { ...init, connectTimeout: 10_000, ...(proxy ? { proxy } : {}) });
   } catch (reason) {
     if (init.signal?.aborted) throw reason;
     throw new ProviderError("network", reason instanceof Error ? reason.message : String(reason));

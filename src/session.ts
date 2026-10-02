@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
 import { providerConfiguration } from "./settings";
-import { currentKeySources, currentSettings, waitForSettings } from "./settings-store";
+import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -49,7 +49,7 @@ async function startRound(input: Input) {
       generation = configurationGeneration;
     }
     const settings = currentSettings();
-    const provider = providerConfiguration(settings, currentKeySources(settings.activePreset));
+    const provider = providerConfiguration(settings, currentKeySources(settings.activePreset), currentProxyPassword());
     if (!provider) return;
     const id = ++lastRoundId;
     let completed: ShownRound | null = null;
