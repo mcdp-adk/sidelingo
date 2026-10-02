@@ -56,7 +56,12 @@ async function checkForUpdates(manual: boolean): Promise<void> {
 export async function startUpdateChecks(): Promise<void> {
   await listen("update-check-requested", () => void checkForUpdates(true));
   await listen("update-status-requested", () => void emit("update-status-changed", status));
-  if (currentSettings().automaticUpdates) void checkForUpdates(false);
+  const checkAutomatically = async () => {
+    await waitForSettings();
+    if (currentSettings().automaticUpdates) await checkForUpdates(false);
+  };
+  void checkAutomatically();
+  setInterval(() => void checkAutomatically(), 24 * 60 * 60 * 1_000);
 }
 
 export async function startUpdateStatus(): Promise<void> {
