@@ -5,11 +5,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   makeStyles,
   mergeClasses,
+  Button,
   Menu,
   MenuItem,
   MenuList,
   MenuPopover,
   MessageBar,
+  MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
   Select,
@@ -17,17 +19,23 @@ import {
   TabList,
   Text,
   Toolbar,
-  ToolbarButton,
   Tooltip,
   tokens,
   type PositioningVirtualElement,
 } from "@fluentui/react-components";
-import { CopyRegular, DocumentCopyRegular, DismissRegular, SettingsRegular } from "@fluentui/react-icons";
+import {
+  ArrowClockwiseRegular,
+  CopyRegular,
+  DocumentCopyRegular,
+  DismissRegular,
+  PauseRegular,
+  SettingsRegular,
+} from "@fluentui/react-icons";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
 import type { RoundError } from "./round";
-import { useShownRound } from "./session";
+import { regenerate, toggleClipboardPause, useSession } from "./session";
 import { DISPLAY_MODES, type DisplayMode } from "./settings";
 import { patchSettings, useSettings } from "./settings-store";
 
@@ -63,6 +71,16 @@ function errorTitle(error: RoundError): string {
 
 const useStyles = makeStyles({
   root: { position: "relative", height: "100vh", overflow: "hidden" },
+  paused: {
+    "::after": {
+      content: '""',
+      position: "absolute",
+      inset: 0,
+      border: `2px solid ${tokens.colorStatusWarningBorder2}`,
+      borderRadius: tokens.borderRadiusXLarge,
+      pointerEvents: "none",
+    },
+  },
   // Overlays the content with no reserved space, shown while the pointer is over the window.
   toolbar: {
     position: "absolute",
@@ -119,9 +137,16 @@ function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
   return e.target === content && e.clientX - content.getBoundingClientRect().left >= content.clientWidth;
 }
 
+/** Inline controls keep their normal pointer behavior rather than moving or hiding the window. */
+function interactiveTarget(target: EventTarget): boolean {
+  return (
+    target instanceof Element && target.closest("button, a[href], input, select, textarea, [role=button]") !== null
+  );
+}
+
 export function PinWindow() {
   const styles = useStyles();
-  const round = useShownRound();
+  const { round, hasInput, paused, overlong } = useSession();
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
@@ -162,6 +187,15 @@ export function PinWindow() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        !e.altKey &&
+        !e.metaKey &&
+        !e.shiftKey &&
+        ((e.ctrlKey && e.key.toLowerCase() === "r") || (!e.ctrlKey && e.key === "F5"))
+      ) {
+        e.preventDefault();
+        regenerate();
+      }
       const mode = DISPLAY_MODES[Number(e.key) - 1];
       if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[123]$/.test(e.key) && mode) {
         e.preventDefault();
@@ -242,7 +276,7 @@ export function PinWindow() {
   };
 
   const onDragMouseDown = (e: MouseEvent<HTMLElement>) => {
-    if (e.button !== 0 || e.ctrlKey) return;
+    if (e.button !== 0 || e.ctrlKey || interactiveTarget(e.target)) return;
     // Without Ctrl a press only moves the window, so it neither selects text nor clears a selection.
     e.preventDefault();
     pressedAt.current = { x: e.screenX, y: e.screenY };
@@ -266,7 +300,7 @@ export function PinWindow() {
   };
 
   const onDoubleClick = (e: MouseEvent<HTMLElement>) => {
-    if (!e.ctrlKey && !onScrollbar(e)) void hide();
+    if (!e.ctrlKey && !onScrollbar(e) && !interactiveTarget(e.target)) void hide();
   };
 
   const pane = (kind: "source" | "translation") => {
@@ -300,7 +334,18 @@ export function PinWindow() {
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
-        {round && state && result ? (
+        {overlong ? (
+          <MessageBar intent="info">
+            <MessageBarBody>
+              <MessageBarTitle>{strings.overlongText}</MessageBarTitle>
+            </MessageBarBody>
+            <MessageBarActions>
+              <Button size="small" onClick={regenerate}>
+                {strings.processAnyway}
+              </Button>
+            </MessageBarActions>
+          </MessageBar>
+        ) : round && state && result ? (
           state.outcome === "no-text" ? (
             <MessageBar intent="info">
               <MessageBarBody>
@@ -344,7 +389,7 @@ export function PinWindow() {
   return (
     <div
       ref={root}
-      className={styles.root}
+      className={mergeClasses(styles.root, paused && styles.paused)}
       onMouseEnter={() => setPointerOver(true)}
       onMouseLeave={() => setPointerOver(false)}
       onContextMenu={onContextMenu}
@@ -400,8 +445,27 @@ export function PinWindow() {
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>
+          <Tooltip content={strings.pauseClipboardMonitoring} relationship="label">
+            <Button
+              size="small"
+              appearance={paused ? "primary" : "subtle"}
+              icon={<PauseRegular />}
+              aria-pressed={paused}
+              onClick={toggleClipboardPause}
+            />
+          </Tooltip>
+          <Tooltip content={strings.regenerate} relationship="label">
+            <Button
+              size="small"
+              appearance="subtle"
+              icon={<ArrowClockwiseRegular />}
+              disabled={!hasInput}
+              onClick={regenerate}
+            />
+          </Tooltip>
           <Tooltip content={strings.copySource} relationship="label">
-            <ToolbarButton
+            <Button
+              size="small"
               appearance="subtle"
               icon={<DocumentCopyRegular />}
               disabled={!round?.state.source.text || round.state.source.status !== "done"}
@@ -409,7 +473,8 @@ export function PinWindow() {
             />
           </Tooltip>
           <Tooltip content={strings.copyTranslation} relationship="label">
-            <ToolbarButton
+            <Button
+              size="small"
               appearance="subtle"
               icon={<CopyRegular />}
               disabled={!round?.state.translation.text || round.state.translation.status !== "done"}
@@ -417,14 +482,15 @@ export function PinWindow() {
             />
           </Tooltip>
           <Tooltip content={strings.settingsShortcut} relationship="label">
-            <ToolbarButton
+            <Button
+              size="small"
               appearance="subtle"
               icon={<SettingsRegular />}
               onClick={() => void invoke("open_settings")}
             />
           </Tooltip>
           <Tooltip content={strings.close} relationship="label">
-            <ToolbarButton appearance="subtle" icon={<DismissRegular />} onClick={() => void hide()} />
+            <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => void hide()} />
           </Tooltip>
         </div>
       </Toolbar>

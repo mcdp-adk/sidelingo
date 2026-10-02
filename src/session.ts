@@ -14,7 +14,15 @@ export interface ShownRound {
   state: RoundState;
 }
 
-let shown: ShownRound | null = null;
+/** One coherent view of the session for results and user controls. */
+export interface SessionState {
+  round: ShownRound | null;
+  hasInput: boolean;
+  paused: boolean;
+  overlong: boolean;
+}
+
+let snapshot: SessionState = { round: null, hasInput: false, paused: false, overlong: false };
 let currentInput: Input | null = null;
 /** Only the last fully successful Round is reusable; nothing is written to disk. */
 let lastSuccessful: { input: Input; round: ShownRound } | null = null;
@@ -25,8 +33,8 @@ let lastRoundId = 0;
 let inFlight: AbortController | null = null;
 const subscribers = new Set<() => void>();
 
-function publish(next: ShownRound) {
-  shown = next;
+function publish(round: ShownRound | null, controls: Partial<Pick<SessionState, "paused" | "overlong">> = {}) {
+  snapshot = { ...snapshot, ...controls, round, hasInput: currentInput !== null };
   for (const notify of subscribers) notify();
 }
 
@@ -82,28 +90,50 @@ export async function startSession(): Promise<void> {
     ++configurationGeneration;
     lastSuccessful = null;
   });
+  await listen("pin-window-hidden", () => {
+    if (snapshot.paused) publish(snapshot.round, { paused: false });
+  });
   await listen<InputEvent>("input", ({ payload }) => {
+    if (payload.origin === "copy" && snapshot.paused) return;
     // Nothing usable on show keeps the current content.
     if (!payload.input || (payload.origin === "copy" && sameInput(currentInput, payload.input))) return;
     inFlight?.abort();
     inFlight = null;
     currentInput = payload.input;
     if (payload.origin === "show" && lastSuccessful && sameInput(lastSuccessful.input, payload.input)) {
-      publish(lastSuccessful.round);
+      publish(lastSuccessful.round, { overlong: false });
+    } else if (payload.input.kind === "text" && payload.input.text.length > 10_000) {
+      publish(null, { overlong: true });
     } else {
+      publish(snapshot.round, { overlong: false });
       void startRound(payload.input);
     }
   });
   await invoke("pin_window_ready");
 }
 
-/** The Round the Pin window shows, or null before the first. */
-export function useShownRound(): ShownRound | null {
+/** Pause ignores only copies; hiding resets it without stopping the Round. */
+export function toggleClipboardPause(): void {
+  publish(snapshot.round, { paused: !snapshot.paused });
+}
+
+/** Reruns the current Input with current settings, bypassing successful reuse. */
+export function regenerate(): void {
+  if (!currentInput) return;
+  lastSuccessful = null;
+  inFlight?.abort();
+  inFlight = null;
+  publish(snapshot.round, { overlong: false });
+  void startRound(currentInput);
+}
+
+/** Results and action availability come from the same session snapshot. */
+export function useSession(): SessionState {
   return useSyncExternalStore(
     (notify) => {
       subscribers.add(notify);
       return () => subscribers.delete(notify);
     },
-    () => shown,
+    () => snapshot,
   );
 }

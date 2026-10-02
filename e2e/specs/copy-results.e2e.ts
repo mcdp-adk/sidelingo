@@ -31,7 +31,7 @@ describe("Copying results", () => {
     await expect($("p")).toHaveText("A translated line.");
   });
 
-  it("enables Copy source for the fast path but waits until Translation is complete", async () => {
+  it("enables Source and Regenerate for the fast path but waits until Translation is complete", async () => {
     const hold = gate();
     provider.reset([{ delta: { content: "Partial translation" } }, hold]);
     writeClipboardText(" ");
@@ -39,10 +39,12 @@ describe("Copying results", () => {
     try {
       await expect(sourceButton()).toBeDisabled();
       await expect(translationButton()).toBeDisabled();
+      await expect($("button[aria-label^='Regenerate']")).toBeDisabled();
       writeClipboardText(source);
       await expect($("p")).toHaveText("Partial translation");
       await expect(sourceButton()).toBeEnabled();
       await expect(translationButton()).toBeDisabled();
+      await expect($("button[aria-label^='Regenerate']")).toBeEnabled();
       hold.open();
       await translationButton().waitForEnabled();
     } finally {
@@ -79,16 +81,16 @@ describe("Copying results", () => {
     }
   });
 
-  for (const [language, sourceName, translationName] of [
-    ["en-US", "Copy source", "Copy translation"],
-    ["zh-TW", "复制原文", "复制译文"],
+  for (const [language, sourceName, translationName, regenerateName, pauseName] of [
+    ["en-US", "Copy source", "Copy translation", "Regenerate (Ctrl+R / F5)", "Pause clipboard monitoring"],
+    ["zh-TW", "复制原文", "复制译文", "重新生成 (Ctrl+R / F5)", "暂停监视剪贴板"],
   ]) {
-    it(`names both copy controls in tooltips under ${language}`, async () => {
+    it(`names copy and Round controls in localized tooltips under ${language}`, async () => {
       provider.reset([{ delta: { content: translation } }]);
       writeClipboardText(source);
       await relaunch({ language, settings: customSettings(provider) });
       await $(`button[aria-label='${translationName}']`).waitForEnabled();
-      for (const name of [sourceName, translationName]) {
+      for (const name of [sourceName, translationName, regenerateName, pauseName]) {
         const control = $(`button[aria-label='${name}']`);
         await browser.waitUntil(async () => {
           await control.moveTo();

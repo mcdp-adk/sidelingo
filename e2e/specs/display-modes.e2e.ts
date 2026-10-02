@@ -297,12 +297,19 @@ describe("Display modes", () => {
     {
       language: "en-US",
       label: "Display mode",
-      actions: ["Copy source", "Copy translation", "Settings (Ctrl+,)", "Close (Esc)"],
+      actions: [
+        "Copy source",
+        "Copy translation",
+        "Pause clipboard monitoring",
+        "Regenerate (Ctrl+R / F5)",
+        "Settings (Ctrl+,)",
+        "Close (Esc)",
+      ],
     },
     {
       language: "zh-CN",
       label: "显示模式",
-      actions: ["复制原文", "复制译文", "设置 (Ctrl+,)", "关闭 (Esc)"],
+      actions: ["复制原文", "复制译文", "暂停监视剪贴板", "重新生成 (Ctrl+R / F5)", "设置 (Ctrl+,)", "关闭 (Esc)"],
     },
   ]) {
     it(`collapses the tabs into one dropdown at the native minimum width and restores them when widened under ${language}`, async () => {
@@ -327,12 +334,18 @@ describe("Display modes", () => {
       await expect($("[role=tablist]")).not.toBeDisplayed();
 
       const viewport = await $("body").getSize();
-      for (const action of actions) {
-        const button = $(`button[aria-label='${action}']`);
-        await expect(button).toBeDisplayed();
-        const [at, size] = await Promise.all([button.getLocation(), button.getSize()]);
+      const occupied: { left: number; right: number }[] = [];
+      for (const control of [dropdown, ...actions.map((action) => $(`button[aria-label='${action}']`))]) {
+        await expect(control).toBeDisplayed();
+        const [at, size] = await Promise.all([control.getLocation(), control.getSize()]);
         expect(at.x).toBeGreaterThanOrEqual(0);
         expect(at.x + size.width).toBeLessThanOrEqual(viewport.width);
+        expect(at.y).toBeGreaterThanOrEqual(0);
+        expect(at.y + size.height).toBeLessThanOrEqual(viewport.height);
+        for (const previous of occupied) {
+          expect(Math.min(at.x + size.width, previous.right) - Math.max(at.x, previous.left)).toBeLessThanOrEqual(0);
+        }
+        occupied.push({ left: at.x, right: at.x + size.width });
       }
       await dropdown.selectByAttribute("value", "source");
       await expect($$("p")).toBeElementsArrayOfSize(1);
