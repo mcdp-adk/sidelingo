@@ -15,6 +15,11 @@ export interface ShownRound {
 }
 
 let shown: ShownRound | null = null;
+let currentInput: Input | null = null;
+/** Only the last fully successful Round is reusable; nothing is written to disk. */
+let lastSuccessful: { input: Input; round: ShownRound } | null = null;
+/** A settings change also invalidates a result still being produced with older settings. */
+let configurationGeneration = 0;
 let lastRoundId = 0;
 /** Cancels the Round in flight. */
 let inFlight: AbortController | null = null;
@@ -25,19 +30,35 @@ function publish(next: ShownRound) {
   for (const notify of subscribers) notify();
 }
 
-/** Starts a Round on `input`, cancelling the one in flight; the window keeps its content until the first update. */
+/** Identity belongs to the session; text and image payloads compare as delivered. */
+function sameInput(left: Input | undefined | null, right: Input): boolean {
+  if (left?.kind === "text" && right.kind === "text") return left.text === right.text;
+  return left?.kind === "image" && right.kind === "image" && left.dataUrl === right.dataUrl;
+}
+
+/** Starts a Round on `input`; the window keeps its content until the first update. */
 async function startRound(input: Input) {
+  const generation = configurationGeneration;
   const settings = currentSettings();
   const provider = providerConfiguration(settings, currentKeySources(settings.activePreset));
   if (!provider) return;
-  inFlight?.abort();
   const controller = (inFlight = new AbortController());
   const id = ++lastRoundId;
   try {
+    let completed: ShownRound | null = null;
     for await (const state of run(input, { provider, targetLanguage: settings.targetLanguage }, controller.signal)) {
       // A newer Round has replaced this one.
       if (controller.signal.aborted) return;
-      publish({ id, state });
+      completed = { id, state };
+      publish(completed);
+    }
+    if (
+      !controller.signal.aborted &&
+      generation === configurationGeneration &&
+      completed &&
+      ["done", "no-text"].includes(completed.state.stage)
+    ) {
+      lastSuccessful = { input, round: completed };
     }
   } catch (error) {
     // A cancelled Round leaves no error; #51 shows the others in the window.
@@ -50,9 +71,21 @@ async function startRound(input: Input) {
  * first `show` Input isn't lost.
  */
 export async function startSession(): Promise<void> {
+  await listen("settings-document-changed", () => {
+    ++configurationGeneration;
+    lastSuccessful = null;
+  });
   await listen<InputEvent>("input", ({ payload }) => {
     // Nothing usable on show keeps the current content.
-    if (payload.input) void startRound(payload.input);
+    if (!payload.input || (payload.origin === "copy" && sameInput(currentInput, payload.input))) return;
+    inFlight?.abort();
+    inFlight = null;
+    currentInput = payload.input;
+    if (payload.origin === "show" && lastSuccessful && sameInput(lastSuccessful.input, payload.input)) {
+      publish(lastSuccessful.round);
+    } else {
+      void startRound(payload.input);
+    }
   });
   await invoke("pin_window_ready");
 }

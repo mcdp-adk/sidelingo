@@ -41,6 +41,10 @@ windows = { version = "0.62", features = [
     "UI_ViewManagement",
 ] }
 
+[patch.crates-io]
+# A cancelled pending response read must release its native HTTP connection (#48).
+tauri-plugin-http = { path = "vendor/tauri-plugin-http" }
+
 [profile.release]
 codegen-units = 1
 lto = true

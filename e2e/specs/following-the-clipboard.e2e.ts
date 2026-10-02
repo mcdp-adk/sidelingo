@@ -148,14 +148,23 @@ describe("Following the clipboard", () => {
   });
 
   it("shows the existing, hidden window with the clipboard's current line when launched again", async () => {
+    const firstTranslation = `Completed original Translation ${Date.now()}`;
+    const currentTranslation = `Completed current Translation ${Date.now()}`;
+    provider.reset(() => [
+      { delta: { content: provider.requests.length === 1 ? firstTranslation : currentTranslation } },
+    ]);
     writeClipboardText(line());
     await launch();
-    await paragraph().waitForExist();
+    await expect($("body")).toHaveText(firstTranslation, { containing: true });
+    await $("button[aria-label='Copy translation']").waitForEnabled();
+    expect(provider.requests).toHaveLength(1);
     await browser.keys("Escape");
     await browser.waitUntil(() => !pinWindows()[0].visible, { timeoutMsg: "the Pin window is still visible" });
 
     const current = line();
     writeClipboardText(current);
+    await browser.pause(750);
+    expect(provider.requests).toHaveLength(1);
     const second = spawn(appExe, { stdio: "ignore" });
     // The second launch hands over to the running one and quits.
     const [code] = await once(second, "exit");
@@ -163,6 +172,9 @@ describe("Following the clipboard", () => {
 
     await browser.waitUntil(() => pinWindows()[0].visible, { timeoutMsg: "the Pin window didn't show" });
     expect(pinWindows()).toHaveLength(1);
-    await expectShown(current);
+    await expect($("body")).toHaveText(currentTranslation, { containing: true });
+    await $("button[aria-label='Copy translation']").waitForEnabled();
+    expect(provider.requests).toHaveLength(2);
+    expect(provider.requests[1].body.messages[1].content).toContain(current);
   });
 });

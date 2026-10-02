@@ -1,8 +1,8 @@
 //! Follows the clipboard while the Pin window is visible.
 //!
 //! A hidden message window on its own thread listens for clipboard changes,
-//! and every Input reaches the front end from that thread, so a `show` and the
-//! copies around it arrive in the order they happened.
+//! and every Input and hidden event reaches the front end from that thread, so
+//! a `show`, the copies around it, and a following hide arrive in order.
 
 use std::collections::BTreeMap;
 use std::io::Cursor;
@@ -34,6 +34,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 /// Carries an Input to the front end.
 const INPUT: &str = "input";
+/// Tells the front end the Pin window was hidden, in order with Inputs.
+const HIDDEN: &str = "pin-window-hidden";
 /// Clipboard notifications this close together are one copy.
 const COALESCE_MS: u32 = 200;
 const COALESCE_TIMER: usize = 1;
@@ -223,6 +225,12 @@ unsafe extern "system" fn window_proc(
         WM_HIDDEN => {
             let _ = RemoveClipboardFormatListener(hwnd);
             let _ = KillTimer(Some(hwnd), COALESCE_TIMER);
+            // Emit on this thread so an earlier show's Input cannot arrive after hidden.
+            if let Some(app) = APP.get() {
+                if let Err(error) = app.emit(HIDDEN, ()) {
+                    eprintln!("failed to send Pin window hidden: {error}");
+                }
+            }
         }
         // Each notification restarts the timer, so a burst ends in one copy.
         WM_CLIPBOARDUPDATE => {

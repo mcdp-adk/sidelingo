@@ -4,8 +4,8 @@ use std::sync::Mutex;
 use tauri::utils::config::WindowEffectsConfig;
 use tauri::window::Effect;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalSize, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, Window, WindowEvent,
+    AppHandle, LogicalSize, Manager, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    Window, WindowEvent,
 };
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -23,8 +23,6 @@ static MINIMUM_SIZE: Mutex<Option<PhysicalSize<u32>>> = Mutex::new(None);
 const MIN_WIDTH: f64 = 230.0;
 /// Room for the toolbar and a few lines.
 const MIN_HEIGHT: f64 = 120.0;
-/// Tells the front end the Pin window was hidden.
-const HIDDEN: &str = "pin-window-hidden";
 /// Set once the front end listens for Inputs, so the first `show` reaches it.
 static READY: AtomicBool = AtomicBool::new(false);
 
@@ -184,7 +182,6 @@ pub fn hide(app: &AppHandle) {
         }
         let _ = window.hide();
         clipboard::hidden();
-        let _ = window.emit(HIDDEN, ());
         // Hiding is the normal "leave the Pin here" operation. Persist now as
         // well as on the plugin's normal process-exit path.
         if let Err(error) = app.save_window_state(STATE_FLAGS) {

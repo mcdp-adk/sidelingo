@@ -16,10 +16,18 @@ export type Step =
   | { delta: { content?: string; reasoning_content?: string; reasoning?: string } }
   /** An SSE comment line, such as `keep-alive`. */
   | { comment: string }
+  /** Drops the actual connection before the reply finishes. */
+  | { drop: true }
   /** Holds the stream until the promise settles. */
   | { wait: Promise<unknown>; onReached?: () => void };
 
-export type Script = Step[] | ((request: RecordedRequest) => Step[]);
+/** A real failed chat response, with the Provider's JSON error detail. */
+export interface HttpReply {
+  status: number;
+  message: string;
+}
+
+export type Script = Step[] | HttpReply | ((request: RecordedRequest) => Step[] | HttpReply);
 
 export interface ModelReply {
   ids?: string[];
@@ -36,6 +44,8 @@ export class FakeProvider {
   /** Chat completions, kept separate so processing assertions exclude model-list fetches. */
   readonly requests: RecordedRequest[] = [];
   readonly modelRequests: RecordedRequest[] = [];
+  /** Actual chat responses closed before the server finished sending them. */
+  readonly interruptedRequests: RecordedRequest[] = [];
   private modelReply: ModelReply = {};
   private script: Script = echo;
   private readonly server = createServer(async (request, response) => {
@@ -63,8 +73,15 @@ export class FakeProvider {
       return;
     }
     this.requests.push(recorded);
-    const steps = typeof this.script === "function" ? this.script(recorded) : this.script;
-    await stream(response, steps);
+    response.once("close", () => {
+      if (!response.writableFinished) this.interruptedRequests.push(recorded);
+    });
+    const reply = typeof this.script === "function" ? this.script(recorded) : this.script;
+    if (Array.isArray(reply)) await stream(response, reply);
+    else {
+      response.writeHead(reply.status, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: { message: reply.message } }));
+    }
   });
 
   static async start(): Promise<FakeProvider> {
@@ -83,6 +100,7 @@ export class FakeProvider {
   reset(script: Script = echo): void {
     this.requests.length = 0;
     this.modelRequests.length = 0;
+    this.interruptedRequests.length = 0;
     this.modelReply = {};
     this.script = script;
   }
@@ -106,6 +124,9 @@ async function stream(response: ServerResponse, steps: Step[]) {
     if ("wait" in step) {
       step.onReached?.();
       await step.wait;
+    } else if ("drop" in step) {
+      response.destroy();
+      return;
     } else if ("comment" in step) response.write(`: ${step.comment}\n\n`);
     else
       response.write(
