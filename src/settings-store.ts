@@ -67,7 +67,11 @@ export async function startSettingsStore(): Promise<void> {
       }).catch((error) => console.error("Could not show settings recovery notification:", error));
     }
   }
-  // Initialization waits for the newest document, including one arriving during quarantine or decryption.
+  await waitForSettings();
+}
+
+/** Waits for the newest document's settings and decrypted keys to publish together. */
+export async function waitForSettings(): Promise<void> {
   let latest: Promise<void>;
   do {
     latest = pending;

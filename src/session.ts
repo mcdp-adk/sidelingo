@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
 import { providerConfiguration } from "./settings";
-import { currentKeySources, currentSettings } from "./settings-store";
+import { currentKeySources, currentSettings, waitForSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -38,13 +38,20 @@ function sameInput(left: Input | undefined | null, right: Input): boolean {
 
 /** Starts a Round on `input`; the window keeps its content until the first update. */
 async function startRound(input: Input) {
-  const generation = configurationGeneration;
-  const settings = currentSettings();
-  const provider = providerConfiguration(settings, currentKeySources(settings.activePreset));
-  if (!provider) return;
   const controller = (inFlight = new AbortController());
-  const id = ++lastRoundId;
   try {
+    let generation = configurationGeneration;
+    while (true) {
+      await waitForSettings();
+      if (controller.signal.aborted) return;
+      // Another raw settings event may arrive while the store publishes its snapshot.
+      if (generation === configurationGeneration) break;
+      generation = configurationGeneration;
+    }
+    const settings = currentSettings();
+    const provider = providerConfiguration(settings, currentKeySources(settings.activePreset));
+    if (!provider) return;
+    const id = ++lastRoundId;
     let completed: ShownRound | null = null;
     for await (const state of run(input, { provider, targetLanguage: settings.targetLanguage }, controller.signal)) {
       // A newer Round has replaced this one.
