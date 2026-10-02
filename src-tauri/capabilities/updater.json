@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "updater",
+  "description": "Pin owns update checks",
+  "windows": ["pin"],
+  "permissions": ["updater:allow-check"]
+}

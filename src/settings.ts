@@ -32,6 +32,7 @@ export interface Settings {
   targetLanguage: TargetLanguage;
   hotkey: string | null;
   displayMode: DisplayMode;
+  automaticUpdates: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   targetLanguage: initialTargetLanguage(navigator.language),
   hotkey: "Win+Alt+Q",
   displayMode: "translation",
+  automaticUpdates: true,
   proxy: { mode: "system", url: "", username: "", passwordCiphertext: null },
 };
 
@@ -134,11 +136,18 @@ export function parseSettings(document: unknown): Settings | null {
     (value): value is DisplayMode => DISPLAY_MODES.includes(value as DisplayMode),
     DEFAULT_SETTINGS.displayMode,
   );
+  const automaticUpdates = field(
+    document,
+    "automaticUpdates",
+    (value): value is boolean => typeof value === "boolean",
+    DEFAULT_SETTINGS.automaticUpdates,
+  );
   if (
     activePreset === undefined ||
     targetLanguage === undefined ||
     hotkey === undefined ||
     displayMode === undefined ||
+    automaticUpdates === undefined ||
     mode === undefined ||
     url === undefined ||
     username === undefined ||
@@ -154,6 +163,7 @@ export function parseSettings(document: unknown): Settings | null {
     targetLanguage,
     hotkey,
     displayMode,
+    automaticUpdates,
   };
 }
 
@@ -192,7 +202,7 @@ export function resolveProviderConnection(
 }
 
 /** The selected global proxy, carrying this connection's decrypted password. */
-function proxyConfiguration(settings: Settings, password: string | null): Proxy | undefined {
+export function proxyConfiguration(settings: Settings, password: string | null): Proxy | undefined {
   if (settings.proxy.mode === "system") return undefined;
   const { url, username } = settings.proxy;
   return { all: { url, ...(username || password ? { basicAuth: { username, password: password ?? "" } } : {}) } };

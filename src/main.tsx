@@ -10,6 +10,7 @@ import { SettingsWindow } from "./SettingsWindow";
 import { startSession } from "./session";
 import { currentSettings, startSettingsStore } from "./settings-store";
 import { useSystemTheme } from "./theme";
+import { startUpdateChecks, startUpdateStatus } from "./updates";
 
 /** Windows' default accent, for when the system's can't be read. */
 const DEFAULT_ACCENT = "#0078d4";
@@ -29,6 +30,7 @@ function App({ accent }: { accent: string }) {
 
 const accent = (await invoke<string | null>("accent_color")) ?? DEFAULT_ACCENT;
 await startSettingsStore();
+if (isSettingsWindow) await startUpdateStatus();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -47,4 +49,5 @@ if (!isSettingsWindow) {
     }).catch((error) => console.error("Could not show hotkey registration notification:", error));
   });
   await startSession();
+  await startUpdateChecks();
 }

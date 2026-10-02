@@ -9,10 +9,12 @@ import {
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
+  Switch,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
 import { strings } from "./i18n";
+import { requestUpdateCheck, useUpdateStatus } from "./updates";
 
 const sourceUrl = "https://github.com/mcdp-adk/sidelingo";
 const useStyles = makeStyles({
@@ -26,8 +28,15 @@ function fileUrl(path: string): string {
   return url.href;
 }
 
-export function AboutSection() {
+export function AboutSection({
+  automaticUpdates,
+  commit,
+}: {
+  automaticUpdates: boolean;
+  commit: (enabled: boolean) => Promise<void>;
+}) {
   const styles = useStyles();
+  const updateStatus = useUpdateStatus();
   const [version, setVersion] = useState<string | null>(null);
   const [dataFolder, setDataFolder] = useState<string | null>(null);
   const [resources, setResources] = useState<{ license: string; notices: string } | null>(null);
@@ -57,6 +66,23 @@ export function AboutSection() {
         <p>
           {strings.version} {version}
         </p>
+      )}
+      <Switch
+        aria-label={strings.automaticUpdates}
+        label={strings.automaticUpdates}
+        checked={automaticUpdates}
+        onChange={(_, data) => void commit(data.checked)}
+      />
+      <Button disabled={updateStatus.checking} onClick={() => void requestUpdateCheck()}>
+        {strings.checkNow}
+      </Button>
+      {updateStatus.error && (
+        <MessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>{strings.updateCheckFailed}</MessageBarTitle>
+            {updateStatus.error}
+          </MessageBarBody>
+        </MessageBar>
       )}
       <p>{strings.copyright}</p>
       <p>{strings.licenseNotice}</p>

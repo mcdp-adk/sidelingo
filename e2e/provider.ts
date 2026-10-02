@@ -147,6 +147,7 @@ export function customSettings(
 ) {
   return {
     schemaVersion: 1,
+    automaticUpdates: false,
     activePreset: "custom",
     presets: { custom: { baseUrl, model } },
     ...(targetLanguage && { targetLanguage }),

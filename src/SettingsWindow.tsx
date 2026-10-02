@@ -170,7 +170,10 @@ export function SettingsWindow() {
         </section>
         <section className={styles.section} aria-label={strings.about}>
           <h2>{strings.about}</h2>
-          <AboutSection />
+          <AboutSection
+            automaticUpdates={settings.automaticUpdates}
+            commit={(automaticUpdates) => commit({ automaticUpdates })}
+          />
         </section>
       </main>
     </div>
