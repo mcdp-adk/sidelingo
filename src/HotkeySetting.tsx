@@ -96,7 +96,7 @@ export function HotkeySetting({
               setError(strings.hotkeyModifierRequired);
               return;
             }
-            const key = event.code.replace(/^(Key|Digit)/, "");
+            const key = (event.code || event.key).replace(/^(Key|Digit)/, "");
             void record([...modifiers, key].join("+"));
           }}
         >
