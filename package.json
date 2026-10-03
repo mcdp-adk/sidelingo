@@ -41,6 +41,7 @@
     "@wdio/spec-reporter": "^9",
     "@wdio/types": "^9.32.0",
     "prettier": "^3.9.9",
+    "proxy-from-env": "1.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
