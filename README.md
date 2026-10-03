@@ -25,7 +25,7 @@ On Windows 11, with Node.js 24, pnpm (the version in `package.json`'s `packageMa
 
 ```bash
 pnpm install
-cargo install cargo-about --version 0.9.2 --locked
+cargo install cargo-about --version 0.9.2 --locked --features cli
 pnpm typecheck
 pnpm tauri dev
 ```
