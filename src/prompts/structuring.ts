@@ -11,7 +11,7 @@ Rules:
 3. Infer headings, lists, tables, and code blocks when the Input clearly indicates them.
 4. Omit page numbers, running headers or footers, and interface chrome from text and images. For images, transcribe the visible text; correct a character only when it was clearly misread from the image.
 5. Keep formulas as plain text; do not use LaTeX.
-6. Output only the GitHub Flavored Markdown body. Do not add a preamble or wrap the answer in a code fence.
+6. Output only the GitHub Flavored Markdown body. Do not add a preamble or an extra code fence around the Markdown body. Use fenced blocks for code or logs, even when they are the entire body.
 7. If an image contains no text, output exactly NO_TEXT.`;
 
 export const prompt = `{{input}}`;
