@@ -41,6 +41,37 @@ describe("Named Preset keys", () => {
     await client.listModels(connection.configuration, signal);
     expect(authorizations).toEqual([`Bearer ${expectedKey}`, `Bearer ${expectedKey}`]);
   });
+
+  it("prefers an entered key to its named environment key for both Bearer headers", async () => {
+    const enteredKey = "synthetic-openai-entered-override";
+    const environmentKey = "synthetic-openai-from-environment";
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      activePreset: "openai" as const,
+      presets: {
+        ...DEFAULT_SETTINGS.presets,
+        openai: { ...DEFAULT_SETTINGS.presets.openai, model: "model" },
+      },
+    };
+    const resolved = resolveProviderConnection(settings, {
+      enteredKey,
+      environment: { OPENAI_API_KEY: environmentKey },
+    });
+    expect(resolved).toHaveProperty("configuration");
+    if (!("configuration" in resolved)) throw new Error("Both supplied keys must make the connection ready");
+
+    const authorizations: (string | null)[] = [];
+    const client = providerClient(async (url, { headers }) => {
+      authorizations.push(new Headers(headers).get("Authorization"));
+      return url.endsWith("/models") ? new Response(JSON.stringify({ data: [] })) : new Response("data: [DONE]\n\n");
+    });
+    const signal = new AbortController().signal;
+    for await (const _ of client.streamChat(resolved.configuration, [{ role: "user", content: "hello" }], signal)) {
+      /* Consume the public stream to send the chat request. */
+    }
+    await client.listModels(resolved.configuration, signal);
+    expect(authorizations).toEqual([`Bearer ${enteredKey}`, `Bearer ${enteredKey}`]);
+  });
 });
 
 describe("Named Preset endpoints", () => {
