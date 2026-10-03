@@ -19,6 +19,7 @@ mod ui_language;
 
 fn main() {
     tauri::Builder::default()
+        .manage(secrets::KeyEnvironmentSnapshot::capture())
         // A second manual launch shows this one's Pin window and quits early.
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if !arguments
@@ -71,6 +72,7 @@ fn main() {
             clipboard::copy_text,
             secrets::protect_secret,
             secrets::unprotect_secret,
+            secrets::read_key_environment,
             hotkey::register_hotkey,
             hotkey::read_hotkey_error
         ])

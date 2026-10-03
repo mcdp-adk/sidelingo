@@ -15,6 +15,65 @@ describe("Provider keys", () => {
     await provider.close();
   });
 
+  it("shows the named launch key source without exposing its value", async () => {
+    const noNamedKeys = {
+      OPENAI_API_KEY: null,
+      OPENROUTER_API_KEY: null,
+      DEEPSEEK_API_KEY: null,
+      OLLAMA_API_KEY: null,
+    };
+    const incompleteOpenAI = {
+      schemaVersion: 1,
+      automaticUpdates: false,
+      activePreset: "openai",
+      presets: { openai: { model: "" } },
+    };
+    const cases = [
+      {
+        name: "set",
+        environment: { ...noNamedKeys, OPENAI_API_KEY: "synthetic-openai-launch-key" },
+        placeholder: "Using OPENAI_API_KEY; changes take effect after restart.",
+      },
+      {
+        name: "unset",
+        environment: noNamedKeys,
+        placeholder: "No key; environment variable changes take effect after restart.",
+      },
+    ];
+
+    for (const item of cases) {
+      clearClipboard();
+      await relaunch({ settings: incompleteOpenAI, environment: item.environment });
+      await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
+
+      writeClipboardText(`OpenAI placeholder ${item.name} ${Date.now()}`);
+      await $("button[aria-label='Regenerate (Ctrl+R / F5)']").waitForEnabled();
+      await expect($("[role=group]")).toHaveText("Enter a model", { containing: true });
+
+      await openSettings();
+      await expect($("select[aria-label='Preset']")).toHaveValue("openai");
+      const key = $("input[aria-label='Key']");
+      await expect(key).toHaveValue("");
+      await expect(key).toHaveAttribute("placeholder", item.placeholder);
+
+      if (item.name === "set") {
+        const model = "environment-persistence-proof-model";
+        await replaceTextField("Model", model);
+        await browser.keys("Enter");
+        const settingsPath = join(dataFolders(identifier).roaming, "settings.json");
+        await browser.waitUntil(() => {
+          try {
+            return JSON.parse(readFileSync(settingsPath, "utf8")).presets.openai.model === model;
+          } catch {
+            return false;
+          }
+        });
+        const writtenSettings = readFileSync(settingsPath, "utf8");
+        expect(writtenSettings.includes("synthetic-openai-launch-key")).toBe(false);
+      }
+    }
+  });
+
   it("protects an entered Custom key for the Windows user and uses it after restarting", async () => {
     const key = "synthetic-custom-key-for-e2e-only";
     provider.reset([{ delta: { content: "Credential test completed" } }]);

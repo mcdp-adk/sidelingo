@@ -11,6 +11,7 @@ export function SecretField({
   showLabel,
   hideLabel,
   undecryptableLabel,
+  placeholder,
   commit,
 }: {
   label: string;
@@ -19,6 +20,7 @@ export function SecretField({
   showLabel: string;
   hideLabel: string;
   undecryptableLabel: string;
+  placeholder?: string;
   commit: (ciphertext: string | null) => Promise<void>;
 }) {
   const entered = value ?? "";
@@ -48,6 +50,7 @@ export function SecretField({
         aria-label={label}
         type={revealed ? "text" : "password"}
         value={draft}
+        placeholder={placeholder}
         contentAfter={
           <Button
             appearance="transparent"

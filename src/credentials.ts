@@ -6,11 +6,17 @@ import type { Settings } from "./settings";
 export type EnteredKeys = Record<Preset, string | null>;
 
 type KeyVariable = NonNullable<(typeof PRESET_REGISTRY)[Preset]["keyVariable"]>;
+export type KeyEnvironmentSnapshot = Record<KeyVariable, string | null>;
 
 /** The running app's sources for a Preset; environment values never belong in Settings. */
 export interface KeySourcesSnapshot {
   enteredKey: string | null;
   environment?: Partial<Record<KeyVariable, string | null>>;
+}
+
+/** Reads the fixed environment-key snapshot captured by Rust when the app launched. */
+export async function readKeyEnvironment(): Promise<KeyEnvironmentSnapshot> {
+  return invoke<KeyEnvironmentSnapshot>("read_key_environment");
 }
 
 export async function readEnteredKeys(settings: Settings): Promise<EnteredKeys> {

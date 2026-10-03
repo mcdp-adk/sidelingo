@@ -8,11 +8,18 @@ import { resolveProviderConnection, type ConnectionFailure, type Preset, type Se
 import { currentKeySources, currentProxyPassword } from "./settings-store";
 
 const client = providerClient(fetch);
-const connectionMessages: Record<ConnectionFailure, string> = {
-  "no-provider": strings.noProvider,
-  "missing-key": strings.missingKey,
-  "missing-base-url": strings.missingBaseUrl,
-};
+function connectionMessage(failure: ConnectionFailure): string {
+  switch (failure.kind) {
+    case "no-provider":
+      return strings.noProvider;
+    case "missing-key":
+      return failure.cause === "environment-unset"
+        ? strings.keyMissingEnvironment(failure.variable)
+        : strings.keyUndecryptable;
+    case "missing-base-url":
+      return strings.missingBaseUrl;
+  }
+}
 
 export function ModelField({
   settings,
@@ -35,6 +42,7 @@ export function ModelField({
   const key = "configuration" in resolved ? resolved.configuration.key : null;
   const baseUrl = "configuration" in resolved ? resolved.configuration.baseUrl : null;
   const connectionError = "error" in resolved ? resolved.error : null;
+  const connectionErrorMessage = connectionError ? connectionMessage(connectionError) : null;
 
   useEffect(() => {
     setDraft(value);
@@ -42,7 +50,7 @@ export function ModelField({
   }, [value]);
   useEffect(() => {
     if ("error" in resolved) {
-      setError(connectionMessages[resolved.error]);
+      setError(connectionMessage(resolved.error));
       setModels([]);
       setLoading(false);
       return;
@@ -77,7 +85,12 @@ export function ModelField({
   }, [
     preset,
     baseUrl,
-    connectionError,
+    connectionError?.kind,
+    connectionError?.kind === "missing-key" ? connectionError.cause : null,
+    connectionError?.kind === "missing-key" && connectionError.cause === "environment-unset"
+      ? connectionError.variable
+      : null,
+    connectionErrorMessage,
     key,
     settings.proxy.mode,
     settings.proxy.url,

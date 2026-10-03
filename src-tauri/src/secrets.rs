@@ -1,11 +1,52 @@
 //! Protects secrets for the current Windows user without prompting.
 
 use base64::{engine::general_purpose::STANDARD, Engine};
+use serde::Serialize;
+use std::env;
+use tauri::State;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{LocalFree, HLOCAL};
 use windows::Win32::Security::Cryptography::{
     CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
 };
+
+/// The four named Provider keys inherited when this app process starts.
+#[derive(Clone, Serialize)]
+pub struct KeyEnvironmentSnapshot {
+    #[serde(rename = "OPENAI_API_KEY")]
+    openai_api_key: Option<String>,
+    #[serde(rename = "OPENROUTER_API_KEY")]
+    openrouter_api_key: Option<String>,
+    #[serde(rename = "DEEPSEEK_API_KEY")]
+    deepseek_api_key: Option<String>,
+    #[serde(rename = "OLLAMA_API_KEY")]
+    ollama_api_key: Option<String>,
+}
+
+impl KeyEnvironmentSnapshot {
+    pub fn capture() -> Self {
+        Self {
+            openai_api_key: env::var("OPENAI_API_KEY")
+                .ok()
+                .filter(|value| !value.is_empty()),
+            openrouter_api_key: env::var("OPENROUTER_API_KEY")
+                .ok()
+                .filter(|value| !value.is_empty()),
+            deepseek_api_key: env::var("DEEPSEEK_API_KEY")
+                .ok()
+                .filter(|value| !value.is_empty()),
+            ollama_api_key: env::var("OLLAMA_API_KEY")
+                .ok()
+                .filter(|value| !value.is_empty()),
+        }
+    }
+}
+
+/// Returns only the fixed environment-key snapshot captured when the app started.
+#[tauri::command]
+pub fn read_key_environment(snapshot: State<'_, KeyEnvironmentSnapshot>) -> KeyEnvironmentSnapshot {
+    snapshot.inner().clone()
+}
 
 fn input_blob(bytes: &[u8]) -> Result<CRYPT_INTEGER_BLOB, String> {
     Ok(CRYPT_INTEGER_BLOB {

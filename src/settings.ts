@@ -15,6 +15,8 @@ export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
 export type { Preset } from "./presets";
 
+type KeyVariable = NonNullable<(typeof PRESET_REGISTRY)[Preset]["keyVariable"]>;
+
 type PresetSettings = {
   [P in Preset]: {
     model: string;
@@ -175,13 +177,19 @@ export function providerConfiguration(
   settings: Settings,
   keySources?: KeySourcesSnapshot,
   proxyPassword: string | null = null,
-): { configuration: ProviderConfiguration } | { error: ConnectionFailure | "missing-model" } {
+): { configuration: ProviderConfiguration } | { error: ConfigurationFailure } {
   const preset = settings.activePreset;
-  if (preset && !settings.presets[preset].model) return { error: "missing-model" };
+  if (preset && !settings.presets[preset].model) return { error: { kind: "missing-model" } };
   return resolveProviderConnection(settings, keySources, proxyPassword);
 }
 
-export type ConnectionFailure = "no-provider" | "missing-key" | "missing-base-url";
+export type ConnectionFailure =
+  | { kind: "no-provider" }
+  | { kind: "missing-base-url" }
+  | { kind: "missing-key"; cause: "environment-unset"; variable: KeyVariable }
+  | { kind: "missing-key"; cause: "saved-key-could-not-decrypt"; variable: KeyVariable | null };
+
+export type ConfigurationFailure = ConnectionFailure | { kind: "missing-model" };
 
 /** Connection readiness shared by Rounds and model lists; a list needs no selected model. */
 export function resolveProviderConnection(
@@ -190,12 +198,17 @@ export function resolveProviderConnection(
   proxyPassword: string | null = null,
 ): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
   const preset = settings.activePreset;
-  if (!preset) return { error: "no-provider" };
+  if (!preset) return { error: { kind: "no-provider" } };
   const variable = PRESET_REGISTRY[preset].keyVariable;
-  const key = keySources?.enteredKey || (variable ? keySources?.environment?.[variable] : null);
-  if (variable && !key) return { error: "missing-key" };
   const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
-  if (!baseUrl) return { error: "missing-base-url" };
+  if (!baseUrl) return { error: { kind: "missing-base-url" } };
+  const savedKeyCiphertext = settings.presets[preset].keyCiphertext;
+  const enteredKey = keySources?.enteredKey;
+  if (savedKeyCiphertext !== null && enteredKey == null) {
+    return { error: { kind: "missing-key", cause: "saved-key-could-not-decrypt", variable } };
+  }
+  const key = enteredKey || (variable ? keySources?.environment?.[variable] : null);
+  if (variable && !key) return { error: { kind: "missing-key", cause: "environment-unset", variable } };
   const { model, reasoningEffort } = settings.presets[preset];
   return {
     configuration: { preset, baseUrl, model, reasoningEffort, key, proxy: proxyConfiguration(settings, proxyPassword) },

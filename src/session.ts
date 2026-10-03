@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
-import { providerConfiguration } from "./settings";
+import { providerConfiguration, type ConfigurationFailure } from "./settings";
 import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
@@ -20,7 +20,7 @@ export interface SessionState {
   hasInput: boolean;
   paused: boolean;
   overlong: boolean;
-  configurationFailure: "no-provider" | "missing-model" | "missing-base-url" | null;
+  configurationFailure: ConfigurationFailure | null;
 }
 
 let snapshot: SessionState = {
@@ -69,13 +69,7 @@ async function startRound(input: Input) {
     const settings = currentSettings();
     const resolved = providerConfiguration(settings, currentKeySources(settings.activePreset), currentProxyPassword());
     if ("error" in resolved) {
-      if (
-        resolved.error === "no-provider" ||
-        resolved.error === "missing-model" ||
-        resolved.error === "missing-base-url"
-      ) {
-        publish(snapshot.round, { configurationFailure: resolved.error });
-      }
+      publish(snapshot.round, { configurationFailure: resolved.error });
       return;
     }
     const provider = resolved.configuration;

@@ -2,12 +2,24 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
-import { PRESETS, type Preset } from "./presets";
-import { readEnteredKeys, unprotectSecret, type EnteredKeys, type KeySourcesSnapshot } from "./credentials";
+import { PRESETS, PRESET_REGISTRY, type Preset } from "./presets";
+import {
+  readEnteredKeys,
+  readKeyEnvironment,
+  unprotectSecret,
+  type EnteredKeys,
+  type KeyEnvironmentSnapshot,
+  type KeySourcesSnapshot,
+} from "./credentials";
 import { strings } from "./i18n";
 
 let settings: Settings = DEFAULT_SETTINGS;
 let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;
+let keyEnvironment: KeyEnvironmentSnapshot = Object.fromEntries(
+  PRESETS.map((preset) => PRESET_REGISTRY[preset].keyVariable)
+    .filter((variable): variable is NonNullable<typeof variable> => variable !== null)
+    .map((variable) => [variable, null]),
+) as KeyEnvironmentSnapshot;
 let proxyPassword: string | null = null;
 let revision = 0;
 let pending = Promise.resolve();
@@ -39,6 +51,7 @@ export async function startSettingsStore(): Promise<void> {
     changed = true;
     void accept(payload);
   });
+  keyEnvironment = await readKeyEnvironment();
   const stored = await invoke<SettingsRead>("read_settings");
   if (!changed) {
     let document: unknown;
@@ -92,7 +105,11 @@ export function currentEnteredKey(preset: Preset | null): string | null {
 }
 
 export function currentKeySources(preset: Preset | null): KeySourcesSnapshot {
-  return { enteredKey: currentEnteredKey(preset) };
+  const variable = preset ? PRESET_REGISTRY[preset].keyVariable : null;
+  return {
+    enteredKey: currentEnteredKey(preset),
+    ...(variable ? { environment: { [variable]: keyEnvironment[variable] } } : {}),
+  };
 }
 
 export function currentProxyPassword(): string | null {

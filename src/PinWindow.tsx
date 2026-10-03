@@ -36,7 +36,7 @@ import { cjk } from "@streamdown/cjk";
 import { strings } from "./i18n";
 import type { RoundError } from "./round";
 import { regenerate, toggleClipboardPause, useSession } from "./session";
-import { DISPLAY_MODES, type DisplayMode } from "./settings";
+import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "./settings";
 import { patchSettings, useSettings } from "./settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
@@ -73,6 +73,21 @@ function canOpenSettings(error: RoundError): boolean {
   return (
     error.category === "network" || (error.category === "provider-http" && [401, 403, 404].includes(error.status ?? 0))
   );
+}
+
+function configurationFailureMessage(failure: ConfigurationFailure): string {
+  switch (failure.kind) {
+    case "no-provider":
+      return strings.chooseProvider;
+    case "missing-model":
+      return strings.missingModel;
+    case "missing-base-url":
+      return strings.missingBaseUrl;
+    case "missing-key":
+      return failure.cause === "environment-unset"
+        ? strings.keyMissingEnvironment(failure.variable)
+        : strings.keyUndecryptable;
+  }
 }
 
 const useStyles = makeStyles({
@@ -341,15 +356,9 @@ export function PinWindow() {
         onDoubleClick={onDoubleClick}
       >
         {configurationFailure && (
-          <MessageBar intent="info" layout="multiline">
+          <MessageBar intent={configurationFailure.kind === "missing-key" ? "error" : "info"} layout="multiline">
             <MessageBarBody>
-              <MessageBarTitle>
-                {configurationFailure === "no-provider"
-                  ? strings.chooseProvider
-                  : configurationFailure === "missing-model"
-                    ? strings.missingModel
-                    : strings.missingBaseUrl}
-              </MessageBarTitle>
+              <MessageBarTitle>{configurationFailureMessage(configurationFailure)}</MessageBarTitle>
             </MessageBarBody>
             <MessageBarActions>
               <Button size="small" onClick={() => void invoke("open_settings")}>
