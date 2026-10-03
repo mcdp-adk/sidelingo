@@ -1,7 +1,9 @@
 import { readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
 import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
+import { inspectWindows } from "./window";
 
 const root = resolve(import.meta.dirname, "..");
 const e2eConfig = join(root, "src-tauri", "tauri.e2e.conf.json");
@@ -75,4 +77,14 @@ export async function relaunch(launch: Launch = {}): Promise<void> {
   resetDataFolders(launch);
   // reloadSession's own attempt to end the already ended session is logged and ignored.
   await browser.reloadSession(capabilities(launch));
+}
+
+/** A real second launch shows the existing hidden Pin window. */
+export async function showAgain(): Promise<void> {
+  const secondLaunch = spawn(appExe, { stdio: "ignore", windowsHide: true });
+  const [code] = await once(secondLaunch, "exit");
+  expect(code).toBe(0);
+  await browser.waitUntil(() => inspectWindows(appExe, "sidelingo")[0]?.visible, {
+    timeoutMsg: "the existing Pin window did not show",
+  });
 }

@@ -70,59 +70,56 @@ function structuringMessages(input: Input): ChatMessage[] {
   ];
 }
 
-/** Hides a leading reasoning block, buffering partial markers so they never flash in the window. */
+/** Streams cleaned snapshots, hiding recognized reasoning and clearing an unmarked prefix once its closer arrives. */
 async function* withoutReasoning(deltas: AsyncGenerator<string>): AsyncGenerator<string> {
   const opening = "<think>";
   const closing = "</think>";
   let prefix = "";
   let hiddenTail = "";
-  let state: "checking-prefix" | "reasoning" | "content" = "checking-prefix";
+  let content = "";
+  let state: "checking-prefix" | "reasoning" | "unmarked" | "content" = "checking-prefix";
 
   for await (const delta of deltas) {
-    if (state === "content") {
-      yield delta;
-      continue;
-    }
+    if (state === "checking-prefix") {
+      prefix += delta;
+      const candidate = prefix.trimStart();
+      if (opening.startsWith(candidate)) {
+        if (candidate === opening) {
+          state = "reasoning";
+          prefix = "";
+        }
+        continue;
+      }
+      if (candidate.startsWith(opening)) {
+        state = "reasoning";
+        hiddenTail = candidate.slice(opening.length);
+      } else {
+        state = "unmarked";
+        content = prefix;
+      }
+      prefix = "";
+    } else if (state === "reasoning") hiddenTail += delta;
+    else content += delta;
 
     if (state === "reasoning") {
-      const hidden = hiddenTail + delta;
-      const end = hidden.indexOf(closing);
+      const end = hiddenTail.indexOf(closing);
+      if (end < 0) {
+        hiddenTail = hiddenTail.slice(-(closing.length - 1));
+        continue;
+      }
+      content = hiddenTail.slice(end + closing.length);
+      hiddenTail = "";
+      state = "content";
+    }
+    if (state === "unmarked") {
+      const end = content.indexOf(closing);
       if (end >= 0) {
+        content = content.slice(end + closing.length);
         state = "content";
-        const content = hidden.slice(end + closing.length);
-        if (content) yield content;
-      } else {
-        hiddenTail = hidden.slice(-(closing.length - 1));
       }
-      continue;
     }
-
-    prefix += delta;
-    if (opening.startsWith(prefix)) {
-      if (prefix === opening) {
-        state = "reasoning";
-        prefix = "";
-      }
-      continue;
-    }
-    if (prefix.startsWith(opening)) {
-      state = "reasoning";
-      const hidden = prefix.slice(opening.length);
-      prefix = "";
-      const end = hidden.indexOf(closing);
-      if (end >= 0) {
-        state = "content";
-        const content = hidden.slice(end + closing.length);
-        if (content) yield content;
-      } else {
-        hiddenTail = hidden.slice(-(closing.length - 1));
-      }
-      continue;
-    }
-
-    state = "content";
-    yield prefix;
-    prefix = "";
+    // An empty replacement must clear content that streamed before an unmarked closer.
+    yield content;
   }
 
   // A normal response may finish while its opening marker is still only a partial match.
@@ -147,10 +144,10 @@ export async function* run(
     const translation: RoundPane = { text: "", status: "waiting" };
     yield { stage: "structuring", outcome: "running", source, translation };
     try {
-      for await (const delta of withoutReasoning(
+      for await (const cleaned of withoutReasoning(
         client.streamChat(configuration.provider, structuringMessages(input), signal),
       )) {
-        sourceText += delta;
+        sourceText = cleaned;
         source = { text: sourceText, status: "streaming" };
         yield { stage: "structuring", outcome: "running", source, translation };
       }
@@ -183,8 +180,8 @@ export async function* run(
   const messages = translationMessages(sourceText, configuration.targetLanguage);
   yield { stage: "translating", outcome: "running", source, translation };
   try {
-    for await (const delta of withoutReasoning(client.streamChat(configuration.provider, messages, signal))) {
-      translated += delta;
+    for await (const cleaned of withoutReasoning(client.streamChat(configuration.provider, messages, signal))) {
+      translated = cleaned;
       translation = { text: translated, status: "streaming" };
       yield { stage: "translating", outcome: "running", source, translation };
     }

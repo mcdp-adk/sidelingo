@@ -346,18 +346,52 @@ describe("Provider errors", () => {
     expect(settled).toContain(detail);
   });
 
+  it("keeps partial Source and shows verbatim malformed SSE data as a Provider error", async () => {
+    const copied = `Wrapped line ${Date.now()}\ncontinues here`;
+    const partial = `## Partial Source ${Date.now()}`;
+    const malformed = `{broken-${Date.now()}`;
+    const held = gate();
+    provider.reset([{ delta: { content: partial } }, { wait: held.wait }, { rawData: malformed }]);
+    writeClipboardText(copied);
+    await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
+
+    try {
+      const sourcePane = $("[role=region][aria-label='Source']");
+      await expect(sourcePane).toHaveText(partial.slice(3), { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+      expect(provider.requests).toHaveLength(1);
+      expect(provider.requests[0].body.messages[1].content).toEqual([{ type: "text", text: copied }]);
+
+      held.open();
+      await expect(sourcePane).toHaveText("Provider error", { containing: true });
+      const visible = await sourcePane.getText();
+      expect(visible).toContain("Structuring failed");
+      expect(visible).toContain(malformed);
+      expect(visible).toContain(partial.slice(3));
+      expect(visible.indexOf(partial.slice(3))).toBeLessThan(visible.indexOf("Provider error"));
+      await expect($("[role=region][aria-label='Translation']")).toHaveText(malformed, { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+      expect(provider.requests).toHaveLength(1);
+    } finally {
+      held.open();
+    }
+  });
+
   it("shows an empty Structuring response and does not start Translation", async () => {
     const thought = `private reasoning ${Date.now()}`;
     const scenarios = [
-      { name: "empty response", steps: [] as Step[], thought: undefined },
-      { name: "hidden reasoning only", steps: [{ delta: { content: `<think>${thought}</think>` } }], thought },
+      { name: "empty response", reply: [] as Step[], thought: undefined },
+      { name: "hidden reasoning only", reply: [{ delta: { content: `<think>${thought}</think>` } }], thought },
+      { name: "HTTP 204", reply: { status: 204, message: "" }, thought: undefined },
     ];
 
     for (const scenario of scenarios) {
       const copied = `Wrapped line ${Date.now()}\ncontinues here`;
       provider.reset(({ body }) =>
         Array.isArray(body.messages[1].content)
-          ? scenario.steps
+          ? scenario.reply
           : [{ delta: { content: `Unexpected Translation ${scenario.name} ${Date.now()}` } }],
       );
       writeClipboardText(copied);
@@ -380,6 +414,8 @@ describe("Provider errors", () => {
       expect(provider.requests).toHaveLength(1);
       expect(visible).toMatch(/Structuring failed|整理失败/);
       expect(visible).toMatch(/Empty response|响应为空/);
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
       if (scenario.thought) expect(visible).not.toContain(scenario.thought);
     }
   });
@@ -478,6 +514,49 @@ describe("Provider errors", () => {
       await browser.waitUntil(async () => /Network error|网络错误/.test(await translationPane.getText()), {
         timeoutMsg: "the Structuring failure did not appear in Translation",
       });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+      expect(provider.requests).toHaveLength(1);
+    } finally {
+      held.open();
+    }
+  });
+
+  it("shows a network error when an HTTP error body drops before completing", async () => {
+    const copied = `Wrapped line ${Date.now()}\ncontinues here`;
+    const detail = `Synthetic interrupted HTTP error ${Date.now()}`;
+    const held = gate();
+    provider.reset(({ body }) =>
+      Array.isArray(body.messages[1].content)
+        ? {
+            status: 429,
+            message: detail,
+            dropAfterPartialBody: { wait: held.wait, onReached: held.signalReached },
+          }
+        : [{ delta: { content: "Unexpected Translation after interrupted error body" } }],
+    );
+    writeClipboardText(copied);
+    await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
+
+    try {
+      await held.reached;
+      expect(provider.requests).toHaveLength(1);
+      const request = provider.requests[0];
+      expect(request.method).toBe("POST");
+      expect(request.body.messages[1].content).toEqual([{ type: "text", text: copied }]);
+      const sourcePane = $("[role=region][aria-label='Source']");
+      await expect(sourcePane).toHaveText("Structuring…", { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+
+      held.open();
+      await browser.waitUntil(() => provider.interruptedRequests.includes(request), {
+        timeoutMsg: "the partial HTTP error response did not actually drop",
+      });
+      await expect(sourcePane).toHaveText("Network error", { containing: true });
+      await expect(sourcePane).toHaveText("Structuring failed", { containing: true });
+      const translationPane = $("[role=region][aria-label='Translation']");
+      await expect(translationPane).toHaveText("Network error", { containing: true });
       await expect($("button[aria-label='Copy source']")).toBeDisabled();
       await expect($("button[aria-label='Copy translation']")).toBeDisabled();
       expect(provider.requests).toHaveLength(1);

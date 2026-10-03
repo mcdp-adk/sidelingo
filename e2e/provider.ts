@@ -16,6 +16,8 @@ export type Step =
   | { delta: { content?: string; reasoning_content?: string; reasoning?: string } }
   /** A Provider error object sent inside an HTTP 200 SSE response. */
   | { error: { message: string } }
+  /** Literal SSE data, including malformed JSON from a Provider. */
+  | { rawData: string }
   /** An SSE comment line, such as `keep-alive`. */
   | { comment: string }
   /** Drops the actual connection before the reply finishes. */
@@ -27,6 +29,8 @@ export type Step =
 export interface HttpReply {
   status: number;
   message: string;
+  /** Sends all but the JSON body's last byte, holds, then drops the real connection. */
+  dropAfterPartialBody?: { wait: Promise<unknown>; onReached?: () => void };
 }
 
 export type Script = Step[] | HttpReply | ((request: RecordedRequest) => Step[] | HttpReply);
@@ -81,8 +85,19 @@ export class FakeProvider {
     const reply = typeof this.script === "function" ? this.script(recorded) : this.script;
     if (Array.isArray(reply)) await stream(response, reply);
     else {
-      response.writeHead(reply.status, { "content-type": "application/json" });
-      response.end(JSON.stringify({ error: { message: reply.message } }));
+      const body = JSON.stringify({ error: { message: reply.message } });
+      response.writeHead(reply.status, {
+        "content-type": "application/json",
+        ...(reply.dropAfterPartialBody && { "content-length": Buffer.byteLength(body) }),
+      });
+      if (reply.dropAfterPartialBody) {
+        response.flushHeaders();
+        await new Promise<void>((resolve) => response.write(body.slice(0, -1), () => resolve()));
+        if (response.destroyed) return;
+        reply.dropAfterPartialBody.onReached?.();
+        await reply.dropAfterPartialBody.wait;
+        response.destroy();
+      } else response.end(body);
     }
   });
 
@@ -131,6 +146,8 @@ async function stream(response: ServerResponse, steps: Step[]) {
       return;
     } else if ("error" in step) {
       response.write(`data: ${JSON.stringify({ error: step.error })}\n\n`);
+    } else if ("rawData" in step) {
+      response.write(`data: ${step.rawData}\n\n`);
     } else if ("comment" in step) response.write(`: ${step.comment}\n\n`);
     else
       response.write(

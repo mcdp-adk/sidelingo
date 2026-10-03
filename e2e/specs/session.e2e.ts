@@ -1,20 +1,10 @@
-import { spawn } from "node:child_process";
-import { once } from "node:events";
-import { appExe, relaunch } from "../app";
+import { appExe, relaunch, showAgain } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
 import { openSettings } from "../settings";
 import { inspectWindows } from "../window";
 
 const pinVisible = () => inspectWindows(appExe, "sidelingo")[0]?.visible;
-
-/** A real second launch shows the existing hidden Pin window. */
-async function showAgain(): Promise<void> {
-  const secondLaunch = spawn(appExe, { stdio: "ignore", windowsHide: true });
-  const [code] = await once(secondLaunch, "exit");
-  expect(code).toBe(0);
-  await browser.waitUntil(pinVisible, { timeoutMsg: "the existing Pin window did not show" });
-}
 
 describe("The Pin window session", () => {
   let provider: FakeProvider;

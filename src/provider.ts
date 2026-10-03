@@ -102,9 +102,15 @@ export function providerClient(transport: Transport): ProviderClient {
         },
         proxy,
       );
-      for await (const data of serverSentData(response.body!, signal)) {
+      if (response.body === null) return;
+      for await (const data of serverSentData(response.body, signal)) {
         if (data === "[DONE]") return;
-        const chunk = JSON.parse(data);
+        let chunk;
+        try {
+          chunk = JSON.parse(data);
+        } catch {
+          throw new ProviderError("provider-error", data);
+        }
         if (chunk?.error !== undefined) {
           const message = typeof chunk.error?.message === "string" ? chunk.error.message : data;
           throw new ProviderError("provider-error", message);
@@ -137,7 +143,13 @@ async function request(transport: Transport, url: string, init: RequestInit, pro
     throw networkError(reason);
   }
   if (!response.ok) {
-    const body = await response.text();
+    let body;
+    try {
+      body = await response.text();
+    } catch (reason) {
+      if (init.signal?.aborted) throw reason;
+      throw networkError(reason);
+    }
     let message = body;
     try {
       const document = JSON.parse(body);

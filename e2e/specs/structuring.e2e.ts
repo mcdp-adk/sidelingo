@@ -1,5 +1,5 @@
 import { relaunch } from "../app";
-import { writeClipboardText } from "../clipboard";
+import { readClipboardText, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
 
 const status = (text: string) => $(`//*[normalize-space(text())="${text}"]`);
@@ -59,42 +59,130 @@ describe("Structuring multi-line text", () => {
   });
 
   it("removes reasoning prefixes from Structuring and Translation", async () => {
+    for (const leading of ["", "\n \t"]) {
+      const copied = `First line ${Date.now()}\nsecond line`;
+      const source = `## ${words("Source")}`;
+      const translated = words("Translated");
+      const structuringGate = gate();
+      const translationGate = gate();
+      provider.reset(({ body }) =>
+        Array.isArray(body.messages[1].content)
+          ? [
+              { delta: { content: `${leading}<think>private structure</th` } },
+              { wait: structuringGate.wait, onReached: structuringGate.signalReached },
+              { delta: { content: `ink>${source}` } },
+            ]
+          : [
+              { delta: { content: `${leading}<think>private translation</th` } },
+              { wait: translationGate.wait, onReached: translationGate.signalReached },
+              { delta: { content: `ink>${translated}` } },
+            ],
+      );
+      writeClipboardText(copied);
+      await relaunch({ settings: customSettings(provider) });
+
+      try {
+        await structuringGate.reached;
+        await browser.pause(100);
+        await expect($("body")).not.toHaveText(/private structure|<think>|<\/think>/);
+        structuringGate.open();
+
+        await translationGate.reached;
+        await browser.pause(100);
+        await expect($("body")).not.toHaveText(/private translation|<think>|<\/think>/);
+        translationGate.open();
+
+        await expect($("body")).toHaveText(translated, { containing: true });
+        expect(provider.requests).toHaveLength(2);
+        expect(provider.requests[1].body.messages[1].content).toContain(source);
+        expect(provider.requests[1].body.messages[1].content).not.toContain("private structure");
+        await expect($("body")).not.toHaveText(/private structure|private translation|<think>|<\/think>/);
+      } finally {
+        structuringGate.open();
+        translationGate.open();
+      }
+    }
+  });
+
+  it("clears opener-less prefixes when their closing marker arrives and copies only the answers", async () => {
     const copied = `First line ${Date.now()}\nsecond line`;
-    const source = `## ${words("Source")}`;
-    const translated = words("Translated");
-    const structuringGate = gate();
-    const translationGate = gate();
+    const sourcePrefix = words("Unmarked Source prefix");
+    const translationPrefix = words("Unmarked Translation prefix");
+    const source = `## ${words("Clean Source")}`;
+    const translated = words("Clean Translation");
+    const sourceClosing = gate();
+    const sourceAnswer = gate();
+    const translationClosing = gate();
+    const translationAnswer = gate();
     provider.reset(({ body }) =>
       Array.isArray(body.messages[1].content)
         ? [
-            { delta: { content: `<think>private structure</th` } },
-            { wait: structuringGate.wait, onReached: structuringGate.signalReached },
-            { delta: { content: `ink>${source}` } },
+            { delta: { content: sourcePrefix } },
+            { wait: sourceClosing.wait },
+            { delta: { content: "</th" } },
+            { delta: { content: "ink>" } },
+            { wait: sourceAnswer.wait, onReached: sourceAnswer.signalReached },
+            { delta: { content: source } },
           ]
         : [
-            { delta: { content: `<think>private translation</th` } },
-            { wait: translationGate.wait, onReached: translationGate.signalReached },
-            { delta: { content: `ink>${translated}` } },
+            { delta: { content: translationPrefix } },
+            { wait: translationClosing.wait },
+            { delta: { content: "</th" } },
+            { delta: { content: "ink>" } },
+            { wait: translationAnswer.wait, onReached: translationAnswer.signalReached },
+            { delta: { content: translated } },
           ],
     );
     writeClipboardText(copied);
-    await relaunch({ settings: customSettings(provider) });
+    await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
 
-    await structuringGate.reached;
-    await browser.pause(100);
-    await expect($("body")).not.toHaveText(/private structure|<think>|<\/think>/);
-    structuringGate.open();
+    try {
+      const sourcePane = $("[role=region][aria-label='Source']");
+      const translationPane = $("[role=region][aria-label='Translation']");
+      await expect(sourcePane).toHaveText(sourcePrefix, { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      expect(provider.requests).toHaveLength(1);
+      expect(provider.requests[0].body.messages[1].content).toEqual([{ type: "text", text: copied }]);
 
-    await translationGate.reached;
-    await browser.pause(100);
-    await expect($("body")).not.toHaveText(/private translation|<think>|<\/think>/);
-    translationGate.open();
+      sourceClosing.open();
+      await sourceAnswer.reached;
+      await expect(sourcePane).toHaveText("Structuring…", { containing: true });
+      await expect(sourcePane).not.toHaveText(sourcePrefix, { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeDisabled();
+      sourceAnswer.open();
 
-    await expect($("body")).toHaveText(translated, { containing: true });
-    expect(provider.requests).toHaveLength(2);
-    expect(provider.requests[1].body.messages[1].content).toContain(source);
-    expect(provider.requests[1].body.messages[1].content).not.toContain("private structure");
-    await expect($("body")).not.toHaveText(/private structure|private translation|<think>|<\/think>/);
+      await expect(translationPane).toHaveText(translationPrefix, { containing: true });
+      await expect(sourcePane).toHaveText(source.slice(3), { containing: true });
+      await expect($("button[aria-label='Copy source']")).toBeEnabled();
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+      expect(provider.requests).toHaveLength(2);
+      expect(provider.requests[1].body.messages[1].content).toBe(`Translate to English:\n\n\n${source}`);
+      await $("button[aria-label='Copy source']").click();
+      await browser.waitUntil(() => readClipboardText() === source, {
+        timeoutMsg: "Copy source did not write only the cleaned Source",
+      });
+
+      translationClosing.open();
+      await translationAnswer.reached;
+      await expect(translationPane).toHaveText("Translating…", { containing: true });
+      await expect(translationPane).not.toHaveText(translationPrefix, { containing: true });
+      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+      await expect($("button[aria-label='Copy source']")).toBeEnabled();
+      translationAnswer.open();
+
+      await expect(translationPane).toHaveText(translated, { containing: true });
+      await expect($("button[aria-label='Copy translation']")).toBeEnabled();
+      await $("button[aria-label='Copy translation']").click();
+      await browser.waitUntil(() => readClipboardText() === translated, {
+        timeoutMsg: "Copy translation did not write only the cleaned Translation",
+      });
+      expect(provider.requests).toHaveLength(2);
+    } finally {
+      sourceClosing.open();
+      sourceAnswer.open();
+      translationClosing.open();
+      translationAnswer.open();
+    }
   });
 
   it("shows the Translation status immediately for a single line", async () => {
