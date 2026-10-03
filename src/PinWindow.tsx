@@ -69,6 +69,12 @@ function errorTitle(error: RoundError): string {
   return `${stage}: ${category}${error.status === undefined ? "" : ` ${error.status}`}`;
 }
 
+function canOpenSettings(error: RoundError): boolean {
+  return (
+    error.category === "network" || (error.category === "provider-http" && [401, 403, 404].includes(error.status ?? 0))
+  );
+}
+
 const useStyles = makeStyles({
   root: { position: "relative", height: "100vh", overflow: "hidden" },
   paused: {
@@ -384,13 +390,25 @@ export function PinWindow() {
                 </div>
               )}
               {result.error && (
-                <MessageBar intent="error">
+                <MessageBar intent="error" layout={canOpenSettings(result.error) ? "multiline" : undefined}>
                   <MessageBarBody>
                     <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
                     <Text as="p" block className={styles.errorDetail}>
                       {result.error.detail}
                     </Text>
+                    {result.error.hints?.map((hint) => (
+                      <Text key={hint} as="p" block>
+                        {hint === "image-model-support" ? strings.imageModelHint : strings.reasoningEffortHint}
+                      </Text>
+                    ))}
                   </MessageBarBody>
+                  {canOpenSettings(result.error) && (
+                    <MessageBarActions>
+                      <Button size="small" onClick={() => void invoke("open_settings")}>
+                        {strings.openSettings}
+                      </Button>
+                    </MessageBarActions>
+                  )}
                 </MessageBar>
               )}
             </>

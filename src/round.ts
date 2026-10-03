@@ -15,12 +15,14 @@ export interface RoundConfiguration {
 
 export type RoundStage = "structuring" | "translating" | "done" | "no-text";
 export type RoundOutcome = "running" | "done" | "no-text" | "failed";
+export type RoundErrorHint = "image-model-support" | "reasoning-effort";
 
 export interface RoundError {
   stage: "structuring" | "translating";
   category: ProviderError["category"];
   status?: number;
   detail: string;
+  hints?: RoundErrorHint[];
 }
 
 export interface RoundPane {
@@ -155,7 +157,7 @@ export async function* run(
       if (!sourceText.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
     } catch (reason) {
       if (signal.aborted) return;
-      const error = roundError(reason, "structuring");
+      const error = roundError(reason, "structuring", input, configuration);
       yield {
         stage: "structuring",
         outcome: "failed",
@@ -189,7 +191,7 @@ export async function* run(
     if (!translated.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
   } catch (reason) {
     if (signal.aborted) return;
-    const error = roundError(reason, "translating");
+    const error = roundError(reason, "translating", input, configuration);
     yield {
       stage: "translating",
       outcome: "failed",
@@ -206,12 +208,23 @@ export async function* run(
   };
 }
 
-function roundError(reason: unknown, stage: RoundError["stage"]): RoundError {
+function roundError(
+  reason: unknown,
+  stage: RoundError["stage"],
+  input: Input,
+  configuration: RoundConfiguration,
+): RoundError {
   if (!(reason instanceof ProviderError)) throw reason;
+  const hints: RoundErrorHint[] = [];
+  if (reason.status === 400) {
+    if (input.kind === "image") hints.push("image-model-support");
+    if (configuration.provider.reasoningEffort != null) hints.push("reasoning-effort");
+  }
   return {
     stage,
     category: reason.category,
     ...(reason.status === undefined ? {} : { status: reason.status }),
     detail: reason.message,
+    ...(hints.length > 0 ? { hints } : {}),
   };
 }

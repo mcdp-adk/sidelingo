@@ -1,5 +1,5 @@
 import { relaunch } from "../app";
-import { readClipboardText, writeClipboardText } from "../clipboard";
+import { readClipboardText, writeClipboardBitmap, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate, type Step } from "../provider";
 
 const CTRL = String.fromCharCode(0xe009);
@@ -54,6 +54,212 @@ describe("Provider errors", () => {
       expect(visible).toContain(locale.status);
       expect(visible).toContain(detail);
       expect(provider.requests).toHaveLength(1);
+    }
+  });
+
+  it("shows an image hint when a 400 rejects an image Input", async () => {
+    const detail = `Synthetic image rejection ${Date.now()}`;
+    provider.reset({ status: 400, message: detail });
+    writeClipboardBitmap(2, 2);
+    await relaunch({ settings: customSettings(provider) });
+
+    await browser.waitUntil(() => provider.requests.length > 0, {
+      timeoutMsg: "the bitmap Input did not reach the fake Provider",
+    });
+    expect(provider.requests).toHaveLength(1);
+    const request = provider.requests[0];
+    expect(request.method).toBe("POST");
+    expect(Array.isArray(request.body.messages[1].content)).toBe(true);
+    expect(request.body.messages[1].content.some((part: { type?: string }) => part.type === "image_url")).toBe(true);
+
+    await expect($("body")).toHaveText(detail, { containing: true });
+    const visible = await $("body").getText();
+    expect(visible).toMatch(/Structuring failed/);
+    expect(visible).toMatch(/Provider HTTP error 400/);
+    expect(visible).toContain(detail);
+    expect(provider.requests).toHaveLength(1);
+    expect(visible).toContain("the model may not support images");
+  });
+
+  it("keeps an image hint when Translation returns HTTP 400", async () => {
+    const source = `Source extracted from bitmap ${Date.now()}`;
+    const detail = `Synthetic image Translation rejection ${Date.now()}`;
+    provider.reset(({ body }) =>
+      Array.isArray(body.messages[1].content) ? [{ delta: { content: source } }] : { status: 400, message: detail },
+    );
+    writeClipboardBitmap(2, 2);
+    await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
+
+    await browser.waitUntil(() => provider.requests.length >= 2, {
+      timeoutMsg: "the completed image Structuring request did not reach Translation",
+    });
+    expect(provider.requests).toHaveLength(2);
+    expect(Array.isArray(provider.requests[0].body.messages[1].content)).toBe(true);
+    expect(
+      provider.requests[0].body.messages[1].content.some((part: { type?: string }) => part.type === "image_url"),
+    ).toBe(true);
+    expect(provider.requests[1].body.messages[1].content).toContain(source);
+
+    const sourcePane = $("[role=region][aria-label='Source']");
+    await expect(sourcePane).toHaveText(source, { containing: true });
+    await expect($("button[aria-label='Copy source']")).toBeEnabled();
+    await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+
+    const translationPane = $("[role=region][aria-label='Translation']");
+    await expect(translationPane).toHaveText(detail, { containing: true });
+    const visible = await translationPane.getText();
+    expect(visible).toMatch(/Translation failed/);
+    expect(visible).toMatch(/Provider HTTP error 400/);
+    expect(visible).toContain(detail);
+    expect(provider.requests).toHaveLength(2);
+    expect(visible).toContain("the model may not support images");
+  });
+
+  it("shows an effort hint when a 400 rejects a non-Default request", async () => {
+    const copied = `Single-line Input ${Date.now()}`;
+    const detail = `Synthetic effort rejection ${Date.now()}`;
+    const defaults = customSettings(provider);
+    const settings = {
+      ...defaults,
+      presets: {
+        ...defaults.presets,
+        custom: { ...defaults.presets.custom, reasoningEffort: "low" },
+      },
+    };
+    provider.reset({ status: 400, message: detail });
+    writeClipboardText(copied);
+    await relaunch({ settings });
+
+    await browser.waitUntil(() => provider.requests.length > 0, {
+      timeoutMsg: "the single-line Input did not reach the fake Provider",
+    });
+    expect(provider.requests).toHaveLength(1);
+    expect(Array.isArray(provider.requests[0].body.messages[1].content)).toBe(false);
+    expect(provider.requests[0].body.reasoning_effort).toBe("low");
+
+    await expect($("body")).toHaveText(detail, { containing: true });
+    const visible = await $("body").getText();
+    expect(visible).toMatch(/Translation failed/);
+    expect(visible).toMatch(/Provider HTTP error 400/);
+    expect(visible).toContain(detail);
+    expect(provider.requests).toHaveLength(1);
+    expect(visible).toContain("the model may not support this reasoning effort; try Default");
+  });
+
+  it("shows neither 400 hint for a text Input at Default", async () => {
+    const copied = `Single-line Default Input ${Date.now()}`;
+    const detail = `Synthetic Default rejection ${Date.now()}`;
+    provider.reset({ status: 400, message: detail });
+    writeClipboardText(copied);
+    await relaunch({ settings: customSettings(provider) });
+
+    await browser.waitUntil(() => provider.requests.length > 0, {
+      timeoutMsg: "the Default Input did not reach the fake Provider",
+    });
+    expect(provider.requests).toHaveLength(1);
+    expect(Array.isArray(provider.requests[0].body.messages[1].content)).toBe(false);
+
+    await expect($("body")).toHaveText(detail, { containing: true });
+    const visible = await $("body").getText();
+    expect(visible).toMatch(/Translation failed/);
+    expect(visible).toMatch(/Provider HTTP error 400/);
+    expect(visible).toContain(detail);
+    expect(visible).not.toContain("the model may not support images");
+    expect(visible).not.toContain("the model may not support this reasoning effort; try Default");
+    expect(provider.requests).toHaveLength(1);
+  });
+
+  it("shows both 400 hints in the UI language when both contexts apply", async () => {
+    const detail = `Synthetic combined rejection ${Date.now()}`;
+    const defaults = customSettings(provider);
+    const settings = {
+      ...defaults,
+      presets: {
+        ...defaults.presets,
+        custom: { ...defaults.presets.custom, reasoningEffort: "low" },
+      },
+    };
+    provider.reset({ status: 400, message: detail });
+    writeClipboardBitmap(2, 2);
+    await relaunch({ language: "zh-CN", settings });
+
+    await browser.waitUntil(() => provider.requests.length > 0, {
+      timeoutMsg: "the image Input with non-Default effort did not reach the fake Provider",
+    });
+    expect(provider.requests).toHaveLength(1);
+    expect(provider.requests[0].body.reasoning_effort).toBe("low");
+    expect(
+      provider.requests[0].body.messages[1].content.some((part: { type?: string }) => part.type === "image_url"),
+    ).toBe(true);
+
+    await expect($("body")).toHaveText(detail, { containing: true });
+    const visible = await $("body").getText();
+    expect(visible).toContain("整理失败");
+    expect(visible).toContain("服务商 HTTP 错误 400");
+    expect(visible).toContain(detail);
+    expect(visible).toContain("模型可能不支持图像");
+    expect(visible).toContain("模型可能不支持当前推理强度；请尝试“默认”");
+    expect(visible).not.toContain("the model may not support images");
+    expect(visible).not.toContain("the model may not support this reasoning effort; try Default");
+  });
+
+  it("opens Provider settings from an HTTP 401 error", async () => {
+    const copied = `Single-line authentication failure ${Date.now()}`;
+    const detail = `Synthetic authentication failure ${Date.now()}`;
+    provider.reset({ status: 401, message: detail });
+    writeClipboardText(copied);
+    await relaunch({ settings: customSettings(provider) });
+
+    await browser.waitUntil(() => provider.requests.length > 0, {
+      timeoutMsg: "the Input did not reach the fake Provider",
+    });
+    expect(provider.requests).toHaveLength(1);
+    expect(provider.requests[0].method).toBe("POST");
+
+    await expect($("body")).toHaveText(detail, { containing: true });
+    const visible = await $("body").getText();
+    expect(visible).toMatch(/Translation failed/);
+    expect(visible).toMatch(/Provider HTTP error 401/);
+    expect(visible).toContain(detail);
+    expect(provider.requests).toHaveLength(1);
+    const pin = await browser.getWindowHandle();
+    const openSettings = $("[role=group]").$(`button=Open settings`);
+    await expect(openSettings).toBeDisplayed();
+    await openSettings.click();
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
+    const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
+    await browser.switchToWindow(settings);
+    await expect($("h1")).toHaveText("Settings");
+    await expect($("h2=Provider")).toBeDisplayed();
+    await expect($("input:focus, select:focus, textarea:focus, [role=combobox]:focus")).not.toExist();
+  });
+
+  it("offers Open settings for HTTP 403 and 404 but not 500", async () => {
+    for (const scenario of [
+      { status: 403, shouldOfferSettings: true },
+      { status: 404, shouldOfferSettings: true },
+      { status: 500, shouldOfferSettings: false },
+    ]) {
+      const copied = `Single-line HTTP ${scenario.status} failure ${Date.now()}`;
+      const detail = `Synthetic HTTP ${scenario.status} failure ${Date.now()}`;
+      provider.reset({ status: scenario.status, message: detail });
+      writeClipboardText(copied);
+      await relaunch({ settings: customSettings(provider) });
+
+      await browser.waitUntil(() => provider.requests.length > 0, {
+        timeoutMsg: `the HTTP ${scenario.status} Input did not reach the fake Provider`,
+      });
+      expect(provider.requests).toHaveLength(1);
+      await expect($("body")).toHaveText(detail, { containing: true });
+      const visible = await $("body").getText();
+      expect(visible).toMatch(/Translation failed/);
+      expect(visible).toMatch(new RegExp(`Provider HTTP error ${scenario.status}`));
+      expect(visible).toContain(detail);
+      expect(provider.requests).toHaveLength(1);
+
+      const openSettings = $("[role=group]").$(`button=Open settings`);
+      if (scenario.shouldOfferSettings) await expect(openSettings).toBeDisplayed();
+      else await expect(openSettings).not.toExist();
     }
   });
 
@@ -296,6 +502,17 @@ describe("Provider errors", () => {
     expect(visible).toMatch(/Structuring failed|整理失败/);
     expect(visible).toMatch(/Network error|网络错误/);
     expect(provider.requests).toHaveLength(0);
+
+    const pin = await browser.getWindowHandle();
+    const openSettings = $("[role=group]").$(`button=Open settings`);
+    await expect(openSettings).toBeDisplayed();
+    await openSettings.click();
+    await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
+    const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
+    await browser.switchToWindow(settings);
+    await expect($("h1")).toHaveText("Settings");
+    await expect($("h2=Provider")).toBeDisplayed();
+    await expect($("input:focus, select:focus, textarea:focus, [role=combobox]:focus")).not.toExist();
   });
 
   it("lets the Provider's error detail be selected and copied", async () => {
