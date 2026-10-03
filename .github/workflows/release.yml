@@ -49,7 +49,12 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: sidelingo ${{ github.ref_name }}
-          releaseBody: Download the Windows installer and its SHA-256 checksum from the assets below. See the README for installation and Windows security prompts.
+          releaseBody: |
+            Download the Windows `*-setup.exe` installer and its matching `.sha256` checksum from the assets below. Verify the checksum before running the installer.
+
+            The installer is not Authenticode-signed. If Microsoft Defender SmartScreen displays “Windows protected your PC”, choose **More info → Run anyway** after verifying the checksum. **Smart App Control blocks this unsigned installer**, so a PC enforcing it cannot install sidelingo.
+
+            See the [README installation instructions](https://github.com/mcdp-adk/sidelingo#installation) for checksum commands and installation details.
           releaseDraft: false
           prerelease: false
           uploadUpdaterJson: true
