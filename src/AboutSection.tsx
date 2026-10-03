@@ -14,7 +14,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { strings } from "./i18n";
-import { requestUpdateCheck, useUpdateStatus } from "./updates";
+import { requestUpdateCheck, requestUpdateInstall, useUpdateStatus } from "./updates";
 
 const sourceUrl = "https://github.com/mcdp-adk/sidelingo";
 const useStyles = makeStyles({
@@ -73,14 +73,29 @@ export function AboutSection({
         checked={automaticUpdates}
         onChange={(_, data) => void commit(data.checked)}
       />
-      <Button disabled={updateStatus.checking} onClick={() => void requestUpdateCheck()}>
+      <Button disabled={updateStatus.checking || updateStatus.installing} onClick={() => void requestUpdateCheck()}>
         {strings.checkNow}
       </Button>
-      {updateStatus.error && (
+      {updateStatus.checkError && (
         <MessageBar intent="error">
           <MessageBarBody>
             <MessageBarTitle>{strings.updateCheckFailed}</MessageBarTitle>
-            {updateStatus.error}
+            {updateStatus.checkError}
+          </MessageBarBody>
+        </MessageBar>
+      )}
+      {updateStatus.upToDate && <p role="status">{strings.upToDate}</p>}
+      {updateStatus.availableVersion && (
+        <Button disabled={updateStatus.checking || updateStatus.installing} onClick={() => void requestUpdateInstall()}>
+          {strings.updateTo} {updateStatus.availableVersion}
+        </Button>
+      )}
+      {updateStatus.installing && <p role="status">{strings.installingUpdate}</p>}
+      {updateStatus.installError && (
+        <MessageBar intent="error">
+          <MessageBarBody>
+            <MessageBarTitle>{strings.updateInstallFailed}</MessageBarTitle>
+            {updateStatus.installError}
           </MessageBarBody>
         </MessageBar>
       )}

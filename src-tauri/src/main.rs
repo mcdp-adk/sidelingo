@@ -69,6 +69,7 @@ fn main() {
             data_folder::data_folder_path,
             data_folder::open_data_folder,
             settings_window::open_settings,
+            tray::set_update_offer,
             clipboard::copy_text,
             secrets::protect_secret,
             secrets::unprotect_secret,
