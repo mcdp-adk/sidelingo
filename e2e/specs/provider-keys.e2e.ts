@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
+import { StalledProxy } from "../proxy";
 import { customSettings, FakeProvider } from "../provider";
 import { openSettings, replaceTextField } from "../settings";
 
@@ -42,34 +43,54 @@ describe("Provider keys", () => {
     ];
 
     for (const item of cases) {
-      clearClipboard();
-      await relaunch({ settings: incompleteOpenAI, environment: item.environment });
-      await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
-
-      writeClipboardText(`OpenAI placeholder ${item.name} ${Date.now()}`);
-      await $("button[aria-label='Regenerate (Ctrl+R / F5)']").waitForEnabled();
-      await expect($("[role=group]")).toHaveText("Enter a model", { containing: true });
-
-      await openSettings();
-      await expect($("select[aria-label='Preset']")).toHaveValue("openai");
-      const key = $("input[aria-label='Key']");
-      await expect(key).toHaveValue("");
-      await expect(key).toHaveAttribute("placeholder", item.placeholder);
-
-      if (item.name === "set") {
-        const model = "environment-persistence-proof-model";
-        await replaceTextField("Model", model);
-        await browser.keys("Enter");
-        const settingsPath = join(dataFolders(identifier).roaming, "settings.json");
-        await browser.waitUntil(() => {
-          try {
-            return JSON.parse(readFileSync(settingsPath, "utf8")).presets.openai.model === model;
-          } catch {
-            return false;
-          }
+      const proxy = await StalledProxy.start();
+      try {
+        clearClipboard();
+        await relaunch({
+          settings: {
+            ...incompleteOpenAI,
+            proxy: { mode: "manual", url: proxy.url },
+          },
+          environment: item.environment,
         });
-        const writtenSettings = readFileSync(settingsPath, "utf8");
-        expect(writtenSettings.includes("synthetic-openai-launch-key")).toBe(false);
+        await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
+        expect(proxy.connectedAt).toBeNull();
+
+        writeClipboardText(`OpenAI placeholder ${item.name} ${Date.now()}`);
+        await $("button[aria-label='Regenerate (Ctrl+R / F5)']").waitForEnabled();
+        await expect($("[role=group]")).toHaveText("Enter a model", { containing: true });
+        expect(proxy.connectedAt).toBeNull();
+
+        await openSettings();
+        await expect($("select[aria-label='Preset']")).toHaveValue("openai");
+        const key = $("input[aria-label='Key']");
+        await expect(key).toHaveValue("");
+        await expect(key).toHaveAttribute("placeholder", item.placeholder);
+
+        if (item.name === "set") {
+          await browser.waitUntil(() => proxy.connectedAt !== null, {
+            timeout: 14_000,
+            timeoutMsg: "Opening Settings on the active OpenAI Preset did not reach its Manual proxy.",
+          });
+
+          const model = "environment-persistence-proof-model";
+          await replaceTextField("Model", model);
+          await browser.keys("Enter");
+          const settingsPath = join(dataFolders(identifier).roaming, "settings.json");
+          await browser.waitUntil(() => {
+            try {
+              return JSON.parse(readFileSync(settingsPath, "utf8")).presets.openai.model === model;
+            } catch {
+              return false;
+            }
+          });
+          const writtenSettings = readFileSync(settingsPath, "utf8");
+          expect(writtenSettings.includes("synthetic-openai-launch-key")).toBe(false);
+        } else {
+          expect(proxy.connectedAt).toBeNull();
+        }
+      } finally {
+        await proxy.close();
       }
     }
   });
