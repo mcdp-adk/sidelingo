@@ -193,10 +193,14 @@ describe("Structuring multi-line text", () => {
     writeClipboardText(copied);
     await relaunch({ settings: customSettings(provider) });
 
-    await expect(status("Translating…")).toBeDisplayed();
-    expect(provider.requests).toHaveLength(1);
-    expect(provider.requests[0].body.messages[1].content).toContain(copied);
-    held.open();
+    try {
+      await expect(status("Translating…")).toBeDisplayed();
+      await browser.waitUntil(() => provider.requests.length > 0);
+      expect(provider.requests).toHaveLength(1);
+      expect(provider.requests[0].body.messages[1].content).toContain(copied);
+    } finally {
+      held.open();
+    }
     await expect($("body")).toHaveText(translated, { containing: true });
   });
 
