@@ -1,7 +1,107 @@
-import { createServer, request, type IncomingHttpHeaders } from "node:http";
+import { createServer, request, type ClientRequest, type IncomingHttpHeaders } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { once } from "node:events";
 import { lookup } from "node:dns/promises";
-import { connect, createServer as createTcpServer, type AddressInfo, type Socket } from "node:net";
+import { connect, createServer as createTcpServer, isIP, type AddressInfo, type Socket } from "node:net";
+import { getProxyForUrl } from "proxy-from-env";
+import type { Duplex } from "node:stream";
+
+/** Opens an opaque GitHub TLS tunnel through the runner's configured egress. */
+function connectUpdater(
+  downstream: Duplex,
+  pending: Set<ClientRequest>,
+  track: (socket: Socket) => void,
+): Promise<Socket> {
+  return new Promise((resolve, reject) => {
+    let upstream: Socket | undefined;
+    let outgoing: ClientRequest | undefined;
+    let settled = false;
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      if (outgoing) pending.delete(outgoing);
+      downstream.off("close", cancel);
+      outgoing?.destroy();
+      upstream?.destroy();
+      reject(new Error("Local updater upstream connection failed"));
+    };
+    const cancel = () => {
+      outgoing?.destroy();
+      upstream?.destroy();
+      fail();
+    };
+    const ready = (socket: Socket, head = Buffer.alloc(0)) => {
+      if (settled || downstream.destroyed) {
+        socket.destroy();
+        fail();
+        return;
+      }
+      upstream = socket;
+      settled = true;
+      if (outgoing) pending.delete(outgoing);
+      outgoing = undefined;
+      track(socket);
+      socket.on("error", () => downstream.destroy());
+      socket.on("close", () => downstream.destroy());
+      socket.pause();
+      if (head.length) socket.unshift(head);
+      resolve(socket);
+    };
+    downstream.once("close", cancel);
+    if (downstream.destroyed) {
+      fail();
+      return;
+    }
+    try {
+      const selected = getProxyForUrl("https://github.com:443");
+      if (!selected) {
+        upstream = connect(443, "github.com");
+        upstream.once("error", fail);
+        upstream.once("close", fail);
+        upstream.once("connect", () => ready(upstream!));
+        return;
+      }
+      const proxy = new URL(selected);
+      if (proxy.protocol !== "http:" && proxy.protocol !== "https:") {
+        fail();
+        return;
+      }
+      const headers: Record<string, string> = { Host: "github.com:443" };
+      if (proxy.username || proxy.password) {
+        const credentials = `${decodeURIComponent(proxy.username)}:${decodeURIComponent(proxy.password)}`;
+        headers["Proxy-Authorization"] = `Basic ${Buffer.from(credentials).toString("base64")}`;
+        proxy.username = "";
+        proxy.password = "";
+      }
+      const proxyHost = proxy.hostname.replace(/^\[|\]$/g, "");
+      outgoing = (proxy.protocol === "https:" ? httpsRequest : request)(proxy, {
+        method: "CONNECT",
+        path: "github.com:443",
+        headers,
+        agent: false,
+        ...(proxy.protocol === "https:" ? { servername: isIP(proxyHost) ? "" : proxyHost } : {}),
+      });
+      pending.add(outgoing);
+      outgoing.once("error", fail);
+      outgoing.once("close", fail);
+      outgoing.once("connect", (response, socket, head) => {
+        if (response.statusCode !== 200) {
+          socket.destroy();
+          fail();
+          return;
+        }
+        ready(socket, head);
+      });
+      outgoing.once("response", (response) => {
+        response.destroy();
+        fail();
+      });
+      outgoing.end();
+    } catch {
+      fail();
+    }
+  });
+}
 
 /** A credential-required CONNECT tunnel to the real updater host, without TLS interception. */
 export class UpdaterProxy {
@@ -9,6 +109,7 @@ export class UpdaterProxy {
   upstreamConnected = false;
   upstreamBytesReceived = false;
   private readonly sockets = new Set<Socket>();
+  private readonly pending = new Set<ClientRequest>();
   private readonly server = createServer((_request, response) => response.writeHead(405).end());
 
   private constructor(username: string, password: string) {
@@ -22,20 +123,17 @@ export class UpdaterProxy {
         socket.end("HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n");
         return;
       }
-      const upstream = connect(443, "github.com");
-      this.track(upstream);
-      upstream.on("error", () => socket.destroy());
-      socket.on("error", () => upstream.destroy());
-      socket.on("close", () => upstream.destroy());
-      upstream.on("close", () => socket.destroy());
-      upstream.once("connect", () => {
-        this.upstreamConnected = true;
-        upstream.on("data", () => (this.upstreamBytesReceived = true));
-        socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-        if (head.length) upstream.write(head);
-        socket.pipe(upstream);
-        upstream.pipe(socket);
-      });
+      socket.on("error", () => socket.destroy());
+      void connectUpdater(socket, this.pending, (upstream) => this.track(upstream))
+        .then((upstream) => {
+          this.upstreamConnected = true;
+          upstream.on("data", () => (this.upstreamBytesReceived = true));
+          socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+          if (head.length) upstream.write(head);
+          socket.pipe(upstream);
+          upstream.pipe(socket);
+        })
+        .catch(() => socket.destroy());
     });
   }
 
@@ -56,6 +154,7 @@ export class UpdaterProxy {
   }
 
   async close(): Promise<void> {
+    for (const request of this.pending) request.destroy();
     for (const socket of this.sockets) socket.destroy();
     this.server.close();
     await once(this.server, "close");
@@ -166,6 +265,7 @@ export class UpdaterSocksProxy {
   upstreamConnected = false;
   upstreamBytesReceived = false;
   private readonly sockets = new Set<Socket>();
+  private readonly pending = new Set<ClientRequest>();
   private readonly server;
 
   private constructor(username: string, password: string, addresses: string[]) {
@@ -204,12 +304,7 @@ export class UpdaterSocksProxy {
       socket.end(Buffer.from([5, 2, 0, 1, 127, 0, 0, 1, 0, 0]));
       return;
     }
-    const upstream = connect(443, "github.com");
-    this.track(upstream);
-    socket.on("close", () => upstream.destroy());
-    upstream.on("close", () => socket.destroy());
-    upstream.on("error", () => socket.destroy());
-    await once(upstream, "connect");
+    const upstream = await connectUpdater(socket, this.pending, (upstream) => this.track(upstream));
     this.upstreamConnected = true;
     upstream.on("data", () => (this.upstreamBytesReceived = true));
     socket.write(Buffer.from([5, 0, 0, 1, 127, 0, 0, 1, 0, 0]));
@@ -218,6 +313,7 @@ export class UpdaterSocksProxy {
   }
 
   async close(): Promise<void> {
+    for (const request of this.pending) request.destroy();
     for (const socket of this.sockets) socket.destroy();
     this.server.close();
     await once(this.server, "close");
