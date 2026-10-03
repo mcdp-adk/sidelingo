@@ -40,11 +40,19 @@ describe("Provider keys", () => {
         environment: noNamedKeys,
         placeholder: "No key; environment variable changes take effect after restart.",
       },
+      {
+        name: "inherited",
+        environment: {},
+        workerEnvironment: { OPENAI_API_KEY: "synthetic-inherited-launch-key" },
+        placeholder: "No key; environment variable changes take effect after restart.",
+      },
     ];
 
     for (const item of cases) {
       const proxy = await StalledProxy.start();
+      const previousOpenAIKey = process.env.OPENAI_API_KEY;
       try {
+        if ("workerEnvironment" in item) Object.assign(process.env, item.workerEnvironment);
         clearClipboard();
         await relaunch({
           settings: {
@@ -90,6 +98,10 @@ describe("Provider keys", () => {
           expect(proxy.connectedAt).toBeNull();
         }
       } finally {
+        if ("workerEnvironment" in item) {
+          if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+          else process.env.OPENAI_API_KEY = previousOpenAIKey;
+        }
         await proxy.close();
       }
     }

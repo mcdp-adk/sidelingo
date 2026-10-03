@@ -4,19 +4,11 @@ import { connect, createServer, type AddressInfo } from "node:net";
 import { join, resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 
+const providerKeyNames = ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OLLAMA_API_KEY"] as const;
+
 /** Only synthetic test values are passed; the owner process environment is never changed. */
 export type LaunchEnvironment = Partial<
-  Record<
-    | "HTTP_PROXY"
-    | "HTTPS_PROXY"
-    | "ALL_PROXY"
-    | "NO_PROXY"
-    | "OPENAI_API_KEY"
-    | "OPENROUTER_API_KEY"
-    | "DEEPSEEK_API_KEY"
-    | "OLLAMA_API_KEY",
-    string | null
-  >
+  Record<(typeof providerKeyNames)[number] | "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY", string | null>
 >;
 
 export const driverDir = resolve(import.meta.dirname, "..", "node_modules", ".cache", "msedgedriver");
@@ -70,6 +62,11 @@ export async function startDriver(environment?: LaunchEnvironment): Promise<void
   }
   assertPortsFree();
   const childEnvironment = { ...process.env };
+  for (const name of providerKeyNames) {
+    for (const existing of Object.keys(childEnvironment)) {
+      if (existing.toLowerCase() === name.toLowerCase()) delete childEnvironment[existing];
+    }
+  }
   for (const [name, value] of Object.entries({ ...(await defaultProxyEnvironment()), ...environment })) {
     for (const existing of Object.keys(childEnvironment)) {
       if (existing.toLowerCase() === name.toLowerCase()) delete childEnvironment[existing];
