@@ -1,13 +1,12 @@
-import { spawn, execFileSync, type ChildProcess } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildApp, capabilities, resetDataFolders } from "./app";
+import { SevereServiceError } from "webdriverio";
+import { driverDir, startDriver, stopDriver } from "./driver";
 
-// msedgedriver must match the installed WebView2 runtime; msedgedriver-tool fetches the matching one.
-const driverDir = resolve(import.meta.dirname, "..", "node_modules", ".cache", "msedgedriver");
 /** A failing test leaves its screenshot and page source here. */
 const failuresDir = resolve(import.meta.dirname, "failures");
-let tauriDriver: ChildProcess | undefined;
 
 export const config: WebdriverIO.Config = {
   runner: "local",
@@ -24,18 +23,21 @@ export const config: WebdriverIO.Config = {
   mochaOpts: { ui: "bdd", timeout: 60_000 },
 
   onPrepare() {
-    rmSync(failuresDir, { recursive: true, force: true });
-    buildApp();
-    mkdirSync(driverDir, { recursive: true });
-    execFileSync("msedgedriver-tool", { cwd: driverDir, stdio: "inherit" });
+    try {
+      rmSync(failuresDir, { recursive: true, force: true });
+      buildApp();
+      mkdirSync(driverDir, { recursive: true });
+      execFileSync("msedgedriver-tool", { cwd: driverDir, stdio: "inherit" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new SevereServiceError(`E2E preparation failed: ${message}`);
+    }
   },
 
   // Every spec file starts the app from empty data folders.
-  beforeSession() {
+  async beforeSession() {
     resetDataFolders();
-    tauriDriver = spawn("tauri-driver", ["--native-driver", join(driverDir, "msedgedriver.exe")], {
-      stdio: [null, process.stdout, process.stderr],
-    });
+    await startDriver();
   },
 
   async afterTest(test, _context, { passed }) {
@@ -51,7 +53,7 @@ export const config: WebdriverIO.Config = {
     }
   },
 
-  afterSession() {
-    tauriDriver?.kill();
+  async afterSession() {
+    await stopDriver();
   },
 };

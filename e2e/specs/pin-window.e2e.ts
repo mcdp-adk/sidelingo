@@ -72,6 +72,7 @@ async function waitUntilHidden() {
  * listeners. The clipboard then holds the whole text, which no partial selection's copy matches.
  */
 async function launch(options?: Launch, text = LINE) {
+  provider.reset();
   writeClipboardText(text);
   await relaunch({ ...options, settings: customSettings(provider) });
   await expect($("p")).toHaveText(text);
@@ -106,7 +107,6 @@ describe("The Pin window", () => {
 
   it("stays visible on a double-click on the toolbar", async () => {
     await launch();
-    // The toolbar's middle is empty; its buttons sit at the ends.
     await toolbar().doubleClick();
     await browser.pause(500);
     expect(pinVisible()).toBe(true);
@@ -144,6 +144,8 @@ describe("The Pin window", () => {
     expect(copied).toMatch(/^\S+$/);
     expect(LINE).toContain(copied);
     expect(pinVisible()).toBe(true);
+    await browser.pause(500);
+    expect(provider.requests).toHaveLength(1);
   });
 
   it("selects nothing on a plain drag", async () => {
@@ -163,6 +165,8 @@ describe("The Pin window", () => {
     const copied = readClipboardText().trim();
     expect(copied).toMatch(/^\S+$/);
     expect(LINE).toContain(copied);
+    await browser.pause(500);
+    expect(provider.requests).toHaveLength(1);
   });
 
   it("offers no right-click menu without a selection", async () => {

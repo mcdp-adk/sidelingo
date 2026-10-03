@@ -45,5 +45,8 @@ vite.config.ts.timestamp-*
 # will have schema files for capabilities auto-completion
 /src-tauri/gen/schemas
 
+# Third-party notices are generated from the installed dependency graphs
+/src-tauri/resources/THIRD-PARTY-NOTICES.html
+
 # What a failing end-to-end test left on screen
 /e2e/failures/

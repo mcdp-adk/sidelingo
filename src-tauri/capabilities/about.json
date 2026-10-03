@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "about",
+  "description": "Open the About license, notices, and source repository from Settings",
+  "windows": ["settings"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$RESOURCE/LICENSE.txt" }, { "path": "$RESOURCE/THIRD-PARTY-NOTICES.html" }]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/mcdp-adk/sidelingo" }]
+    }
+  ]
+}

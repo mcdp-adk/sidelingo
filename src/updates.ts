@@ -1,0 +1,132 @@
+import { useSyncExternalStore } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { emit, emitTo, listen } from "@tauri-apps/api/event";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { proxyConfiguration } from "./settings";
+import { currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
+
+interface UpdateStatus {
+  checking: boolean;
+  installing: boolean;
+  upToDate: boolean;
+  availableVersion: string | null;
+  checkError: string | null;
+  installError: string | null;
+}
+
+let status: UpdateStatus = {
+  checking: false,
+  installing: false,
+  upToDate: false,
+  availableVersion: null,
+  checkError: null,
+  installError: null,
+};
+let availableUpdate: Update | null = null;
+const subscribers = new Set<() => void>();
+
+function accept(next: UpdateStatus): void {
+  status = next;
+  for (const notify of subscribers) notify();
+}
+
+function publish(next: UpdateStatus): void {
+  accept(next);
+  // View synchronization failures must not replace an SDK operation's result.
+  void emit("update-status-changed", next).catch((reason) => console.error(failureReason(reason)));
+  void invoke("set_update_offer", {
+    version: next.availableVersion,
+    enabled: !next.checking && !next.installing,
+  }).catch((reason) => console.error(failureReason(reason)));
+}
+
+/** SDK failures are shown without credential-bearing URL userinfo. */
+function failureReason(reason: unknown): string {
+  return String(reason).replace(/\b([a-z][a-z\d+.-]*:\/\/)[^\s/@]+@/gi, "$1[redacted]@");
+}
+
+async function checkForUpdates(manual: boolean): Promise<void> {
+  if (status.checking || status.installing) return;
+  publish({ ...status, checking: true, checkError: null });
+  let update: Update | null;
+  try {
+    await waitForSettings();
+    const proxy = proxyConfiguration(currentSettings(), currentProxyPassword())?.all;
+    let proxyUrl: string | undefined;
+    if (proxy) {
+      const configuration = typeof proxy === "string" ? { url: proxy } : proxy;
+      const url = new URL(configuration.url);
+      if (configuration.basicAuth) {
+        // URL setters preserve literal %xx; encode first so the SDK decodes the entered bytes once.
+        url.username = encodeURIComponent(configuration.basicAuth.username);
+        url.password = encodeURIComponent(configuration.basicAuth.password);
+      }
+      proxyUrl = url.href;
+    }
+    update = await check({ timeout: 10_000, ...(proxyUrl ? { proxy: proxyUrl } : {}) });
+  } catch (reason) {
+    publish({ ...status, checking: false, checkError: manual ? failureReason(reason) : null });
+    return;
+  }
+  const previous = availableUpdate;
+  availableUpdate = update;
+  publish({
+    ...status,
+    checking: false,
+    upToDate: update === null,
+    availableVersion: update?.version ?? null,
+    checkError: null,
+    installError: null,
+  });
+  await previous?.close().catch((reason) => console.error(failureReason(reason)));
+}
+
+async function installUpdate(): Promise<void> {
+  if (!availableUpdate || status.checking || status.installing) return;
+  const update = availableUpdate;
+  publish({ ...status, installing: true, installError: null });
+  try {
+    // The retained SDK object carries the check's proxy; Windows installation owns exit/relaunch.
+    await update.downloadAndInstall();
+  } catch (reason) {
+    publish({ ...status, installing: false, installError: failureReason(reason) });
+    return;
+  }
+  await update.close().catch((reason) => console.error(failureReason(reason)));
+}
+
+/** Only Pin calls the SDK; Settings requests checks and receives its state. */
+export async function startUpdateChecks(): Promise<void> {
+  await listen("update-check-requested", () => void checkForUpdates(true));
+  await listen("update-install-requested", () => void installUpdate());
+  await listen("update-status-requested", () => void emit("update-status-changed", status));
+  const checkAutomatically = async () => {
+    await waitForSettings();
+    if (currentSettings().automaticUpdates) await checkForUpdates(false);
+  };
+  void checkAutomatically();
+  setInterval(() => void checkAutomatically(), 24 * 60 * 60 * 1_000);
+}
+
+export async function startUpdateStatus(): Promise<void> {
+  await listen<UpdateStatus>("update-status-changed", ({ payload }) => accept(payload));
+  await emitTo("pin", "update-status-requested");
+}
+
+export function requestUpdateCheck(): Promise<void> {
+  return emitTo("pin", "update-check-requested");
+}
+
+export function requestUpdateInstall(): Promise<void> {
+  return emitTo("pin", "update-install-requested");
+}
+
+export function useUpdateStatus(): UpdateStatus {
+  return useSyncExternalStore(
+    (notify) => {
+      subscribers.add(notify);
+      return () => subscribers.delete(notify);
+    },
+    () => status,
+  );
+}

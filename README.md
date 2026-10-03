@@ -1,14 +1,42 @@
 # sidelingo
 
+sidelingo is a Windows 11 desktop companion that structures text or images from your clipboard, translates them, and shows the results in a Pin window.
+
+## Installation
+
+Download the Windows `*-setup.exe` installer and its matching `.sha256` file from the [latest release](https://github.com/mcdp-adk/sidelingo/releases/latest). In PowerShell, from the download folder, verify the installer before running it:
+
+```powershell
+$checksum = Get-Content .\sidelingo_0.1.0_x64-setup.exe.sha256
+$expected = ($checksum -split '\s+')[0]
+$actual = (Get-FileHash .\sidelingo_0.1.0_x64-setup.exe -Algorithm SHA256).Hash
+if ($actual -ne $expected) { throw 'Checksum mismatch: do not run this installer.' }
+```
+
+Replace the example filenames with the version you downloaded. The installer needs no administrator rights and installs into `%LOCALAPPDATA%\sidelingo`. It creates a Start menu entry and offers a desktop shortcut. The installer uses Simplified Chinese for a Chinese Windows display language, and English otherwise.
+
+The installer is not Authenticode-signed. If Microsoft Defender SmartScreen displays “Windows protected your PC”, choose **More info → Run anyway** after checking the download. **Smart App Control blocks this unsigned installer**, so a PC enforcing it cannot install sidelingo. The updater's signature authenticates updates; it does not replace Windows Authenticode signing.
+
+Settings and window state are stored in `%APPDATA%\io.github.mcdp-adk.sidelingo`; WebView2 data is in `%LOCALAPPDATA%\io.github.mcdp-adk.sidelingo`. During uninstall, the **delete application data** option removes both folders. Leave it unchecked to retain settings.
+
 ## Development
 
 On Windows 11, with Node.js 24, pnpm (the version in `package.json`'s `packageManager`), Rust, and the MSVC build tools:
 
 ```bash
 pnpm install
+cargo install cargo-about --version 0.9.2 --locked --features cli
 pnpm typecheck
 pnpm tauri dev
 ```
+
+### Installer builds and releases
+
+`pnpm tauri build` generates the frontend and Rust third-party license texts before building and packages `THIRD-PARTY-NOTICES.html` beside the installed executable. `pnpm notices` generates that file on its own. Debug builds also copy it to their resource directory, so About uses the same resource path in development and installed builds. New npm packages that omit license text fail the build until their upstream notice is supplied; the existing omissions are documented in `scripts/licenses/README.md`.
+
+The owner selects each release version. Set that version in `package.json`, `src-tauri/Cargo.toml` (and its lockfile) and `src-tauri/tauri.conf.json` before pushing its `vX.Y.Z` tag. The release workflow checks that they match, builds the per-user NSIS installer, signs updater artifacts through the repository's `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets, and publishes a normal GitHub Release with the installer, signature, `latest.json` and SHA-256 checksum. No private updater key belongs in this repository.
+
+Published-release acceptance still requires checking the downloaded checksum and verifying the updater signature against the configured public key. Installer and uninstall behavior require desktop verification.
 
 For interactive desktop development, including GUI automation, use:
 
