@@ -346,38 +346,58 @@ describe("Provider errors", () => {
     expect(settled).toContain(detail);
   });
 
-  it("keeps partial Source and shows verbatim malformed SSE data as a Provider error", async () => {
-    const copied = `Wrapped line ${Date.now()}\ncontinues here`;
-    const partial = `## Partial Source ${Date.now()}`;
-    const malformed = `{broken-${Date.now()}`;
-    const held = gate();
-    provider.reset([{ delta: { content: partial } }, { wait: held.wait }, { rawData: malformed }]);
-    writeClipboardText(copied);
-    await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
+  for (const scenario of [
+    { name: "malformed", data: `{broken-${Date.now()}` },
+    { name: "malformed choices", data: '{"choices":{}}' },
+    { name: "malformed choice", data: '{"choices":[null]}' },
+    { name: "malformed envelope", data: "null" },
+    { name: "malformed content", data: '{"choices":[{"delta":{"content":7}}]}' },
+  ]) {
+    it(`keeps partial Source and shows verbatim ${scenario.name} SSE data as a Provider error`, async () => {
+      const copied = `Wrapped line ${Date.now()}\ncontinues here`;
+      const partial = `## Partial Source ${Date.now()}`;
+      const malformed = scenario.data;
+      const held = gate();
+      provider.reset([
+        { rawData: "{}" },
+        { rawData: '{"choices":[]}' },
+        { rawData: '{"choices":[{}]}' },
+        { rawData: '{"choices":[{"delta":{"content":null}}]}' },
+        { rawData: '{"choices":[{"delta":{"role":"assistant"}}]}' },
+        {
+          rawData: '{"choices":[{"delta":{"reasoning_content":"ignored reasoning","reasoning":"ignored reasoning"}}]}',
+        },
+        { delta: { content: partial } },
+        { wait: held.wait },
+        { rawData: malformed },
+      ]);
+      writeClipboardText(copied);
+      await relaunch({ settings: { ...customSettings(provider), displayMode: "both" } });
 
-    try {
-      const sourcePane = $("[role=region][aria-label='Source']");
-      await expect(sourcePane).toHaveText(partial.slice(3), { containing: true });
-      await expect($("button[aria-label='Copy source']")).toBeDisabled();
-      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
-      expect(provider.requests).toHaveLength(1);
-      expect(provider.requests[0].body.messages[1].content).toEqual([{ type: "text", text: copied }]);
+      try {
+        const sourcePane = $("[role=region][aria-label='Source']");
+        await expect(sourcePane).toHaveText(partial.slice(3), { containing: true });
+        await expect($("button[aria-label='Copy source']")).toBeDisabled();
+        await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+        expect(provider.requests).toHaveLength(1);
+        expect(provider.requests[0].body.messages[1].content).toEqual([{ type: "text", text: copied }]);
 
-      held.open();
-      await expect(sourcePane).toHaveText("Provider error", { containing: true });
-      const visible = await sourcePane.getText();
-      expect(visible).toContain("Structuring failed");
-      expect(visible).toContain(malformed);
-      expect(visible).toContain(partial.slice(3));
-      expect(visible.indexOf(partial.slice(3))).toBeLessThan(visible.indexOf("Provider error"));
-      await expect($("[role=region][aria-label='Translation']")).toHaveText(malformed, { containing: true });
-      await expect($("button[aria-label='Copy source']")).toBeDisabled();
-      await expect($("button[aria-label='Copy translation']")).toBeDisabled();
-      expect(provider.requests).toHaveLength(1);
-    } finally {
-      held.open();
-    }
-  });
+        held.open();
+        await expect(sourcePane).toHaveText("Provider error", { containing: true });
+        const visible = await sourcePane.getText();
+        expect(visible).toContain("Structuring failed");
+        expect(visible).toContain(malformed);
+        expect(visible).toContain(partial.slice(3));
+        expect(visible.indexOf(partial.slice(3))).toBeLessThan(visible.indexOf("Provider error"));
+        await expect($("[role=region][aria-label='Translation']")).toHaveText(malformed, { containing: true });
+        await expect($("button[aria-label='Copy source']")).toBeDisabled();
+        await expect($("button[aria-label='Copy translation']")).toBeDisabled();
+        expect(provider.requests).toHaveLength(1);
+      } finally {
+        held.open();
+      }
+    });
+  }
 
   it("shows an empty Structuring response and does not start Translation", async () => {
     const thought = `private reasoning ${Date.now()}`;

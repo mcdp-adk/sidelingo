@@ -111,13 +111,23 @@ export function providerClient(transport: Transport): ProviderClient {
         } catch {
           throw new ProviderError("provider-error", data);
         }
+        if (typeof chunk !== "object" || chunk === null || Array.isArray(chunk)) {
+          throw new ProviderError("provider-error", data);
+        }
         if (chunk?.error !== undefined) {
           const message = typeof chunk.error?.message === "string" ? chunk.error.message : data;
           throw new ProviderError("provider-error", message);
         }
         // Only the content counts; `reasoning_content` and `reasoning` are the model thinking aloud.
-        for (const choice of (chunk.choices ?? []) as ChunkChoice[]) {
-          if (choice.delta?.content) yield choice.delta.content;
+        const choices = chunk.choices ?? [];
+        if (!Array.isArray(choices)) throw new ProviderError("provider-error", data);
+        for (const choice of choices as ChunkChoice[]) {
+          if (typeof choice !== "object" || choice === null || Array.isArray(choice)) {
+            throw new ProviderError("provider-error", data);
+          }
+          const content = choice.delta?.content;
+          if (content != null && typeof content !== "string") throw new ProviderError("provider-error", data);
+          if (content) yield content;
         }
       }
     },
