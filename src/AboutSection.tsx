@@ -67,40 +67,46 @@ export function AboutSection({
           {strings.version} {version}
         </p>
       )}
+      {updateStatus.upToDate && <p role="status">{strings.upToDate}</p>}
+      {updateStatus.installing && <p role="status">{strings.installingUpdate}</p>}
+      {updateStatus.availableVersion ? (
+        <>
+          <Button
+            disabled={updateStatus.checking || updateStatus.installing}
+            onClick={() => void requestUpdateInstall()}
+          >
+            {strings.updateTo} {updateStatus.availableVersion}
+          </Button>
+          {updateStatus.installError && (
+            <MessageBar intent="error">
+              <MessageBarBody>
+                <MessageBarTitle>{strings.updateInstallFailed}</MessageBarTitle>
+                {updateStatus.installError}
+              </MessageBarBody>
+            </MessageBar>
+          )}
+        </>
+      ) : (
+        <>
+          <Button disabled={updateStatus.checking || updateStatus.installing} onClick={() => void requestUpdateCheck()}>
+            {strings.checkNow}
+          </Button>
+          {updateStatus.checkError && (
+            <MessageBar intent="error">
+              <MessageBarBody>
+                <MessageBarTitle>{strings.updateCheckFailed}</MessageBarTitle>
+                {updateStatus.checkError}
+              </MessageBarBody>
+            </MessageBar>
+          )}
+        </>
+      )}
       <Switch
         aria-label={strings.automaticUpdates}
         label={strings.automaticUpdates}
         checked={automaticUpdates}
         onChange={(_, data) => void commit(data.checked)}
       />
-      <Button disabled={updateStatus.checking || updateStatus.installing} onClick={() => void requestUpdateCheck()}>
-        {strings.checkNow}
-      </Button>
-      {updateStatus.checkError && (
-        <MessageBar intent="error">
-          <MessageBarBody>
-            <MessageBarTitle>{strings.updateCheckFailed}</MessageBarTitle>
-            {updateStatus.checkError}
-          </MessageBarBody>
-        </MessageBar>
-      )}
-      {updateStatus.upToDate && <p role="status">{strings.upToDate}</p>}
-      {updateStatus.availableVersion && (
-        <Button disabled={updateStatus.checking || updateStatus.installing} onClick={() => void requestUpdateInstall()}>
-          {strings.updateTo} {updateStatus.availableVersion}
-        </Button>
-      )}
-      {updateStatus.installing && <p role="status">{strings.installingUpdate}</p>}
-      {updateStatus.installError && (
-        <MessageBar intent="error">
-          <MessageBarBody>
-            <MessageBarTitle>{strings.updateInstallFailed}</MessageBarTitle>
-            {updateStatus.installError}
-          </MessageBarBody>
-        </MessageBar>
-      )}
-      <p>{strings.copyright}</p>
-      <p>{strings.licenseNotice}</p>
       {dataFolder && (
         <>
           <p>
@@ -109,6 +115,8 @@ export function AboutSection({
           <Button onClick={() => void open(() => invoke("open_data_folder"))}>{strings.openFolder}</Button>
         </>
       )}
+      <p>{strings.copyright}</p>
+      <p>{strings.licenseNotice}</p>
       <div className={styles.links}>
         {resources && (
           <Link
