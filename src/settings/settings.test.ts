@@ -213,6 +213,27 @@ describe("Loading the settings document", () => {
   });
 });
 
+describe("A changed settings document", () => {
+  it("applies to an Input that arrives at once after it, before the store has published it", async () => {
+    // The new document's saved key is still being decrypted when the Input arrives.
+    let decrypt!: (key: string) => void;
+    const decrypting = new Promise<string>((resolve) => (decrypt = resolve));
+    const core = await startCore({
+      settings: customSettings({ model: "previous-model" }),
+      commands: { unprotect_secret: ({ ciphertext }) => (ciphertext === "next-ciphertext" ? decrypting : null) },
+    });
+    core.provider.reply([{ content: "Translated" }]);
+    await core.changeSettings(customSettings({ model: "next-model", keyCiphertext: "next-ciphertext" }));
+    await core.copy("A single line");
+    await settle();
+    decrypt("next-key");
+    await core.roundEnds();
+    expect(core.provider.requests.map(({ body, headers }) => [body.model, headers.get("authorization")])).toEqual([
+      ["next-model", "Bearer next-key"],
+    ]);
+  });
+});
+
 describe("The initial Target language", () => {
   afterEach(() => {
     vi.stubGlobal("navigator", { language: "en-US" });
