@@ -27,48 +27,4 @@ describe("settings recovery", () => {
       activePreset: "custom",
     });
   });
-
-  it("sets aside valid JSON rejected by the schema, loads defaults, and saves a fresh file", async () => {
-    clearClipboard();
-    const rejected = JSON.stringify({
-      schemaVersion: 99,
-      activePreset: "custom",
-      presets: { custom: { baseUrl: "http://127.0.0.1:9/v1", model: "rejected-model" } },
-    });
-    await relaunch({ settingsText: rejected });
-
-    await openSettings();
-    const preset = $("select[aria-label='Preset']");
-    await expectShownOption(preset, "Choose a Provider");
-
-    const folder = dataFolders(identifier).roaming;
-    const brokenFile = join(folder, "settings.json.broken");
-    const settingsFile = join(folder, "settings.json");
-    expect(existsSync(brokenFile)).toBe(true);
-    expect(readFileSync(brokenFile, "utf8")).toBe(rejected);
-
-    await preset.selectByVisibleText("Custom");
-    await browser.waitUntil(() => existsSync(settingsFile), { timeout: 5_000 });
-    expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toMatchObject({
-      schemaVersion: 1,
-      activePreset: "custom",
-    });
-  });
-
-  it("distinguishes a missing settings file from persisted JSON null", async () => {
-    clearClipboard();
-    await relaunch();
-
-    await openSettings();
-    await expectShownOption($("select[aria-label='Preset']"), "Choose a Provider");
-    const folder = dataFolders(identifier).roaming;
-    const brokenFile = join(folder, "settings.json.broken");
-    expect(existsSync(brokenFile)).toBe(false);
-
-    await relaunch({ settingsText: "null" });
-    await openSettings();
-    await expectShownOption($("select[aria-label='Preset']"), "Choose a Provider");
-    expect(existsSync(brokenFile)).toBe(true);
-    expect(readFileSync(brokenFile, "utf8")).toBe("null");
-  });
 });

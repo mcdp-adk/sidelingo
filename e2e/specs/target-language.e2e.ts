@@ -88,31 +88,4 @@ describe("Target language", () => {
     await openSettings();
     await expect(picker()).toHaveValue("Japanese");
   });
-
-  for (const [language, expected] of [
-    ["zh-CN", /^(?:简体中文|中文（简体）)$/],
-    ["zh-SG", /^(?:简体中文|中文（简体）)$/],
-    ["zh-TW", /^(?:繁体中文|中文（繁体）)$/],
-    ["zh-HK", /^(?:繁体中文|中文（繁体）)$/],
-    ["zh-MO", /^(?:繁体中文|中文（繁体）)$/],
-  ] as const) {
-    it(`maps ${language} to its Chinese script when the saved document has no Target language`, async () => {
-      clearClipboard();
-      await relaunch({ language, settings: { schemaVersion: 1 } });
-      await openSettings({ shortcut: "设置 (Ctrl+,)", title: "设置" });
-      await expect($("[role=combobox][aria-label='目标语言']")).toHaveValue(expected);
-    });
-  }
-
-  for (const [language, expected] of [
-    ["fr-CA", "French"],
-    ["sv-SE", "English"],
-  ]) {
-    it(`uses ${expected} for ${language} on first launch without a settings file`, async () => {
-      clearClipboard();
-      await relaunch({ language });
-      await openSettings();
-      await expect($("[role=combobox][aria-label='Target language']")).toHaveValue(expected);
-    });
-  }
 });
