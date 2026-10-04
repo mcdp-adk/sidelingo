@@ -22,6 +22,8 @@ export interface RoundError {
   status?: number;
   detail: string;
   hints?: RoundErrorHint[];
+  /** The Pin window offers Open settings: the cause is likely there (the Base URL, proxy, key or Model). */
+  offersSettings: boolean;
 }
 
 export interface RoundPane {
@@ -221,5 +223,8 @@ function roundError(
     ...(reason.status === undefined ? {} : { status: reason.status }),
     detail: reason.message,
     ...(hints.length > 0 ? { hints } : {}),
+    offersSettings:
+      reason.category === "network" ||
+      (reason.category === "provider-http" && [401, 403, 404].includes(reason.status ?? 0)),
   };
 }

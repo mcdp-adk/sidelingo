@@ -69,12 +69,6 @@ function errorTitle(error: RoundError): string {
   return `${stage}: ${category}${error.status === undefined ? "" : ` ${error.status}`}`;
 }
 
-function canOpenSettings(error: RoundError): boolean {
-  return (
-    error.category === "network" || (error.category === "provider-http" && [401, 403, 404].includes(error.status ?? 0))
-  );
-}
-
 function configurationFailureMessage(failure: ConfigurationFailure): string {
   switch (failure.kind) {
     case "no-provider":
@@ -402,7 +396,7 @@ export function PinWindow({ session }: { session: Session }) {
                 </div>
               )}
               {result.error && (
-                <MessageBar intent="error" layout={canOpenSettings(result.error) ? "multiline" : undefined}>
+                <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
                   <MessageBarBody>
                     <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
                     <Text as="p" block className={styles.errorDetail}>
@@ -414,7 +408,7 @@ export function PinWindow({ session }: { session: Session }) {
                       </Text>
                     ))}
                   </MessageBarBody>
-                  {canOpenSettings(result.error) && (
+                  {result.error.offersSettings && (
                     <MessageBarActions>
                       <Button size="small" onClick={() => void invoke("open_settings")}>
                         {strings.openSettings}
