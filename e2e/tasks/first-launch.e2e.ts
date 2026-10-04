@@ -71,12 +71,13 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await preset.selectByVisibleText(ui.custom);
       await replaceTextField("Base URL", provider.baseUrl);
       await browser.keys("Enter");
-      // The Provider's models are offered once the Base URL is in; Enter takes the one the typed start matches.
+      await $(`aria/${ui.reasoningEffort}`).selectByVisibleText("low");
+      // The Provider's models are offered once the Base URL is in; the user types a Model of their own,
+      // commits it with Enter and copies straight away.
       await $(`aria/${ui.model}`).click();
       await expect($("aria/catalog-alpha")).toBeDisplayed();
-      await replaceTextField(ui.model, "catalog-a");
+      await replaceTextField(ui.model, "my-own-model");
       await browser.keys("Enter");
-      await $(`aria/${ui.reasoningEffort}`).selectByVisibleText("low");
 
       await browser.switchToWindow(pin);
       const line = `A line copied after setup ${stamp}`;
@@ -94,7 +95,7 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
         timeoutMsg: "the clipboard never held the Translated text",
       });
       expect(provider.requests).toHaveLength(1);
-      expect(provider.requests[0].body).toMatchObject({ model: "catalog-alpha", reasoning_effort: "low" });
+      expect(provider.requests[0].body).toMatchObject({ model: "my-own-model", reasoning_effort: "low" });
       expect(provider.requests[0].body.messages.at(-1).content).toContain(line);
     });
   }
