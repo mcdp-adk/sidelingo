@@ -44,6 +44,7 @@ pnpm tauri dev
   - `src/updates/`: update checks.
   - `src/pin-window/`: the Pin window UI.
   - `src/settings-window/`: the settings window and its sections.
+  - `src/testing/`: the webview core's test harness: a fake transport for the Provider, and the Rust side played through Tauri's IPC mocks.
 - `src-tauri/`: the Rust side, with its Tauri configurations, capabilities, icons and installer hooks.
 
 Tests sit beside the module they test.
@@ -65,6 +66,14 @@ pnpm dev:desktop
 This mode uses an unowned window that appears in the taskbar and Alt+Tab and does not stay on top. It shares the regular UI and interactions, with a separate application identifier and independent application data. The `desktop-dev` Cargo feature is limited to debug builds.
 
 Use regular mode (`pnpm tauri dev`) for the final verdict on always-on-top behavior, taskbar and Alt+Tab exclusion, and tray behavior. Desktop development mode does not replace those acceptance checks. The regular development, end-to-end test, and release commands keep their existing behavior.
+
+### Core tests
+
+```bash
+pnpm test
+```
+
+Vitest runs the webview core's rules in Node, without launching the app. CI runs them on every PR. ADR 0006 describes the test layers.
 
 ### End-to-end tests
 
