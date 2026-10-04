@@ -13,7 +13,7 @@ export async function openSettings(): Promise<{ pin: string; settings: string }>
 
 /** Replace a controlled text field as a user does, without WebDriver's synthetic clear. */
 export async function replaceTextField(label: string, value: string): Promise<void> {
-  await $(`input[aria-label='${label}']`).click();
+  await $(`aria/${label}`).click();
   await browser.keys(["Control", "a"]);
   await browser.keys(value);
 }

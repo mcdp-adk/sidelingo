@@ -30,7 +30,7 @@ export const config: WebdriverIO.Config = {
   runner: "local",
   hostname: "127.0.0.1",
   port: 4444,
-  specs: ["./specs/**/*.e2e.ts"],
+  specs: ["./tasks/**/*.e2e.ts", "./specs/**/*.e2e.ts"],
   maxInstances: 1,
   capabilities: [capabilities()],
   logLevel: "warn",
