@@ -75,6 +75,14 @@ pnpm test
 
 Vitest runs the webview core's rules in Node, without launching the app. CI runs them on every PR. ADR 0006 describes the test layers.
 
+### Real-Provider check
+
+```bash
+pnpm test:real
+```
+
+It runs one multi-line text Round and one image Round through the Provider client against OpenRouter (`~openai/gpt-luna-latest`, reasoning effort `low`), and passes when both finish with non-empty text. It reads the key from `OPENROUTER_API_KEY` and spends a few tokens, so run it locally before a release and when a change touches the Provider client or a prompt. Neither `pnpm test` nor CI runs it.
+
 ### End-to-end tests
 
 The suite drives a debug build through WebDriver. It needs two tools on `PATH`:
