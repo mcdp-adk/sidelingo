@@ -61,6 +61,17 @@ pub fn show(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Opens Settings from a synchronous event handler (tray menu, notification click), where
+/// creating the WebView2 window directly deadlocks.
+pub fn show_from_event_handler(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = show(&app) {
+            eprintln!("failed to open Settings: {error}");
+        }
+    });
+}
+
 #[tauri::command]
 pub async fn open_settings(app: AppHandle) -> Result<(), String> {
     show(&app).map_err(|error| error.to_string())

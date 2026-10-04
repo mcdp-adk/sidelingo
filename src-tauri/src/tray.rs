@@ -90,15 +90,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             SHOW => pin_window::show(app),
-            SETTINGS => {
-                // WebView2 window creation cannot run in a synchronous event handler.
-                let app = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(error) = settings_window::show(&app) {
-                        eprintln!("failed to open Settings: {error}");
-                    }
-                });
-            }
+            SETTINGS => settings_window::show_from_event_handler(app),
             QUIT => app.exit(0),
             UPDATE => {
                 if let Err(error) = app.emit_to(pin_window::LABEL, "update-install-requested", ()) {

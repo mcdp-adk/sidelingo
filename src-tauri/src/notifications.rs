@@ -160,20 +160,12 @@ fn show(
     let app = app.clone();
     let handler = TypedEventHandler::<ToastNotification, IInspectable>::new(move |_, _| {
         if let Some(target) = target {
-            let app = app.clone();
-            let dispatch_app = app.clone();
-            if let Err(error) = app.run_on_main_thread(move || {
-                if let Some(state) = dispatch_app.try_state::<NotificationState>() {
-                    if let Ok(mut pending) = state.pending_target.lock() {
-                        *pending = Some(target);
-                    }
+            if let Some(state) = app.try_state::<NotificationState>() {
+                if let Ok(mut pending) = state.pending_target.lock() {
+                    *pending = Some(target);
                 }
-                if let Err(error) = settings_window::show(&dispatch_app) {
-                    eprintln!("failed to open Settings from a notification: {error}");
-                }
-            }) {
-                eprintln!("failed to dispatch notification activation: {error}");
             }
+            settings_window::show_from_event_handler(&app);
         }
         Ok(())
     });
