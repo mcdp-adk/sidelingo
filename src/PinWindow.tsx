@@ -116,7 +116,8 @@ const useStyles = makeStyles({
     transitionProperty: "opacity",
     transitionDuration: tokens.durationNormal,
     transitionTimingFunction: tokens.curveEasyEase,
-    ":focus-within": { opacity: 1 },
+    // Keyboard focus shows it too; a mouse click leaves it to fade with the pointer.
+    ":has(:focus-visible)": { opacity: 1 },
   },
   shown: { opacity: 1 },
   modeControls: { position: "relative", flexGrow: 1, minWidth: 0 },
