@@ -67,25 +67,48 @@ This mode uses an unowned window that appears in the taskbar and Alt+Tab and doe
 
 Use regular mode (`pnpm tauri dev`) for the final verdict on always-on-top behavior, taskbar and Alt+Tab exclusion, and tray behavior. Desktop development mode does not replace those acceptance checks. The regular development, end-to-end test, and release commands keep their existing behavior.
 
-### Core tests
+### Tests
+
+Tests come in five layers, and each behaviour has one owning test at the layer that proves it best. ADR 0006 records why, and `CODING_STANDARDS.md` holds the rules for each layer.
+
+| Layer | Command | Runs |
+| --- | --- | --- |
+| User tasks | `pnpm test:e2e` | Locally, before a PR that changes code merges |
+| Webview core | `pnpm test` | In CI on every PR |
+| Rust modules | `cargo test`, in `src-tauri/` | In CI on every PR |
+| Real Provider | `pnpm test:real` | Locally, before a release and when a change touches the Provider client or a prompt |
+| Desktop checklist | [`docs/desktop-checklist.md`](docs/desktop-checklist.md), with computer-use | Before each release, plus the items a PR touches |
+
+CI also runs type-checking, `pnpm format:check`, `pnpm check:tasks`, `cargo fmt --check` and Clippy. It can't run the user tasks: GitHub-hosted Windows runners are elevated, and WebView2 ignores its `WEBVIEW2_*` environment variables under an elevated host, so the WebDriver debugging port never arrives ([tauri-apps/wry#1782](https://github.com/tauri-apps/wry/issues/1782)). Revisit once wry passes that setting through its own API.
+
+#### Webview core
 
 ```bash
 pnpm test
 ```
 
-Vitest runs the webview core's rules in Node, without launching the app. CI runs them on every PR. ADR 0006 describes the test layers.
+Vitest runs the webview core's rules in Node, without launching the app.
 
-### Real-Provider check
+#### Rust modules
+
+```bash
+cd src-tauri
+cargo test
+```
+
+It covers the Rust logic that is already pure: the settings document and notification links.
+
+#### Real Provider
 
 ```bash
 pnpm test:real
 ```
 
-It runs one multi-line text Round and one image Round through the Provider client against OpenRouter (`~openai/gpt-luna-latest`, reasoning effort `low`), and passes when both finish with non-empty text. It reads the key from `OPENROUTER_API_KEY` and spends a few tokens, so run it locally before a release and when a change touches the Provider client or a prompt. Neither `pnpm test` nor CI runs it.
+It runs one multi-line text Round and one image Round through the Provider client against OpenRouter (`~openai/gpt-luna-latest`, reasoning effort `low`), and passes when both finish with non-empty text. It reads the key from `OPENROUTER_API_KEY` and spends a few tokens. Neither `pnpm test` nor CI runs it.
 
-### End-to-end tests
+#### User tasks
 
-The suite drives a debug build through WebDriver. It needs two tools on `PATH`:
+Each test walks one user task through a debug build, driven through WebDriver. They need two tools on `PATH`:
 
 ```bash
 cargo install tauri-driver --locked
