@@ -55,3 +55,48 @@ export async function setUpCustomProvider(baseUrl: string): Promise<{ pin: strin
   await browser.switchToWindow(pin);
   return { pin, settings };
 }
+
+/** Follows the Open settings button of the Pin window's notice or error, returning once Settings shows. */
+export async function followOpenSettings(): Promise<{ pin: string; settings: string }> {
+  // The user waits to see the notice or error before pressing its button.
+  await $("[role=group]").waitForDisplayed();
+  return switchToSettings(() => $("[role=group]").$("button=Open settings").click());
+}
+
+async function switchToSettings(open: () => Promise<unknown>): Promise<{ pin: string; settings: string }> {
+  const pin = await browser.getWindowHandle();
+  await open();
+  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
+  const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
+  await browser.switchToWindow(settings);
+  await expect($("h1")).toHaveText("Settings");
+  return { pin, settings };
+}
+
+/**
+ * On a fresh install, opens Settings from the Pin window's toolbar and sets up the Custom Preset as a user does,
+ * committing each field with Enter, then returns to the Pin window. Settings stays open behind it.
+ */
+export async function setUpCustom({ baseUrl, model, key }: { baseUrl: string; model: string; key?: string }) {
+  await $("[role=toolbar]").moveTo();
+  const windows = await switchToSettings(() => $("aria/Settings (Ctrl+,)").click());
+  await $("aria/Preset").selectByVisibleText("Custom");
+  for (const [label, value] of [
+    ["Base URL", baseUrl],
+    ["Model", model],
+    ["Key", key],
+  ] as const) {
+    if (value === undefined) continue;
+    await replaceTextField(label, value);
+    await browser.keys("Enter");
+  }
+  await browser.switchToWindow(windows.pin);
+  return windows;
+}
+
+/** Waits until keyboard input goes to no control, as on arriving in a window that focuses nothing. */
+export async function expectNothingFocused(): Promise<void> {
+  await browser.waitUntil(async () => (await $(await browser.getActiveElement()).getTagName()) === "body", {
+    timeoutMsg: "a control has keyboard focus",
+  });
+}
