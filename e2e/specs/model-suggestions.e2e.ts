@@ -99,4 +99,21 @@ describe("Provider model suggestions", () => {
     await model().click();
     await expect($("//*[@role='option' and normalize-space(.)='chosen-again-model']")).toBeDisplayed();
   });
+
+  it("uses the suggested model accepted with Enter", async () => {
+    provider.reset();
+    provider.models({ ids: ["catalog-alpha", "catalog-beta"] });
+    clearClipboard();
+    await relaunch({ settings: customSettings(provider) });
+    const { pin } = await openSettings();
+    await $("input[role=combobox][aria-label='Model']").click();
+    await expect($("//*[@role='option' and normalize-space(.)='catalog-alpha']")).toBeDisplayed();
+    await replaceTextField("Model", "catalog-a");
+    await browser.keys("Enter");
+    await browser.switchToWindow(pin);
+    const copied = `keyboard-model-${Date.now()}`;
+    writeClipboardText(copied);
+    await expect($("p")).toHaveText(copied);
+    expect(provider.requests.at(-1)?.body.model).toBe("catalog-alpha");
+  });
 });
