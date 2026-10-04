@@ -1,7 +1,7 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate } from "../support/provider";
-import { expectNothingFocused, followOpenSettings, replaceTextField, setUpCustom } from "../support/settings";
+import { expectNothingFocused, followOpenSettings, replaceTextField, setUpCustomProvider } from "../support/settings";
 
 describe("Task 4: recovering from a Provider error", () => {
   let provider: FakeProvider;
@@ -31,7 +31,7 @@ describe("Task 4: recovering from a Provider error", () => {
     for (const name of ["Regenerate (Ctrl+R / F5)", "Copy source", "Copy translation"]) {
       await expect($(`aria/${name}`)).toBeDisabled();
     }
-    const { pin, settings } = await setUpCustom({ baseUrl: provider.baseUrl, model: "chat-model", key: "wrong-key" });
+    const { pin, settings } = await setUpCustomProvider(provider.baseUrl, { key: "wrong-key" });
 
     const line = `A line for a Provider that rejects the key ${stamp}`;
     writeClipboardText(line);

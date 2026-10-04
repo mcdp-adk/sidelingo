@@ -1,7 +1,7 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, inspectPng, writeClipboardBitmap } from "../support/clipboard";
 import { FakeProvider, gate, type RecordedRequest } from "../support/provider";
-import { setUpCustom } from "../support/settings";
+import { setUpCustomProvider } from "../support/settings";
 
 const structuring = (request: RecordedRequest) => Array.isArray(request.body.messages[1].content);
 
@@ -31,7 +31,7 @@ describe("Task 3: images", () => {
     const stamp = Date.now();
     clearClipboard();
     await relaunch();
-    await setUpCustom({ baseUrl: provider.baseUrl, model: "vision-model" });
+    await setUpCustomProvider(provider.baseUrl);
 
     // A screenshot: Structuring reads its text, then the Source text is translated.
     const source = `Text read from the screenshot ${stamp}`;

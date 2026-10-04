@@ -1,7 +1,7 @@
 import { appExe, capabilities, relaunch } from "../support/app";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate } from "../support/provider";
-import { expectShownOption, setUpCustom } from "../support/settings";
+import { expectShownOption, setUpCustomProvider } from "../support/settings";
 import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../support/window";
 
 const paragraphs = (count: number, name: string) =>
@@ -58,7 +58,7 @@ describe("Task 2: multi-line text", () => {
     await relaunch();
     const wide = { x: 120, y: 100, width: 1000, height: 600 };
     setWindowBounds(appExe, "sidelingo", wide);
-    await setUpCustom({ baseUrl: provider.baseUrl, model: "text-model" });
+    await setUpCustomProvider(provider.baseUrl);
 
     // 1. The Source text streams under a status, then the Translated text streams.
     writeClipboardText(`A copied line ${stamp}\nAnother copied line`);
