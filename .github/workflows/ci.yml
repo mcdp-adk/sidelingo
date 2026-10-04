@@ -58,6 +58,7 @@ jobs:
         working-directory: .
       - run: pnpm notices
         working-directory: .
-      # The app embeds the built front end, which lint doesn't need; an empty folder satisfies the build.
+      # The app embeds the built front end, which lint and tests don't need; an empty folder satisfies the build.
       - run: New-Item -ItemType Directory -Force ../dist
       - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
