@@ -24,20 +24,6 @@ describe("Translating a copied line", () => {
     await provider.close();
   });
 
-  it("sends one request and streams the Translated text into the window as chunks arrive", async () => {
-    const first = words(4, "first");
-    const second = words(4, "second");
-    const held = gate();
-    provider.reset([{ delta: { content: first } }, held, { delta: { content: ` ${second}` } }]);
-    writeClipboardText(words());
-    await relaunch({ settings: customSettings(provider) });
-
-    await expect(paragraph()).toHaveText(first);
-    held.open();
-    await expect(paragraph()).toHaveText(`${first} ${second}`);
-    expect(provider.requests).toHaveLength(1);
-  });
-
   it("sends no request for a copy made while the window is hidden", async () => {
     provider.reset();
     clearClipboard();

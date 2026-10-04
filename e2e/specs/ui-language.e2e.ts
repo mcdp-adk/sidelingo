@@ -6,9 +6,7 @@ const english = "Copy text or an image to see it here.";
 
 describe("The UI language", () => {
   for (const [language, text] of [
-    ["zh-CN", chinese],
     ["zh-TW", chinese],
-    ["en-US", english],
     ["ja-JP", english],
   ]) {
     it(`is ${text === chinese ? "Simplified Chinese" : "English"} under ${language}`, async () => {

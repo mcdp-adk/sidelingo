@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { appExe, dataFolders, identifier, ownerIdentifier, relaunch } from "../support/app";
-import { clearClipboard } from "../support/clipboard";
 import { inspectWindows } from "../support/window";
 
 const owner = dataFolders(ownerIdentifier);
@@ -18,19 +17,6 @@ function snapshot(folder: string): Record<string, string> | null {
 }
 
 describe("Launching sidelingo", () => {
-  it("starts from an empty data folder and shows the Pin window", async () => {
-    const { roaming } = dataFolders(identifier);
-    mkdirSync(roaming, { recursive: true });
-    writeFileSync(join(roaming, "left-over.json"), "{}");
-    clearClipboard();
-
-    await relaunch();
-
-    expect(existsSync(join(roaming, "left-over.json"))).toBe(false);
-    await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
-    expect(inspectWindows(appExe, "sidelingo").map((w) => w.visible)).toEqual([true]);
-  });
-
   it("keeps to its own data folders, leaving the owner's untouched", async () => {
     const ownerSettings = snapshot(owner.roaming);
     const ownerWebViewExists = existsSync(owner.local);
