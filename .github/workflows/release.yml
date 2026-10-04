@@ -55,7 +55,8 @@ jobs:
             The installer is not Authenticode-signed. If Microsoft Defender SmartScreen displays “Windows protected your PC”, choose **More info → Run anyway** after verifying the checksum. **Smart App Control blocks this unsigned installer**, so a PC enforcing it cannot install sidelingo.
 
             See the [README installation instructions](https://github.com/mcdp-adk/sidelingo#installation) for checksum commands and installation details.
-          releaseDraft: false
+          # Stays a draft until every asset is attached, so `latest` never points at a partial release.
+          releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           uploadUpdaterSignatures: true
@@ -74,3 +75,7 @@ jobs:
           [IO.File]::WriteAllText($checksum, "$hash  $($installer.Name)`n", [Text.UTF8Encoding]::new($false))
           gh release upload $env:GITHUB_REF_NAME $checksum --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Checksum upload failed.' }
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit ${{ github.ref_name }} --draft=false --latest
