@@ -43,7 +43,7 @@ describe("The Pin window session", () => {
     const held = gate();
     provider.reset(({ body }) =>
       Array.isArray(body.messages[1].content)
-        ? [{ delta: { content: partial } }, held, { delta: { content: " obsolete suffix" } }]
+        ? [{ delta: { content: partial } }, { keepAliveUntil: held.wait }, { delta: { content: " obsolete suffix" } }]
         : [{ delta: { content: translated } }],
     );
     clearClipboard();

@@ -23,7 +23,9 @@ export type Step =
   /** Drops the actual connection before the reply finishes. */
   | { drop: true }
   /** Holds the stream until the promise settles. */
-  | { wait: Promise<unknown>; onReached?: () => void };
+  | { wait: Promise<unknown>; onReached?: () => void }
+  /** Holds the stream like a real Provider still generating: a keep-alive comment every 250 ms until the promise settles. */
+  | { keepAliveUntil: Promise<unknown> };
 
 /** A real failed chat response, with the Provider's JSON error detail. */
 export interface HttpReply {
@@ -141,6 +143,13 @@ async function stream(response: ServerResponse, steps: Step[]) {
     if ("wait" in step) {
       step.onReached?.();
       await step.wait;
+    } else if ("keepAliveUntil" in step) {
+      let settled = false;
+      void step.keepAliveUntil.then(() => (settled = true));
+      while (!settled && !response.destroyed) {
+        response.write(": keep-alive\n\n");
+        await Promise.race([step.keepAliveUntil, new Promise((resolve) => setTimeout(resolve, 250))]);
+      }
     } else if ("drop" in step) {
       response.destroy();
       return;

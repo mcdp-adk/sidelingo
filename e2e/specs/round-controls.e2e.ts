@@ -61,7 +61,11 @@ describe("Round controls", () => {
       provider.reset(({ body }) =>
         Array.isArray(body.messages[1].content)
           ? provider.requests.length === 1
-            ? [{ delta: { content: partial } }, held, { delta: { content: " obsolete shortcut suffix" } }]
+            ? [
+                { delta: { content: partial } },
+                { keepAliveUntil: held.wait },
+                { delta: { content: " obsolete shortcut suffix" } },
+              ]
             : [{ delta: { content: source } }]
           : [{ delta: { content: translation } }],
       );
