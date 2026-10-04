@@ -112,6 +112,10 @@ describe("Translating a copied line", () => {
     clearClipboard();
     await relaunch({ settings: customSettings(provider) });
     await expect($("body")).toHaveText("Copy text or an image to see it here.", { containing: true });
+    // The empty state renders before the window shows, and Esc hides nothing until it has.
+    await browser.waitUntil(() => inspectWindows(appExe, "sidelingo")[0]?.visible, {
+      timeoutMsg: "the Pin window never showed",
+    });
     await browser.keys("Escape");
     await browser.waitUntil(() => !inspectWindows(appExe, "sidelingo")[0].visible, {
       timeoutMsg: "the Pin window is still visible",
