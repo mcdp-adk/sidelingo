@@ -3,15 +3,19 @@
 //! Desktop toasts require a Start menu shortcut with a matching AppUserModelID;
 //! Tauri's NSIS bundle supplies the configured application identifier. See
 //! https://learn.microsoft.com/en-us/windows/win32/shell/quickstart-sending-desktop-toast.
+//!
+//! A click on the banner never reached this unpackaged app's `Activated` handler, so a
+//! notification with a target opens a `sidelingo:` link instead. Windows starts sidelingo with
+//! it, and the single-instance plugin hands it to the running one.
 
 use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
-use windows::core::{IInspectable, Interface, HSTRING};
+use tauri_plugin_deep_link::DeepLinkExt;
+use windows::core::{Interface, HSTRING};
 use windows::Data::Xml::Dom::{XmlDocument, XmlElement};
-use windows::Foundation::TypedEventHandler;
 use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
 use windows::UI::Notifications::{ToastNotification, ToastNotificationManager, ToastNotifier};
 
@@ -29,6 +33,51 @@ enum Message {
 #[serde(rename_all = "camelCase")]
 pub enum NotificationTarget {
     Hotkey,
+}
+
+impl NotificationTarget {
+    const ALL: [Self; 1] = [Self::Hotkey];
+
+    const fn link(self) -> &'static str {
+        match self {
+            Self::Hotkey => "sidelingo://settings/hotkey",
+        }
+    }
+
+    fn from_link(link: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|target| target.link() == link)
+    }
+}
+
+/// Whether a launch argument is a notification's link, which opens Settings rather than the Pin.
+pub fn is_link(argument: &str) -> bool {
+    NotificationTarget::from_link(argument).is_some()
+}
+
+/// Opens Settings at a clicked notification's target, whether the click started sidelingo or
+/// reached it running.
+pub fn handle_links(app: &AppHandle) {
+    if let Ok(Some(urls)) = app.deep_link().get_current() {
+        open_link(app, &urls);
+    }
+    let handle = app.clone();
+    app.deep_link()
+        .on_open_url(move |event| open_link(&handle, &event.urls()));
+}
+
+fn open_link(app: &AppHandle, urls: &[impl AsRef<str>]) {
+    let Some(target) = urls
+        .iter()
+        .find_map(|url| NotificationTarget::from_link(url.as_ref()))
+    else {
+        return;
+    };
+    if let Some(state) = app.try_state::<NotificationState>() {
+        if let Ok(mut pending) = state.pending_target.lock() {
+            *pending = Some(target);
+        }
+    }
+    settings_window::show_from_event_handler(app);
 }
 
 pub struct NotificationState {
@@ -111,41 +160,34 @@ fn run(app: AppHandle, receiver: mpsc::Receiver<Message>) {
         }
     };
 
-    // Keep each toast and activation handler alive while Windows can deliver its callback.
-    let mut active = Vec::new();
     while let Ok(Message::Show {
         title,
         body,
         target,
     }) = receiver.recv()
     {
-        match show(&app, &notifier, &title, &body, target) {
-            Ok((toast, handler, token)) => active.push((toast, handler, token)),
-            Err(error) => eprintln!("failed to show Windows notification: {error}"),
+        if let Err(error) = show(&notifier, &title, &body, target) {
+            eprintln!("failed to show Windows notification: {error}");
         }
-    }
-
-    for (toast, _, token) in active {
-        let _ = toast.RemoveActivated(token);
     }
     unsafe { RoUninitialize() };
 }
 
 fn show(
-    app: &AppHandle,
     notifier: &ToastNotifier,
     title: &str,
     body: &str,
     target: Option<NotificationTarget>,
-) -> windows::core::Result<(
-    ToastNotification,
-    TypedEventHandler<ToastNotification, IInspectable>,
-    i64,
-)> {
+) -> windows::core::Result<()> {
     let document = XmlDocument::new()?;
     document.LoadXml(&HSTRING::from(
         "<toast><visual><binding template=\"ToastGeneric\"/></visual></toast>",
     ))?;
+    if let Some(target) = target {
+        let toast = document.DocumentElement()?;
+        toast.SetAttribute(&HSTRING::from("activationType"), &HSTRING::from("protocol"))?;
+        toast.SetAttribute(&HSTRING::from("launch"), &HSTRING::from(target.link()))?;
+    }
     let binding = document
         .GetElementsByTagName(&HSTRING::from("binding"))?
         .Item(0)?
@@ -156,20 +198,5 @@ fn show(
         binding.AppendChild(&element)?;
     }
 
-    let toast = ToastNotification::CreateToastNotification(&document)?;
-    let app = app.clone();
-    let handler = TypedEventHandler::<ToastNotification, IInspectable>::new(move |_, _| {
-        if let Some(target) = target {
-            if let Some(state) = app.try_state::<NotificationState>() {
-                if let Ok(mut pending) = state.pending_target.lock() {
-                    *pending = Some(target);
-                }
-            }
-            settings_window::show_from_event_handler(&app);
-        }
-        Ok(())
-    });
-    let token = toast.Activated(&handler)?;
-    notifier.Show(&toast)?;
-    Ok((toast, handler, token))
+    notifier.Show(&ToastNotification::CreateToastNotification(&document)?)
 }

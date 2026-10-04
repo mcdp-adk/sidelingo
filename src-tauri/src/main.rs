@@ -20,15 +20,16 @@ mod ui_language;
 fn main() {
     tauri::Builder::default()
         .manage(secrets::KeyEnvironmentSnapshot::capture())
-        // A second manual launch shows this one's Pin window and quits early.
+        // A second manual launch shows this one's Pin window and quits early; a notification's
+        // link reaches the deep-link plugin first and opens Settings instead.
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
-            if !arguments
-                .iter()
-                .any(|argument| argument == autostart::LAUNCH_ARGUMENT)
-            {
+            if !arguments.iter().any(|argument| {
+                argument == autostart::LAUNCH_ARGUMENT || notifications::is_link(argument)
+            }) {
                 pin_window::show(app)
             }
         }))
+        .plugin(tauri_plugin_deep_link::init())
         // Settle the borderless client area before restoring its inner size.
         .plugin(pin_window::init())
         .plugin(
@@ -53,6 +54,7 @@ fn main() {
             clipboard::start(app.handle())?;
             pin_window::create(app.handle())?;
             tray::create(app.handle())?;
+            notifications::handle_links(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

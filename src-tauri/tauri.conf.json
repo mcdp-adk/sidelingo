@@ -34,6 +34,9 @@
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["sidelingo"] }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERENjM0OUU0QkQ5MUMyMUIKUldRYndwRzk1RWxqM1NPaUllbGp0Ly95UkI2YjVaYnFIY3I0UWNGV08vL3BESjF3aGNnRmN0c24K",
       "endpoints": ["https://github.com/mcdp-adk/sidelingo/releases/latest/download/latest.json"],
