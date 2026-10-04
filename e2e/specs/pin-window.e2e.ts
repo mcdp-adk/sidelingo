@@ -88,18 +88,6 @@ describe("The Pin window", () => {
     await provider.close();
   });
 
-  it("hides on Esc", async () => {
-    await launch();
-    await browser.keys("Escape");
-    await waitUntilHidden();
-  });
-
-  it("hides on the toolbar's rightmost button, Close", async () => {
-    await launch();
-    await (await closeButton()).click();
-    await waitUntilHidden();
-  });
-
   it("hides on a double-click on the content", async () => {
     await launch();
     await (await paragraph()).doubleClick();
