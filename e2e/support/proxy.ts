@@ -6,6 +6,19 @@ import { connect, createServer as createTcpServer, isIP, type AddressInfo, type 
 import { getProxyForUrl } from "proxy-from-env";
 import type { Duplex } from "node:stream";
 
+/** The username and password a proxy requires. */
+export interface ProxyCredentials {
+  username: string;
+  password: string;
+}
+
+const defaultCredentials: ProxyCredentials = { username: "proxy-user", password: "proxy-password" };
+
+/** The `Proxy-Authorization` value that carries `credentials`. */
+export function basicAuthorization({ username, password }: ProxyCredentials): string {
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+}
+
 /** Opens an opaque GitHub TLS tunnel through the runner's configured egress. */
 function connectUpdater(
   downstream: Duplex,
@@ -167,9 +180,7 @@ export class HttpProxy {
   private readonly sockets = new Set<Socket>();
   private readonly server = createServer((incoming, outgoing) => {
     this.requests.push({ method: incoming.method!, url: incoming.url!, headers: incoming.headers });
-    if (
-      incoming.headers["proxy-authorization"] !== `Basic ${Buffer.from("proxy-user:proxy-password").toString("base64")}`
-    ) {
+    if (incoming.headers["proxy-authorization"] !== basicAuthorization(this.credentials)) {
       outgoing.writeHead(407, { "proxy-authenticate": "Basic realm=local-test" });
       outgoing.end("Proxy credentials required");
       return;
@@ -188,8 +199,10 @@ export class HttpProxy {
     incoming.pipe(upstream);
   });
 
-  static async start(): Promise<HttpProxy> {
-    const proxy = new HttpProxy();
+  private constructor(private readonly credentials: ProxyCredentials) {}
+
+  static async start(credentials = defaultCredentials): Promise<HttpProxy> {
+    const proxy = new HttpProxy(credentials);
     proxy.server.on("connection", (socket) => {
       proxy.sockets.add(socket);
       socket.on("close", () => proxy.sockets.delete(socket));
@@ -219,8 +232,10 @@ export class SocksProxy {
     void this.forward(socket).catch(() => socket.destroy());
   });
 
-  static async start(): Promise<SocksProxy> {
-    const proxy = new SocksProxy();
+  private constructor(private readonly credentials: ProxyCredentials) {}
+
+  static async start(credentials = defaultCredentials): Promise<SocksProxy> {
+    const proxy = new SocksProxy(credentials);
     proxy.server.listen(0, "127.0.0.1");
     await once(proxy.server, "listening");
     return proxy;
@@ -236,7 +251,7 @@ export class SocksProxy {
   }
 
   private async forward(socket: Socket): Promise<void> {
-    const request = await socksRequest(socket, "proxy-user", "proxy-password");
+    const request = await socksRequest(socket, this.credentials.username, this.credentials.password);
     if (!request) return;
     const { username, password, host, port } = request;
     const upstream = connect(port, host);

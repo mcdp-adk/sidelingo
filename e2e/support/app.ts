@@ -1,4 +1,4 @@
-import { readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -22,6 +22,31 @@ export const appExe = join(targetDir, "debug", "sidelingo.exe");
 /** Folders named by an identifier, per ADR 0004: settings in Roaming, WebView2 data in Local. */
 export function dataFolders(id: string) {
   return { roaming: join(process.env.APPDATA!, id), local: join(process.env.LOCALAPPDATA!, id) };
+}
+
+function filesBelow(folder: string): string[] {
+  try {
+    return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(folder, entry.name);
+      return entry.isDirectory() ? filesBelow(path) : entry.isFile() ? [path] : [];
+    });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+/** Each private value found in a file under either of the e2e build's data folders, as "<name> in <path>". */
+export function dataFolderLeaks(values: Record<string, string | Buffer>): string[] {
+  const { roaming, local } = dataFolders(identifier);
+  return [roaming, local].flatMap((folder) =>
+    filesBelow(folder).flatMap((path) => {
+      const contents = readFileSync(path);
+      return Object.entries(values)
+        .filter(([, value]) => contents.includes(value))
+        .map(([name]) => `${name} in ${path}`);
+    }),
+  );
 }
 
 export function buildApp(): void {

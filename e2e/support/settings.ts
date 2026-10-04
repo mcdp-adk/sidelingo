@@ -11,6 +11,20 @@ export async function openSettings(): Promise<{ pin: string; settings: string }>
   return { pin, settings };
 }
 
+/**
+ * From a fresh install's Pin window, opens Settings and sets up the Custom Preset with `baseUrl` and a typed
+ * `model`, in English. Stays in Settings.
+ */
+export async function setUpCustomProvider(baseUrl: string, model: string): Promise<{ pin: string; settings: string }> {
+  const windows = await openSettings();
+  await $("aria/Preset").selectByVisibleText("Custom");
+  await replaceTextField("Base URL", baseUrl);
+  await browser.keys("Enter");
+  await replaceTextField("Model", model);
+  await browser.keys("Enter");
+  return windows;
+}
+
 /** Replace a controlled text field as a user does, without WebDriver's synthetic clear. */
 export async function replaceTextField(label: string, value: string): Promise<void> {
   await $(`aria/${label}`).click();
