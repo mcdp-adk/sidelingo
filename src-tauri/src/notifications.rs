@@ -200,3 +200,34 @@ fn show(
 
     notifier.Show(&ToastNotification::CreateToastNotification(&document)?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_hotkey_link_targets_the_hotkey_setting() {
+        assert!(matches!(
+            NotificationTarget::from_link("sidelingo://settings/hotkey"),
+            Some(NotificationTarget::Hotkey)
+        ));
+        assert!(is_link("sidelingo://settings/hotkey"));
+    }
+
+    #[test]
+    fn other_launch_arguments_are_not_links() {
+        for argument in [
+            "",
+            crate::autostart::LAUNCH_ARGUMENT,
+            r"C:\Program Files\sidelingo\sidelingo.exe",
+            "sidelingo://settings",
+            "sidelingo://settings/",
+            "sidelingo://settings/proxy",
+            "sidelingo://settings/hotkey/",
+            "sidelingo://settings/hotkey?from=toast",
+            "https://settings/hotkey",
+        ] {
+            assert!(!is_link(argument), "{argument:?}");
+        }
+    }
+}
