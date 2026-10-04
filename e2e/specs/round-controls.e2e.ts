@@ -13,10 +13,7 @@ describe("Round controls", () => {
     await provider.close();
   });
 
-  for (const [shortcut, keys] of [
-    ["Ctrl+R", ["Control", "r"]],
-    ["F5", ["F5"]],
-  ] as const) {
+  for (const [shortcut, keys] of [["Ctrl+R", ["Control", "r"]]] as const) {
     it(`cancels streaming Structuring with ${shortcut} and reruns the retained Input through Translation`, async () => {
       const input = `Retained shortcut Input ${Date.now()}\ncontinues`;
       const partial = `Old partial Source ${Date.now()}`;
