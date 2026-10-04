@@ -34,3 +34,24 @@ export async function expectShownOption(dropdown: ReturnType<typeof $>, text: st
     timeoutMsg: `the dropdown never showed "${text}"`,
   });
 }
+
+/**
+ * Sets up the Custom Preset as a user does on a fresh install, from the Pin window: the toolbar's Settings button,
+ * Custom, then the Base URL and a Model, each committed with Enter. Returns to the Pin window and leaves the settings
+ * window open.
+ */
+export async function setUpCustomProvider(baseUrl: string): Promise<{ pin: string; settings: string }> {
+  const pin = await browser.getWindowHandle();
+  await $("[role=toolbar]").moveTo();
+  await $("aria/Settings (Ctrl+,)").click();
+  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
+  const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
+  await browser.switchToWindow(settings);
+  await $("aria/Preset").selectByVisibleText("Custom");
+  await replaceTextField("Base URL", baseUrl);
+  await browser.keys("Enter");
+  await replaceTextField("Model", "task-model");
+  await browser.keys("Enter");
+  await browser.switchToWindow(pin);
+  return { pin, settings };
+}
