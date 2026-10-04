@@ -6,6 +6,8 @@ export type Step =
   | { content: string }
   /** A server-sent `data:` line, verbatim. */
   | { data: string }
+  /** A server-sent comment line, such as a keep-alive. */
+  | { comment: string }
   /** An `error` object inside the stream, as some Providers send. */
   | { error: string }
   /** Holds the stream here until the promise settles. */
@@ -101,6 +103,12 @@ function stream(steps: Step[], signal: AbortSignal): ReadableStream<Uint8Array> 
           else if ("content" in step) {
             return send(JSON.stringify({ choices: [{ delta: { content: step.content } }] }));
           } else if ("error" in step) return send(JSON.stringify({ error: { message: step.error } }));
+          else if ("comment" in step)
+            return controller.enqueue(
+              encoder.encode(`: ${step.comment}
+
+`),
+            );
           else return send(step.data);
         }
       },
