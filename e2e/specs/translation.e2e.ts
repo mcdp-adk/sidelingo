@@ -1,3 +1,4 @@
+import type { ChainablePromiseElement } from "webdriverio";
 import { appExe, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
@@ -120,6 +121,26 @@ describe("Translating a copied line", () => {
     // Well past the listener's 200 ms coalescing.
     await browser.pause(1000);
     expect(provider.requests).toHaveLength(0);
+  });
+
+  it("wraps a long unbroken line instead of scrolling sideways, leaving sideways scrolling to code", async () => {
+    // No space or hyphen offers a line break inside the folder name.
+    const path = `C:\\Users\\${"a".repeat(120)}${Date.now()}\\file.txt`;
+    const code = `run --flag ${"x".repeat(300)}`;
+    provider.reset([{ delta: { content: `${path}\n\n\`\`\`\n${code}\n\`\`\`` } }]);
+    writeClipboardText(path);
+    await relaunch({ settings: customSettings(provider) });
+    await expect(paragraph()).toHaveText(path);
+
+    const viewport = (await $("body").getSize()).width;
+    const overflows = async (element: ChainablePromiseElement) =>
+      Number(await element.getProperty("scrollWidth")) > Number(await element.getProperty("clientWidth"));
+    expect(await overflows(paragraph())).toBe(false);
+    const block = $("pre");
+    await expect(block).toHaveText(code, { containing: true });
+    expect(await overflows(block)).toBe(true);
+    const [at, size] = await Promise.all([block.getLocation(), block.getSize()]);
+    expect(at.x + size.width).toBeLessThanOrEqual(viewport);
   });
 
   it("keeps the scroll position while text streams in", async () => {

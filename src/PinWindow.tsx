@@ -137,6 +137,8 @@ const useStyles = makeStyles({
     overflowY: "auto",
     overflowAnchor: "none",
     padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    // Long paths and URLs wrap; only code blocks scroll sideways, inside themselves.
+    overflowWrap: "anywhere",
     cursor: "default",
     // A thin, rounded Fluent scrollbar with no arrow buttons, shown only while in use.
     "::-webkit-scrollbar": { width: "6px" },
