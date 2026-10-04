@@ -98,6 +98,8 @@ async function startRound(input: Input) {
   } catch (error) {
     // A cancelled Round leaves no error; #51 shows the others in the window.
     if (!controller.signal.aborted) console.error("The Round failed:", error);
+  } finally {
+    if (inFlight === controller) inFlight = null;
   }
 }
 
@@ -121,6 +123,8 @@ export async function startSession(): Promise<void> {
     if (payload.origin === "copy" && snapshot.paused) return;
     // Nothing usable on show keeps the current content.
     if (!payload.input || (payload.origin === "copy" && sameInput(currentInput, payload.input))) return;
+    // A Round still running on the shown Input keeps running and shows its whole result.
+    if (payload.origin === "show" && inFlight && sameInput(currentInput, payload.input)) return;
     inFlight?.abort();
     inFlight = null;
     currentInput = payload.input;

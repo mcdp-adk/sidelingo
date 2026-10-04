@@ -168,6 +168,37 @@ describe("The Pin window session", () => {
     }
   });
 
+  it("keeps a hidden Round running when shown again with the same clipboard before it finishes", async () => {
+    const input = `Reopened Input ${Date.now()}`;
+    const partial = `Streaming reopened result ${Date.now()}`;
+    const whole = `${partial} finished after reopening`;
+    const held = gate();
+    provider.reset(() =>
+      provider.requests.length === 1
+        ? [{ delta: { content: partial } }, held, { delta: { content: " finished after reopening" } }]
+        : [{ delta: { content: "Unexpected restarted Round" } }],
+    );
+    clearClipboard();
+    await relaunch({ settings: customSettings(provider) });
+    try {
+      writeClipboardText(input);
+      await expect($("body")).toHaveText(partial, { containing: true });
+      await browser.keys("Escape");
+      await browser.waitUntil(() => !pinVisible(), { timeoutMsg: "the streaming Pin window did not hide" });
+
+      await showAgain();
+      await browser.pause(750);
+      expect(provider.requests).toHaveLength(1);
+      expect(provider.interruptedRequests).toHaveLength(0);
+      held.open();
+      await expect($("body")).toHaveText(whole, { containing: true });
+      await $("button[aria-label='Copy translation']").waitForEnabled();
+      expect(provider.requests).toHaveLength(1);
+    } finally {
+      held.open();
+    }
+  });
+
   it("requests the same Input again after a Provider HTTP failure instead of reusing it", async () => {
     const input = `Rejected Input ${Date.now()}`;
     const translated = `Successful retry ${Date.now()}`;
