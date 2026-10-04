@@ -70,13 +70,15 @@ export function resetDataFolders({ settings, settingsText }: Launch = {}): void 
   }
 }
 
-/** Quits the app and launches it again from fresh data folders. */
+/** Quits the app and launches it again from fresh data folders, returning once the Pin window shows. */
 export async function relaunch(launch: Launch = {}): Promise<void> {
   await browser.deleteSession();
   await useLaunchEnvironment(launch.environment);
   resetDataFolders(launch);
   // reloadSession's own attempt to end the already ended session is logged and ignored.
   await browser.reloadSession(capabilities(launch));
+  // An Autostart launch stays in the tray, so there is no window to wait for.
+  if (!launch.args?.includes("--autostart")) await pinWindowShows();
 }
 
 /** A real second launch shows the existing hidden Pin window. */
@@ -84,7 +86,11 @@ export async function showAgain(): Promise<void> {
   const secondLaunch = spawn(appExe, { stdio: "ignore", windowsHide: true });
   const [code] = await once(secondLaunch, "exit");
   expect(code).toBe(0);
+  await pinWindowShows();
+}
+
+async function pinWindowShows(): Promise<void> {
   await browser.waitUntil(() => inspectWindows(appExe, "sidelingo")[0]?.visible, {
-    timeoutMsg: "the existing Pin window did not show",
+    timeoutMsg: "the Pin window did not show",
   });
 }
