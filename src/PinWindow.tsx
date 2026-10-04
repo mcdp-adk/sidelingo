@@ -466,10 +466,10 @@ export function PinWindow() {
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
           >
-            {DISPLAY_MODES.map((value) => (
-              <Tab key={value} value={value}>
-                {modeLabels[value]}
-              </Tab>
+            {DISPLAY_MODES.map((value, index) => (
+              <Tooltip key={value} content={`${modeLabels[value]} (Ctrl+${index + 1})`} relationship="description">
+                <Tab value={value}>{modeLabels[value]}</Tab>
+              </Tooltip>
             ))}
           </TabList>
           {compact && (

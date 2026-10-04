@@ -1,6 +1,7 @@
 import { appExe, relaunch, type Launch } from "../app";
 import { readClipboardText, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider } from "../provider";
+import { expectTooltip } from "../tooltip";
 import { inspectWindows, minimumSizes } from "../window";
 
 const pinVisible = () => inspectWindows(appExe, "sidelingo")[0].visible;
@@ -119,12 +120,7 @@ describe("The Pin window", () => {
     it(`names Close and its shortcut in a tooltip under ${language}`, async () => {
       await launch({ language });
       const close = await closeButton();
-      // A hover sometimes leaves the tooltip closed in a full run, so hover until it shows.
-      await browser.waitUntil(async () => {
-        await close.moveTo();
-        return $("[role=tooltip]").isExisting();
-      });
-      await expect($("[role=tooltip]")).toHaveText(tooltip);
+      await expectTooltip(close, tooltip);
     });
   }
 

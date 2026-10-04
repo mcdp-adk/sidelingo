@@ -1,3 +1,4 @@
+import { expectTooltip } from "../tooltip";
 import { relaunch } from "../app";
 import { readClipboardText, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
@@ -91,12 +92,7 @@ describe("Copying results", () => {
       await relaunch({ language, settings: customSettings(provider) });
       await $(`button[aria-label='${translationName}']`).waitForEnabled();
       for (const name of [sourceName, translationName, regenerateName, pauseName]) {
-        const control = $(`button[aria-label='${name}']`);
-        await browser.waitUntil(async () => {
-          await control.moveTo();
-          return (await $("[role=tooltip]").getText()) === name;
-        });
-        await expect($("[role=tooltip]")).toHaveText(name);
+        await expectTooltip(await $(`button[aria-label='${name}']`).getElement(), name);
       }
     });
   }

@@ -3,6 +3,7 @@ import { appExe, capabilities, relaunch } from "../app";
 import { writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
 import { expectShownOption } from "../settings";
+import { expectTooltip } from "../tooltip";
 import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../window";
 
 async function scrollPosition(pane: WebdriverIO.Element) {
@@ -296,6 +297,23 @@ describe("Display modes", () => {
     await browser.waitUntil(inStep, { timeoutMsg: "the held Translation scrollbar did not drive Source" });
     expect(provider.requests).toHaveLength(2);
   });
+
+  for (const [language, tooltips] of [
+    ["en-US", ["Source (Ctrl+1)", "Translation (Ctrl+2)", "Side-by-side (Ctrl+3)"]],
+    ["zh-CN", ["原文 (Ctrl+1)", "译文 (Ctrl+2)", "对照 (Ctrl+3)"]],
+  ] as const) {
+    it(`names each Display mode tab and its shortcut in a tooltip under ${language}`, async () => {
+      provider.reset();
+      writeClipboardText("A line for the tab tooltips");
+      await relaunch({ language, settings: customSettings(provider) });
+      setWindowBounds(appExe, "sidelingo", { x: 120, y: 160, width: 800, height: 500 });
+      const tabs = await $$("[role=tab]").getElements();
+      expect(tabs).toHaveLength(3);
+      for (const [index, tooltip] of tooltips.entries()) {
+        await expectTooltip(tabs[index], tooltip);
+      }
+    });
+  }
 
   for (const { language, label, modes, actions } of [
     {
