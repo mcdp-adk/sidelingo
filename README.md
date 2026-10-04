@@ -30,6 +30,24 @@ pnpm typecheck
 pnpm tauri dev
 ```
 
+### Repository layout
+
+- `.github/`: the CI and release workflows.
+- `docs/`: architecture decision records (`docs/adr/`) and agent guides (`docs/agents/`).
+- `e2e/`: the end-to-end suite (`e2e/specs/`) and its harness.
+- `scripts/`: build scripts, such as the third-party notice generator.
+- `src/`: the front end. Its shared files (`main.tsx`, `global.css`, `i18n.ts`, `theme.ts`, `languages.ts`) sit at the top, and each concept from `GLOSSARY.md` has a folder:
+  - `src/round/`: the Round pipeline and its prompts.
+  - `src/session/`: following Inputs, reuse, cancellation and pause.
+  - `src/provider/`: the Provider client, Presets and keys.
+  - `src/settings/`: the settings document and its store.
+  - `src/updates/`: update checks.
+  - `src/pin-window/`: the Pin window UI.
+  - `src/settings-window/`: the settings window and its sections.
+- `src-tauri/`: the Rust side, with its Tauri configurations, capabilities, icons and installer hooks.
+
+Tests sit beside the module they test.
+
 ### Installer builds and releases
 
 `pnpm tauri build` generates the frontend and Rust third-party license texts before building and packages `THIRD-PARTY-NOTICES.html` beside the installed executable. `pnpm notices` generates that file on its own. Debug builds also copy it to their resource directory, so About uses the same resource path in development and installed builds. New npm packages that omit license text fail the build until their upstream notice is supplied; the existing omissions are documented in `scripts/licenses/README.md`.
