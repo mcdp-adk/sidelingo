@@ -19,6 +19,16 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # A patch to a dependency is code we maintain by hand at every upgrade.
+      - name: Use dependencies as published
+        run: |
+          $patches = @(
+            if (Select-String -Path src-tauri/Cargo.toml -Pattern '^\s*\[patch[.\]]' -Quiet) { 'a [patch] table in src-tauri/Cargo.toml' }
+            if (Test-Path src-tauri/vendor) { 'src-tauri/vendor/' }
+            if (Test-Path patches) { 'patches/' }
+            if ((Get-Content package.json -Raw | ConvertFrom-Json).pnpm.patchedDependencies) { 'pnpm.patchedDependencies in package.json' }
+          )
+          if ($patches) { throw "Found $($patches -join ', '). Use the published dependency, or record an exception in an ADR and in this check." }
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm format:check
