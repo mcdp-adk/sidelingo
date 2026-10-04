@@ -33,7 +33,7 @@ Tests come in five layers, and each contract has one owning test at the layer th
 
 - `#[cfg(test)]` tests cover only logic that is already pure. No function is split out to make it testable.
 
-### Real Provider
+### Real Provider (`pnpm test:real`)
 
 - A real-Provider check runs only through its own script, never through `pnpm test` or CI. It reads its key from the environment and never enters, prints or writes it.
 
