@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
+import { psString, runPowerShell } from "./powershell";
 import { inspectWindows } from "./window";
 
 const root = resolve(import.meta.dirname, "..", "..");
@@ -79,6 +80,16 @@ export async function relaunch(launch: Launch = {}): Promise<void> {
   await browser.reloadSession(capabilities(launch));
   // An Autostart launch stays in the tray, so there is no window to wait for.
   if (!launch.args?.includes("--autostart")) await pinWindowShows();
+}
+
+/** Quits the app keeping its data, returning once its process has exited and its files are free. */
+export async function quit(): Promise<void> {
+  await browser.deleteSession();
+  const running = () =>
+    runPowerShell(
+      `(Get-Process sidelingo -ErrorAction SilentlyContinue | Where-Object Path -eq ${psString(appExe)}).Id`,
+    ).trim() !== "";
+  await browser.waitUntil(() => !running(), { timeoutMsg: "the app did not quit" });
 }
 
 /** A real second launch shows the existing hidden Pin window. */
