@@ -35,7 +35,7 @@ import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { strings } from "../i18n";
 import type { RoundError } from "../round/round";
-import { regenerate, toggleClipboardPause, useSession } from "../session/session";
+import { useSession, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
 import { patchSettings, useSettings } from "../settings/settings-store";
 
@@ -168,9 +168,9 @@ function interactiveTarget(target: EventTarget): boolean {
   );
 }
 
-export function PinWindow() {
+export function PinWindow({ session }: { session: Session }) {
   const styles = useStyles();
-  const { round, hasInput, paused, overlong, configurationFailure } = useSession();
+  const { round, hasInput, paused, overlong, configurationFailure } = useSession(session);
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
@@ -218,7 +218,7 @@ export function PinWindow() {
         ((e.ctrlKey && e.key.toLowerCase() === "r") || (!e.ctrlKey && e.key === "F5"))
       ) {
         e.preventDefault();
-        regenerate();
+        session.regenerate();
       }
       const mode = DISPLAY_MODES[Number(e.key) - 1];
       if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[123]$/.test(e.key) && mode) {
@@ -271,7 +271,7 @@ export function PinWindow() {
       window.removeEventListener("pointercancel", onPointerCancel);
       window.removeEventListener("blur", onPointerCancel);
     };
-  }, []);
+  }, [session]);
 
   // Each new Round starts at the top; updates within a Round leave the scroll where it is.
   useLayoutEffect(() => {
@@ -376,7 +376,7 @@ export function PinWindow() {
               <MessageBarTitle>{strings.overlongText}</MessageBarTitle>
             </MessageBarBody>
             <MessageBarActions>
-              <Button size="small" onClick={regenerate}>
+              <Button size="small" onClick={session.regenerate}>
                 {strings.processAnyway}
               </Button>
             </MessageBarActions>
@@ -499,7 +499,7 @@ export function PinWindow() {
               appearance={paused ? "primary" : "subtle"}
               icon={<PauseRegular />}
               aria-pressed={paused}
-              onClick={toggleClipboardPause}
+              onClick={session.toggleClipboardPause}
             />
           </Tooltip>
           <Tooltip content={strings.regenerate} relationship="label">
@@ -508,7 +508,7 @@ export function PinWindow() {
               appearance="subtle"
               icon={<ArrowClockwiseRegular />}
               disabled={!hasInput}
-              onClick={regenerate}
+              onClick={session.regenerate}
             />
           </Tooltip>
           <Tooltip content={strings.copySource} relationship="label">

@@ -1,6 +1,5 @@
-import { fetch } from "@tauri-apps/plugin-http";
 import { englishName, type TargetLanguage } from "../languages";
-import { ProviderError, providerClient, type ChatMessage, type ProviderConfiguration } from "../provider/provider";
+import { ProviderError, type ChatMessage, type ProviderClient, type ProviderConfiguration } from "../provider/provider";
 import * as structuring from "./prompts/structuring";
 import * as translation from "./prompts/translation";
 
@@ -38,8 +37,6 @@ export interface RoundState {
   source: RoundPane;
   translation: RoundPane;
 }
-
-const client = providerClient(fetch);
 
 /** Read Frog's fallbacks for the Document Metadata, which a copy never has. */
 const METADATA_FALLBACKS = { webTitle: "No title available", webSummary: "No summary available" };
@@ -128,9 +125,10 @@ async function* withoutReasoning(deltas: AsyncGenerator<string>): AsyncGenerator
 
 /**
  * Runs Structuring for images and text with a line break, then streams one Translation of the whole
- * Source text. A single line goes straight to Translation. Aborting `signal` cancels every call.
+ * Source text through `client`. A single line goes straight to Translation. Aborting `signal` cancels every call.
  */
 export async function* run(
+  client: ProviderClient,
   input: Input,
   configuration: RoundConfiguration,
   signal: AbortSignal,
