@@ -1,12 +1,30 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { buildApp, capabilities, resetDataFolders } from "./app";
+import { appExe, buildApp, capabilities, resetDataFolders } from "./app";
 import { SevereServiceError } from "webdriverio";
 import { driverDir, startDriver, stopDriver } from "./driver";
+import { reserveHotkey } from "./hotkey";
+import { psString, runPowerShell } from "./powershell";
 
 /** A failing test leaves its screenshot and page source here. */
 const failuresDir = resolve(import.meta.dirname, "failures");
+
+/** A leftover e2e app, or another owner of the default hotkey, would taint every launch. */
+async function expectNothingHeldOver(): Promise<void> {
+  const running = runPowerShell(
+    `(Get-Process sidelingo -ErrorAction SilentlyContinue | Where-Object Path -eq ${psString(appExe)}).Id`,
+  ).trim();
+  if (running) throw new Error(`the e2e app is still running as process ${running.split(/\s+/).join(", ")}`);
+  // Windows MOD_WIN | MOD_ALT, VK_Q: the default hotkey every launch registers.
+  const hotkey = await reserveHotkey(0x8 | 0x1, 0x51);
+  await hotkey.close();
+  if (!hotkey.registered) {
+    throw new Error(
+      `another process holds Win+Alt+Q (error ${hotkey.error}); quit sidelingo or the probe that reserved it`,
+    );
+  }
+}
 
 export const config: WebdriverIO.Config = {
   runner: "local",
@@ -22,8 +40,9 @@ export const config: WebdriverIO.Config = {
   reporters: ["spec"],
   mochaOpts: { ui: "bdd", timeout: 60_000 },
 
-  onPrepare() {
+  async onPrepare() {
     try {
+      await expectNothingHeldOver();
       rmSync(failuresDir, { recursive: true, force: true });
       buildApp();
       mkdirSync(driverDir, { recursive: true });
