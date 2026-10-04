@@ -2,7 +2,13 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { run, type Input, type RoundState } from "./round";
-import { providerConfiguration, type ConfigurationFailure } from "./settings";
+import {
+  DEFAULT_SETTINGS,
+  parseSettings,
+  providerConfiguration,
+  roundSettings,
+  type ConfigurationFailure,
+} from "./settings";
 import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
@@ -33,7 +39,7 @@ let snapshot: SessionState = {
 let currentInput: Input | null = null;
 /** Only the last fully successful Round is reusable; nothing is written to disk. */
 let lastSuccessful: { input: Input; round: ShownRound } | null = null;
-/** A settings change also invalidates a result still being produced with older settings. */
+/** A configuration change also invalidates a result still being produced with older settings. */
 let configurationGeneration = 0;
 let lastRoundId = 0;
 /** Cancels the Round in flight. */
@@ -100,7 +106,11 @@ async function startRound(input: Input) {
  * first `show` Input isn't lost.
  */
 export async function startSession(): Promise<void> {
-  await listen("settings-document-changed", () => {
+  let configuration = JSON.stringify(roundSettings(currentSettings()));
+  await listen("settings-document-changed", ({ payload }) => {
+    const changed = JSON.stringify(roundSettings(parseSettings(payload) ?? DEFAULT_SETTINGS));
+    if (changed === configuration) return;
+    configuration = changed;
     ++configurationGeneration;
     lastSuccessful = null;
   });

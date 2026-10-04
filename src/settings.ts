@@ -169,6 +169,11 @@ export function parseSettings(document: unknown): Settings | null {
   };
 }
 
+/** The settings a Round runs with; the Display mode, hotkey and update checks change nothing it sends. */
+export function roundSettings({ activePreset, presets, proxy, targetLanguage }: Settings) {
+  return { activePreset, presets, proxy, targetLanguage };
+}
+
 /**
  * How to reach the active Preset's Provider, or why a Round can't send anything.
  * The connection producer selects credentials before either Provider operation sends.

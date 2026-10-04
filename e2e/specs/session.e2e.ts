@@ -91,6 +91,29 @@ describe("The Pin window session", () => {
     await $("button[aria-label='Copy translation']").waitForEnabled();
   });
 
+  it("still reuses a completed Round after the Display mode changes", async () => {
+    const input = `Mode-switched Input ${Date.now()}`;
+    const translated = `Mode-switched Translation ${Date.now()}`;
+    provider.reset(() => [
+      { delta: { content: provider.requests.length === 1 ? translated : "Unexpected repeated Translation" } },
+    ]);
+    clearClipboard();
+    await relaunch({ settings: customSettings(provider) });
+    writeClipboardText(input);
+    await expect($("body")).toHaveText(translated, { containing: true });
+    await $("button[aria-label='Copy translation']").waitForEnabled();
+    await browser.keys(["Control", "1"]);
+    await expect($("body")).not.toHaveText(translated, { containing: true });
+    await browser.keys("Escape");
+    await browser.waitUntil(() => !pinVisible(), { timeoutMsg: "the Pin window did not hide" });
+
+    await showAgain();
+    await browser.pause(750);
+    expect(provider.requests).toHaveLength(1);
+    await browser.keys(["Control", "2"]);
+    await expect($("body")).toHaveText(translated, { containing: true });
+  });
+
   it("keeps the completed result when shown with an empty clipboard", async () => {
     const input = `Retained Input ${Date.now()}`;
     const translated = `Retained completed Translation ${Date.now()}`;
