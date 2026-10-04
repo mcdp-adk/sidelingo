@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Input, RoundError, RoundPane } from "./round";
-import { customSettings, startCore, type Reply } from "../testing/core";
+import type { Input, RoundError, RoundPane, RoundState } from "./round";
+import { customSettings, startCore, type Core, type Reply, type SentRequest } from "../testing/core";
 
 const IMAGE: Input = { kind: "image", dataUrl: "data:image/png;base64,iVBORw0KGgo=" };
 const LINES = "A wrapped line\ncontinues here";
@@ -188,5 +188,354 @@ describe("The Round's Provider errors", () => {
     expect(await core.roundEnds()).toEqual({ stage: error.stage, outcome: "failed", source, translation });
     // Nothing more is sent after a failure: Translation never starts once Structuring fails.
     expect(core.provider.requests).toHaveLength(replies.length);
+  });
+});
+
+/** A Round's published states, from the panes' text. */
+const structuring = (source: string): RoundState => ({
+  stage: "structuring",
+  outcome: "running",
+  source: { text: source, status: "streaming" },
+  translation: { text: "", status: "waiting" },
+});
+const translating = (source: string, translation: string): RoundState => ({
+  stage: "translating",
+  outcome: "running",
+  source: { text: source, status: "done" },
+  translation: { text: translation, status: "streaming" },
+});
+const done = (source: string, translation: string): RoundState => ({
+  stage: "done",
+  outcome: "done",
+  source: { text: source, status: "done" },
+  translation: { text: translation, status: "done" },
+});
+/** A Source text streamed in one chunk, then translated in one chunk. */
+const structuredThenTranslated = (source: string, translation: string) => [
+  structuring(""),
+  structuring(source),
+  translating(source, ""),
+  translating(source, translation),
+  done(source, translation),
+];
+/** A single line translated in one chunk. */
+const translatedAtOnce = (source: string, translation: string) => [
+  translating(source, ""),
+  translating(source, translation),
+  done(source, translation),
+];
+
+/** What the fake Provider received, as a row expects it. */
+const sentAs = ({ method, url, headers, body }: SentRequest) => ({
+  method,
+  url,
+  authorization: headers.get("authorization"),
+  body,
+});
+
+const CHAT = "https://provider.test/v1/chat/completions";
+const IMAGE_PART = { type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } };
+const textPart = (text: string) => ({ type: "text", text });
+
+interface RequestOptions {
+  fields?: object;
+  model?: string;
+  url?: string;
+  authorization?: string | null;
+}
+
+/** A Structuring request for `part` (the copied text or image), with no body field other than `fields`. */
+const structuringRequest = (
+  part: object,
+  { fields = {}, model = "test-model", url = CHAT, authorization = null }: RequestOptions = {},
+) => ({
+  method: "POST",
+  url,
+  authorization,
+  body: {
+    model,
+    stream: true,
+    ...fields,
+    messages: [
+      { role: "system", content: expect.stringMatching(/^You turn an Input into faithful, readable Source text\./) },
+      { role: "user", content: [part] },
+    ],
+  },
+});
+
+/** A Translation request for the whole `source` into `language`, with no body field other than `fields`. */
+const translationRequest = (
+  source: string,
+  {
+    language = "English",
+    fields = {},
+    model = "test-model",
+    url = CHAT,
+    authorization = null,
+  }: RequestOptions & {
+    language?: string;
+  } = {},
+) => ({
+  method: "POST",
+  url,
+  authorization,
+  body: {
+    model,
+    stream: true,
+    ...fields,
+    messages: [
+      {
+        role: "system",
+        // Read Frog's prompt, filled in: no placeholder is left.
+        content: expect.stringMatching(
+          new RegExp(
+            `^You are a professional ${language} native translator who needs to fluently translate text into ${language}\\.\\n` +
+              "[^{}]*\\n4\\. For content that should not be translated \\(such as proper nouns, code, etc\\.\\), keep the original text\\.\\n" +
+              "[^{}]*\\nWebpage title: No title available\\nWebpage summary: No summary available$",
+          ),
+        ),
+      },
+      { role: "user", content: `Translate to ${language}:\n\n\n${source}` },
+    ],
+  },
+});
+
+/** Holds a stream until released. */
+function hold() {
+  let release!: () => void;
+  const wait = new Promise<void>((resolve) => (release = resolve));
+  return { wait, release };
+}
+const midRound = hold();
+
+interface PipelineRow {
+  name: string;
+  /** The stored settings document; a Custom Preset when absent. */
+  settings?: unknown;
+  keyEnvironment?: Record<string, string>;
+  input: Input | string;
+  replies: Reply[];
+  /** Runs once the Round has started. */
+  meanwhile?: (core: Core) => Promise<void>;
+  /** Every distinct Round state the Session publishes, in order. */
+  shown: RoundState[];
+  /** What each request carried, in order. */
+  sent: ReturnType<typeof structuringRequest>[];
+}
+
+const pipeline: PipelineRow[] = [
+  {
+    name: "a single line skips Structuring, so its Source text is done at once",
+    input: "  Une seule ligne  ",
+    replies: [[{ content: "A single" }, { content: " line" }]],
+    shown: [
+      translating("Une seule ligne", ""),
+      translating("Une seule ligne", "A single"),
+      translating("Une seule ligne", "A single line"),
+      done("Une seule ligne", "A single line"),
+    ],
+    sent: [translationRequest("Une seule ligne")],
+  },
+  {
+    name: "a line ending in a line break is a single line",
+    input: "Une ligne\r\n",
+    replies: [[{ content: "A line" }]],
+    shown: translatedAtOnce("Une ligne", "A line"),
+    sent: [translationRequest("Une ligne")],
+  },
+  {
+    name: "multi-line text streams Structuring, then one Translation of the complete Source text",
+    input: LINES,
+    replies: [[{ content: "## Clean" }, { content: "\nwith the rest" }], [{ content: "Translated" }]],
+    shown: [
+      structuring(""),
+      structuring("## Clean"),
+      structuring("## Clean\nwith the rest"),
+      translating("## Clean\nwith the rest", ""),
+      translating("## Clean\nwith the rest", "Translated"),
+      done("## Clean\nwith the rest", "Translated"),
+    ],
+    sent: [structuringRequest(textPart(LINES)), translationRequest("## Clean\nwith the rest")],
+  },
+  {
+    name: "an image runs Structuring on the image, then one Translation of its Source text",
+    input: IMAGE,
+    replies: [[{ content: "Text in the image" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("Text in the image", "Translated"),
+    sent: [structuringRequest(IMAGE_PART), translationRequest("Text in the image")],
+  },
+  {
+    name: "an image whose Source text is exactly NO_TEXT ends the Round as no text",
+    input: IMAGE,
+    replies: [[{ content: " \nNO_TEXT\n " }]],
+    shown: [
+      structuring(""),
+      structuring(" \nNO_TEXT\n "),
+      {
+        stage: "no-text",
+        outcome: "no-text",
+        source: { text: "", status: "done" },
+        translation: { text: "", status: "skipped" },
+      },
+    ],
+    sent: [structuringRequest(IMAGE_PART)],
+  },
+  {
+    name: "an image whose Source text only contains NO_TEXT is translated",
+    input: IMAGE,
+    replies: [[{ content: "The label reads NO_TEXT" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("The label reads NO_TEXT", "Translated"),
+    sent: [structuringRequest(IMAGE_PART), translationRequest("The label reads NO_TEXT")],
+  },
+  {
+    name: "multi-line text whose Source text is exactly NO_TEXT is translated",
+    input: LINES,
+    replies: [[{ content: "NO_TEXT" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("NO_TEXT", "Translated"),
+    sent: [structuringRequest(textPart(LINES)), translationRequest("NO_TEXT")],
+  },
+  ...["", "\n \t"].map((leading): PipelineRow => ({
+    name: `marked reasoning${leading ? " after whitespace" : ""}, split across chunks, is removed from both stages`,
+    input: LINES,
+    replies: [
+      [{ content: `${leading}<thi` }, { content: "nk>private structure</th" }, { content: "ink>## Source" }],
+      [{ content: `${leading}<think>private translation</th` }, { content: "ink>Translated" }],
+    ],
+    shown: structuredThenTranslated("## Source", "Translated"),
+    sent: [structuringRequest(textPart(LINES)), translationRequest("## Source")],
+  })),
+  {
+    name: "reasoning with only a closing marker shows until the marker arrives, then is removed from both stages",
+    input: LINES,
+    replies: [
+      [{ content: "Unmarked structure" }, { content: "</th" }, { content: "ink>" }, { content: "## Source" }],
+      [{ content: "Unmarked translation" }, { content: "</th" }, { content: "ink>" }, { content: "Translated" }],
+    ],
+    shown: [
+      structuring(""),
+      structuring("Unmarked structure"),
+      structuring("Unmarked structure</th"),
+      structuring(""),
+      structuring("## Source"),
+      translating("## Source", ""),
+      translating("## Source", "Unmarked translation"),
+      translating("## Source", "Unmarked translation</th"),
+      translating("## Source", ""),
+      translating("## Source", "Translated"),
+      done("## Source", "Translated"),
+    ],
+    sent: [structuringRequest(textPart(LINES)), translationRequest("## Source")],
+  },
+  {
+    name: "reasoning fields and keep-alive comments in the stream are not shown",
+    input: "A single line",
+    replies: [
+      [
+        { comment: "keep-alive" },
+        { data: '{"choices":[{"delta":{"reasoning_content":"leaked"}}]}' },
+        { comment: "OPENROUTER PROCESSING" },
+        { data: '{"choices":[{"delta":{"reasoning":"leaked"}}]}' },
+        { content: "Translated" },
+      ],
+    ],
+    shown: translatedAtOnce("A single line", "Translated"),
+    sent: [translationRequest("A single line")],
+  },
+  {
+    name: "at Default effort, both streamed requests carry only the Model and the prompts, Translation's in the Target language",
+    settings: customSettings({ model: "seeded-model" }, { targetLanguage: "ja" }),
+    input: LINES,
+    replies: [[{ content: "## Source" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("## Source", "Translated"),
+    sent: [
+      structuringRequest(textPart(LINES), { model: "seeded-model" }),
+      translationRequest("## Source", { language: "Japanese", model: "seeded-model" }),
+    ],
+  },
+  {
+    name: "Source text already in the Target language is still translated, into English while none is stored",
+    input: "The quick brown fox",
+    replies: [[{ content: "The quick brown fox" }]],
+    shown: translatedAtOnce("The quick brown fox", "The quick brown fox"),
+    sent: [translationRequest("The quick brown fox")],
+  },
+  ...["low", "none"].map((reasoningEffort): PipelineRow => ({
+    name: `Custom's ${reasoningEffort} effort is sent as reasoning_effort in both stages`,
+    settings: customSettings({ reasoningEffort }),
+    input: LINES,
+    replies: [[{ content: "## Source" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("## Source", "Translated"),
+    sent: [
+      structuringRequest(textPart(LINES), { fields: { reasoning_effort: reasoningEffort } }),
+      translationRequest("## Source", { fields: { reasoning_effort: reasoningEffort } }),
+    ],
+  })),
+  {
+    name: "OpenRouter's effort is sent as reasoning.effort",
+    settings: {
+      schemaVersion: 1,
+      activePreset: "openrouter",
+      presets: { openrouter: { model: "router-model", reasoningEffort: "high" } },
+    },
+    keyEnvironment: { OPENROUTER_API_KEY: "router-key" },
+    input: "A single line",
+    replies: [[{ content: "Translated" }]],
+    shown: translatedAtOnce("A single line", "Translated"),
+    sent: [
+      translationRequest("A single line", {
+        fields: { reasoning: { effort: "high" } },
+        model: "router-model",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        authorization: "Bearer router-key",
+      }),
+    ],
+  },
+  {
+    name: "an effort changed during a Round leaves that Round's requests unchanged",
+    settings: customSettings({ reasoningEffort: "low" }),
+    input: LINES,
+    replies: [[{ wait: midRound.wait }, { content: "## Source" }], [{ content: "Translated" }]],
+    meanwhile: async (core) => {
+      await core.changeSettings(customSettings({ reasoningEffort: "high" }));
+      await new Promise((resolve) => setTimeout(resolve));
+      midRound.release();
+    },
+    shown: structuredThenTranslated("## Source", "Translated"),
+    sent: [
+      structuringRequest(textPart(LINES), { fields: { reasoning_effort: "low" } }),
+      translationRequest("## Source", { fields: { reasoning_effort: "low" } }),
+    ],
+  },
+  ...[
+    ["https://provider.test/v1", CHAT],
+    ["https://provider.test/v1/", CHAT],
+    ["https://provider.test/v1///", CHAT],
+    ["https://provider.test", "https://provider.test/chat/completions"],
+    ["https://provider.test//", "https://provider.test/chat/completions"],
+  ].map(([baseUrl, url]): PipelineRow => ({
+    name: `the Base URL ${baseUrl} is used as entered without trailing slashes`,
+    settings: customSettings({ baseUrl }),
+    input: "A single line",
+    replies: [[{ content: "Translated" }]],
+    shown: translatedAtOnce("A single line", "Translated"),
+    sent: [translationRequest("A single line", { url })],
+  })),
+];
+
+describe("The Round's pipeline", () => {
+  it.each(pipeline)("$name", async ({ settings, keyEnvironment, input, replies, meanwhile, shown, sent }) => {
+    const core = await startCore({ ...(settings === undefined ? {} : { settings }), keyEnvironment });
+    const published: RoundState[] = [];
+    core.session.subscribe(() => {
+      const state = core.session.state().round?.state;
+      if (state && JSON.stringify(state) !== JSON.stringify(published.at(-1))) published.push(state);
+    });
+    core.provider.reply(...replies);
+    await core.copy(input);
+    if (meanwhile) await core.until((state) => state.round !== null).then(() => meanwhile(core));
+
+    await core.roundEnds();
+    expect(published).toEqual(shown);
+    expect(core.provider.requests.map(sentAs)).toEqual(sent);
   });
 });
