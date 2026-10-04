@@ -27,8 +27,7 @@ describe("Task 13: Rounds leave nothing private behind", () => {
     });
     clearClipboard();
     await relaunch();
-    const { pin } = await setUpCustomProvider(provider.baseUrl, "private-model");
-    await browser.switchToWindow(pin);
+    await setUpCustomProvider(provider.baseUrl);
 
     writeClipboardText(copiedText);
     await expect($("p")).toHaveText(textResult);

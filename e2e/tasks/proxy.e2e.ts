@@ -39,7 +39,8 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
       });
 
       // System mode, the default, follows the proxy environment present at launch.
-      const { pin, settings } = await setUpCustomProvider(provider.baseUrl, "proxied-model");
+      const { pin, settings } = await setUpCustomProvider(provider.baseUrl);
+      await browser.switchToWindow(settings);
       await expectShownOption($("aria/Proxy mode"), "System");
       await $("aria/Model").click();
       await expect($("aria/through-system")).toBeDisplayed();
