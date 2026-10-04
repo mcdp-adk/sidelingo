@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "build:local-installer": "tauri build --config src-tauri/tauri.local.conf.json",
     "test": "vitest run",
-    "test:e2e": "wdio run e2e/wdio.conf.ts"
+    "test:e2e": "wdio run e2e/wdio.conf.ts",
+    "test:real": "vitest run --config vitest.real.config.ts"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",
