@@ -1,7 +1,7 @@
 // Task tests find elements as a user does and configure sidelingo through its UI (CODING_STANDARDS.md → User tasks).
 // Allowed selectors: an accessible name (`aria/…`), a role (`[role=…]`, or a tag that is one, such as `button` or
 // `p`), and visible text (`button=Copy`, `*=part`). Class, `#id`, any other attribute and XPath are refused, as is
-// seeding or reading the settings document, which only a task about that document may do.
+// seeding or reading the settings document, which only a task about that document may do (Tasks 10 and 11, named below).
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,8 @@ function* selectorCalls(source) {
 
 /** The file's name, the harness's seeding helper, and `relaunch({ settings | settingsText })`. */
 const settingsDocument = /settings\.json|\bcustomSettings\b|\brelaunch\([^)]*\bsettings(?:Text)?\b/g;
+/** The tasks about the settings document itself: Task 10 (the keys saved in it) and Task 11 (a broken one). */
+const aboutSettingsDocument = new Set(["keys.e2e.ts", "broken-settings-file.e2e.ts"]);
 
 const problems = [];
 const files = (await readdir(tasks, { recursive: true })).filter((name) => name.endsWith(".ts"));
@@ -54,7 +56,8 @@ for (const name of files) {
   for (const match of source.matchAll(/\b(?:react|custom)\$\$?\(/g)) {
     report(match.index, `finds an element by component structure (\`${match[0]}\`)`);
   }
-  for (const match of source.matchAll(settingsDocument)) {
+  const settingsUses = aboutSettingsDocument.has(name) ? [] : source.matchAll(settingsDocument);
+  for (const match of settingsUses) {
     const use = match[0].replace(/^relaunch\(.*?(settings(?:Text)?)$/s, "relaunch({ $1 })");
     report(match.index, `uses the settings document (\`${use}\`); configure sidelingo through its UI`);
   }
