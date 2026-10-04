@@ -1,5 +1,5 @@
-import { relaunch } from "../app";
-import { clearClipboard } from "../clipboard";
+import { relaunch } from "../support/app";
+import { clearClipboard } from "../support/clipboard";
 
 const chinese = "复制文本或图片，结果会显示在这里。";
 const english = "Copy text or an image to see it here.";

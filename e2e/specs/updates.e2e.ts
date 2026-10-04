@@ -1,10 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { capabilities, dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard } from "../clipboard";
-import { StalledProxy, UpdaterProxy, UpdaterSocksProxy } from "../proxy";
-import { openSettings, replaceTextField, expectShownOption } from "../settings";
-import { useLaunchEnvironment } from "../driver";
+import { capabilities, dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard } from "../support/clipboard";
+import { StalledProxy, UpdaterProxy, UpdaterSocksProxy } from "../support/proxy";
+import { openSettings, replaceTextField, expectShownOption } from "../support/settings";
+import { useLaunchEnvironment } from "../support/driver";
 
 /** Advance only the selected WebView's public clock, waiting for the complete virtual budget. */
 async function advanceBrowserTime(budget: number): Promise<void> {

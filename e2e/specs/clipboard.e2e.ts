@@ -1,4 +1,4 @@
-import { readClipboardText, writeClipboardText } from "../clipboard";
+import { readClipboardText, writeClipboardText } from "../support/clipboard";
 
 describe("The clipboard helper", () => {
   it("writes text to the Windows clipboard and reads it back", () => {

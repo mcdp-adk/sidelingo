@@ -1,10 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { appExe, capabilities, relaunch } from "../app";
-import { writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
-import { expectShownOption } from "../settings";
-import { expectTooltip } from "../tooltip";
-import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../window";
+import { appExe, capabilities, relaunch } from "../support/app";
+import { writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
+import { expectShownOption } from "../support/settings";
+import { expectTooltip } from "../support/tooltip";
+import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../support/window";
 
 async function scrollPosition(pane: WebdriverIO.Element) {
   const [top, height, client] = await Promise.all([

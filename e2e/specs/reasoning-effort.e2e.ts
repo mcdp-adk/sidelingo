@@ -1,7 +1,7 @@
-import { capabilities, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
-import { openSettings, PRESET_NAMES, expectShownOption } from "../settings";
+import { capabilities, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
+import { openSettings, PRESET_NAMES, expectShownOption } from "../support/settings";
 
 describe("Reasoning effort", () => {
   let provider: FakeProvider;

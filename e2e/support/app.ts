@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
 import { inspectWindows } from "./window";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "..", "..");
 const e2eConfig = join(root, "src-tauri", "tauri.e2e.conf.json");
 const identifierIn = (config: string): string => JSON.parse(readFileSync(config, "utf8")).identifier;
 

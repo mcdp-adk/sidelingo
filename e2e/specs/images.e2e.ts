@@ -1,6 +1,6 @@
-import { relaunch } from "../app";
-import { clearClipboard, inspectPng, writeClipboardBitmap } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
+import { relaunch } from "../support/app";
+import { clearClipboard, inspectPng, writeClipboardBitmap } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
 
 describe("Copied images", () => {
   let provider: FakeProvider;

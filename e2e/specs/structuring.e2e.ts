@@ -1,6 +1,6 @@
-import { relaunch } from "../app";
-import { writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
+import { relaunch } from "../support/app";
+import { writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
 
 describe("Structuring multi-line text", () => {
   let provider: FakeProvider;

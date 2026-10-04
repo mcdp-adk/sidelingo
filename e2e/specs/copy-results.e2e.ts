@@ -1,7 +1,7 @@
-import { expectTooltip } from "../tooltip";
-import { relaunch } from "../app";
-import { readClipboardText, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
+import { expectTooltip } from "../support/tooltip";
+import { relaunch } from "../support/app";
+import { readClipboardText, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
 
 const source = "**A readable source line.**";
 const translation = "**A translated line.**";

@@ -1,8 +1,8 @@
 import type { ChainablePromiseElement } from "webdriverio";
-import { appExe, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
-import { inspectWindows } from "../window";
+import { appExe, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
+import { inspectWindows } from "../support/window";
 
 /** The Translated text's first paragraph. */
 const paragraph = () => $("p");

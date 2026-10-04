@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { appExe, dataFolders, identifier, ownerIdentifier, relaunch } from "../app";
-import { clearClipboard } from "../clipboard";
-import { inspectWindows } from "../window";
+import { appExe, dataFolders, identifier, ownerIdentifier, relaunch } from "../support/app";
+import { clearClipboard } from "../support/clipboard";
+import { inspectWindows } from "../support/window";
 
 const owner = dataFolders(ownerIdentifier);
 

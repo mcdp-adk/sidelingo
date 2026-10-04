@@ -1,8 +1,8 @@
-import { appExe, relaunch, type Launch } from "../app";
-import { readClipboardText, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
-import { expectTooltip } from "../tooltip";
-import { inspectWindows, minimumSizes } from "../window";
+import { appExe, relaunch, type Launch } from "../support/app";
+import { readClipboardText, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
+import { expectTooltip } from "../support/tooltip";
+import { inspectWindows, minimumSizes } from "../support/window";
 
 const pinVisible = () => inspectWindows(appExe, "sidelingo")[0].visible;
 const toolbar = () => $("[role=toolbar]");

@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { StalledProxy } from "../proxy";
-import { customSettings, FakeProvider } from "../provider";
-import { openSettings, replaceTextField, expectShownOption } from "../settings";
+import { dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { StalledProxy } from "../support/proxy";
+import { customSettings, FakeProvider } from "../support/provider";
+import { openSettings, replaceTextField, expectShownOption } from "../support/settings";
 
 describe("Provider keys", () => {
   let provider: FakeProvider;

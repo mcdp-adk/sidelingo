@@ -1,11 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { appExe, buildApp, capabilities, resetDataFolders } from "./app";
+import { appExe, buildApp, capabilities, resetDataFolders } from "./support/app";
 import { SevereServiceError } from "webdriverio";
-import { driverDir, startDriver, stopDriver } from "./driver";
-import { reserveHotkey } from "./hotkey";
-import { psString, runPowerShell } from "./powershell";
+import { driverDir, startDriver, stopDriver } from "./support/driver";
+import { reserveHotkey } from "./support/hotkey";
+import { psString, runPowerShell } from "./support/powershell";
 
 /** A failing test leaves its screenshot and page source here. */
 const failuresDir = resolve(import.meta.dirname, "failures");

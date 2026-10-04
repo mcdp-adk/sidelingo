@@ -1,8 +1,8 @@
-import { relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
-import { StalledProxy } from "../proxy";
-import { replaceTextField, expectShownOption } from "../settings";
+import { relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
+import { StalledProxy } from "../support/proxy";
+import { replaceTextField, expectShownOption } from "../support/settings";
 
 const noNamedKeys = {
   OPENAI_API_KEY: null,

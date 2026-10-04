@@ -1,12 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { appExe, capabilities, dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { psString, runPowerShell } from "../powershell";
-import { customSettings, FakeProvider } from "../provider";
-import { openSettings } from "../settings";
-import { inspectWindows, monitorBounds, setWindowBounds, windowBounds } from "../window";
+import { appExe, capabilities, dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { psString, runPowerShell } from "../support/powershell";
+import { customSettings, FakeProvider } from "../support/provider";
+import { openSettings } from "../support/settings";
+import { inspectWindows, monitorBounds, setWindowBounds, windowBounds } from "../support/window";
 
 const runKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 const approvalKey = "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";

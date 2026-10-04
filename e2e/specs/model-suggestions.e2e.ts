@@ -1,7 +1,7 @@
-import { relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
-import { openSettings, replaceTextField } from "../settings";
+import { relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
+import { openSettings, replaceTextField } from "../support/settings";
 
 describe("Provider model suggestions", () => {
   let provider: FakeProvider;

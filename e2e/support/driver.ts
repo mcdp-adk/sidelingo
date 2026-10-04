@@ -11,7 +11,7 @@ export type LaunchEnvironment = Partial<
   Record<(typeof providerKeyNames)[number] | "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY", string | null>
 >;
 
-export const driverDir = resolve(import.meta.dirname, "..", "node_modules", ".cache", "msedgedriver");
+export const driverDir = resolve(import.meta.dirname, "..", "..", "node_modules", ".cache", "msedgedriver");
 
 interface DriverState {
   process?: ChildProcess;

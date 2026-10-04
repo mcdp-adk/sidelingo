@@ -1,6 +1,6 @@
-import { capabilities, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
+import { capabilities, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
 
 async function openSettings({ shortcut = "Settings (Ctrl+,)", title = "Settings" } = {}) {
   const pin = await browser.getWindowHandle();

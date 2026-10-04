@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { appExe, relaunch } from "../app";
+import { appExe, relaunch } from "../support/app";
 import {
   clearClipboard,
   writeClipboardFiles,
@@ -9,9 +9,9 @@ import {
   writeClipboardText,
   writeClipboardTextAndHold,
   writeClipboardTextWithMarker,
-} from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
-import { inspectWindows } from "../window";
+} from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
+import { inspectWindows } from "../support/window";
 
 const pinWindows = () => inspectWindows(appExe, "sidelingo");
 /** The Translated text's first paragraph, which the fake Provider makes the copied line itself. */

@@ -1,11 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { capabilities, dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
-import { HttpProxy, SocksProxy, StalledProxy } from "../proxy";
-import { openSettings, replaceTextField, expectShownOption } from "../settings";
-import { useLaunchEnvironment } from "../driver";
+import { capabilities, dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
+import { HttpProxy, SocksProxy, StalledProxy } from "../support/proxy";
+import { openSettings, replaceTextField, expectShownOption } from "../support/settings";
+import { useLaunchEnvironment } from "../support/driver";
 
 describe("Provider proxy", () => {
   let provider: FakeProvider;

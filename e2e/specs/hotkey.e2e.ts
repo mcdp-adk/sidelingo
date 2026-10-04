@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { capabilities, dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard } from "../clipboard";
-import { openSettings } from "../settings";
-import { reserveHotkey } from "../hotkey";
+import { capabilities, dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard } from "../support/clipboard";
+import { openSettings } from "../support/settings";
+import { reserveHotkey } from "../support/hotkey";
 
 describe("Hotkey settings", () => {
   it("records a combination with a modifier and retains it after a restart", async () => {

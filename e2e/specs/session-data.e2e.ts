@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard, writeClipboardBitmap, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
+import { dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardBitmap, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
 
 function filesBelow(folder: string): string[] {
   try {

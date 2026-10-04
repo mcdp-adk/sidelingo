@@ -1,6 +1,6 @@
-import { relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider, gate } from "../provider";
+import { relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider, gate } from "../support/provider";
 
 describe("Round controls", () => {
   let provider: FakeProvider;

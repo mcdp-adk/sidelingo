@@ -1,9 +1,9 @@
 import { mkdirSync, unlinkSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
-import { capabilities, dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard, writeClipboardText } from "../clipboard";
-import { customSettings, FakeProvider } from "../provider";
-import { openSettings, PRESET_NAMES, replaceTextField, expectShownOption } from "../settings";
+import { capabilities, dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard, writeClipboardText } from "../support/clipboard";
+import { customSettings, FakeProvider } from "../support/provider";
+import { openSettings, PRESET_NAMES, replaceTextField, expectShownOption } from "../support/settings";
 
 describe("Provider settings", () => {
   let provider: FakeProvider;

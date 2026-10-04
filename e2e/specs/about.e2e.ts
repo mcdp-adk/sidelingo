@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dataFolders, identifier, relaunch } from "../app";
-import { clearClipboard } from "../clipboard";
+import { dataFolders, identifier, relaunch } from "../support/app";
+import { clearClipboard } from "../support/clipboard";
 
 const version = JSON.parse(readFileSync(resolve(import.meta.dirname, "../../package.json"), "utf8")).version;
 
