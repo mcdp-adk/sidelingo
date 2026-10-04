@@ -15,6 +15,7 @@
     "build:local-installer": "tauri build --config src-tauri/tauri.local.conf.json",
     "test": "vitest run",
     "test:e2e": "wdio run e2e/wdio.conf.ts",
+    "check:tasks": "node scripts/check-tasks.mjs",
     "test:real": "vitest run --config vitest.real.config.ts"
   },
   "dependencies": {

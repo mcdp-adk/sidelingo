@@ -33,6 +33,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm format:check
       - run: pnpm test
+      - run: pnpm check:tasks
 
   rust:
     runs-on: windows-latest
