@@ -23,6 +23,13 @@ let status: UpdateStatus = {
   installError: null,
 };
 let availableUpdate: Update | null = null;
+/** An unreachable endpoint or proxy fails a check quickly. */
+const CHECK_TIMEOUT_MS = 10_000;
+/**
+ * The SDK applies a check's timeout to the whole download too, which would cut off the installer
+ * on a slow link, so the download gets a bound of its own.
+ */
+const DOWNLOAD_TIMEOUT_MS = 30 * 60_000;
 const subscribers = new Set<() => void>();
 
 function accept(next: UpdateStatus): void {
@@ -63,7 +70,7 @@ async function checkForUpdates(manual: boolean): Promise<void> {
       }
       proxyUrl = url.href;
     }
-    update = await check({ timeout: 10_000, ...(proxyUrl ? { proxy: proxyUrl } : {}) });
+    update = await check({ timeout: CHECK_TIMEOUT_MS, ...(proxyUrl ? { proxy: proxyUrl } : {}) });
   } catch (reason) {
     publish({ ...status, checking: false, checkError: manual ? failureReason(reason) : null });
     return;
@@ -87,7 +94,7 @@ async function installUpdate(): Promise<void> {
   publish({ ...status, installing: true, installError: null });
   try {
     // The retained SDK object carries the check's proxy; Windows installation owns exit/relaunch.
-    await update.downloadAndInstall();
+    await update.downloadAndInstall(undefined, { timeout: DOWNLOAD_TIMEOUT_MS });
   } catch (reason) {
     publish({ ...status, installing: false, installError: failureReason(reason) });
     return;
