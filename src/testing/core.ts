@@ -20,7 +20,7 @@ export function customSettings(custom: Record<string, unknown> = {}, document: R
 type Command = (args: any) => unknown;
 
 export interface CoreOptions {
-  /** The stored settings document `read_settings` returns; a Custom Preset by default. */
+  /** The stored settings document `read_settings` returns, `null` included; a Custom Preset when left out. */
   settings?: unknown;
   /** The launch environment's Provider keys; every variable is unset by default. */
   keyEnvironment?: Record<string, string | null>;
@@ -67,7 +67,11 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
       OLLAMA_API_KEY: null,
       ...options.keyEnvironment,
     }),
-    read_settings: () => ({ status: "document", document: options.settings ?? customSettings() }),
+    // A stored JSON `null` is a document too.
+    read_settings: () => ({
+      status: "document",
+      document: "settings" in options ? options.settings : customSettings(),
+    }),
     unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext] ?? null,
     pin_window_ready: () => null,
     ...options.commands,
