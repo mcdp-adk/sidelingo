@@ -13,18 +13,37 @@ desktop-dev = []
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+auto-launch = "0.6"
+base64 = "0.22"
+global-hotkey = "0.8"
+image = { version = "0.25", default-features = false, features = ["bmp", "png"] }
+# The updater logs credential-bearing proxy URLs at debug; omit them in every build.
+log = { version = "0.4", features = ["max_level_info", "release_max_level_info"] }
+# Updater uses reqwest 0.13; the Provider plugin's 0.12 SOCKS feature cannot enable it.
+reqwest = { version = "0.13", default-features = false, features = ["socks"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-http = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-http = { version = "2", features = ["socks"] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-updater = "2"
+tauri-plugin-window-state = "2"
 windows = { version = "0.62", features = [
+    "Data_Xml_Dom",
+    "Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
     "Win32_Globalization",
     "Win32_System_DataExchange",
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
     "Win32_System_Ole",
+    "Win32_System_WinRT",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
+    "UI_Notifications",
     "UI_ViewManagement",
 ] }
 

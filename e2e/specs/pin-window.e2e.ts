@@ -1,6 +1,7 @@
 import { appExe, relaunch, type Launch } from "../app";
 import { readClipboardText, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider } from "../provider";
+import { expectTooltip } from "../tooltip";
 import { inspectWindows, minimumSizes } from "../window";
 
 const pinVisible = () => inspectWindows(appExe, "sidelingo")[0].visible;
@@ -72,6 +73,7 @@ async function waitUntilHidden() {
  * listeners. The clipboard then holds the whole text, which no partial selection's copy matches.
  */
 async function launch(options?: Launch, text = LINE) {
+  provider.reset();
   writeClipboardText(text);
   await relaunch({ ...options, settings: customSettings(provider) });
   await expect($("p")).toHaveText(text);
@@ -106,7 +108,6 @@ describe("The Pin window", () => {
 
   it("stays visible on a double-click on the toolbar", async () => {
     await launch();
-    // The toolbar's middle is empty; its buttons sit at the ends.
     await toolbar().doubleClick();
     await browser.pause(500);
     expect(pinVisible()).toBe(true);
@@ -119,12 +120,7 @@ describe("The Pin window", () => {
     it(`names Close and its shortcut in a tooltip under ${language}`, async () => {
       await launch({ language });
       const close = await closeButton();
-      // A hover sometimes leaves the tooltip closed in a full run, so hover until it shows.
-      await browser.waitUntil(async () => {
-        await close.moveTo();
-        return $("[role=tooltip]").isExisting();
-      });
-      await expect($("[role=tooltip]")).toHaveText(tooltip);
+      await expectTooltip(close, tooltip);
     });
   }
 
@@ -144,6 +140,8 @@ describe("The Pin window", () => {
     expect(copied).toMatch(/^\S+$/);
     expect(LINE).toContain(copied);
     expect(pinVisible()).toBe(true);
+    await browser.pause(500);
+    expect(provider.requests).toHaveLength(1);
   });
 
   it("selects nothing on a plain drag", async () => {
@@ -163,6 +161,8 @@ describe("The Pin window", () => {
     const copied = readClipboardText().trim();
     expect(copied).toMatch(/^\S+$/);
     expect(LINE).toContain(copied);
+    await browser.pause(500);
+    expect(provider.requests).toHaveLength(1);
   });
 
   it("offers no right-click menu without a selection", async () => {

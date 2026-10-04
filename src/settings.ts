@@ -1,5 +1,8 @@
-import { TARGET_LANGUAGES, type TargetLanguage } from "./languages";
+import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "./languages";
 import type { ProviderConfiguration } from "./provider";
+import type { KeySourcesSnapshot } from "./credentials";
+import type { Proxy } from "@tauri-apps/plugin-http";
+import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
 
 /**
  * The settings model, shared by both windows: the document's schema, its defaults, its
@@ -7,24 +10,48 @@ import type { ProviderConfiguration } from "./provider";
  */
 
 export const SCHEMA_VERSION = 1;
+export const DISPLAY_MODES = ["source", "translation", "both"] as const;
+export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
-export const PRESETS = ["openai", "openrouter", "deepseek", "ollama-cloud", "custom"] as const;
-export type Preset = (typeof PRESETS)[number];
+export type { Preset } from "./presets";
+
+type KeyVariable = NonNullable<(typeof PRESET_REGISTRY)[Preset]["keyVariable"]>;
+
+type PresetSettings = {
+  [P in Preset]: {
+    model: string;
+    reasoningEffort: ReasoningEffort | null;
+    keyCiphertext: string | null;
+  } & (P extends "custom" ? { baseUrl: string } : {});
+};
 
 export interface Settings {
   schemaVersion: typeof SCHEMA_VERSION;
   /** None until the user chooses a Provider. */
   activePreset: Preset | null;
-  presets: { custom: { baseUrl: string; model: string } };
+  presets: PresetSettings;
+  proxy: { mode: "system" | "manual"; url: string; username: string; passwordCiphertext: string | null };
   targetLanguage: TargetLanguage;
+  hotkey: string | null;
+  displayMode: DisplayMode;
+  automaticUpdates: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: SCHEMA_VERSION,
   activePreset: null,
-  presets: { custom: { baseUrl: "", model: "" } },
-  // The Windows display language takes over in #47.
-  targetLanguage: "en",
+  presets: {
+    openai: { model: "", reasoningEffort: null, keyCiphertext: null },
+    openrouter: { model: "", reasoningEffort: null, keyCiphertext: null },
+    deepseek: { model: "", reasoningEffort: null, keyCiphertext: null },
+    "ollama-cloud": { model: "", reasoningEffort: null, keyCiphertext: null },
+    custom: { baseUrl: "", model: "", reasoningEffort: null, keyCiphertext: null },
+  },
+  targetLanguage: initialTargetLanguage(navigator.language),
+  hotkey: "Win+Alt+Q",
+  displayMode: "translation",
+  automaticUpdates: true,
+  proxy: { mode: "system", url: "", username: "", passwordCiphertext: null },
 };
 
 type JsonObject = Record<string, unknown>;
@@ -56,25 +83,146 @@ export function parseSettings(document: unknown): Settings | null {
   if (document === null || document === undefined) return DEFAULT_SETTINGS;
   if (!isJsonObject(document) || document.schemaVersion !== SCHEMA_VERSION) return null;
   const presets = field(document, "presets", isJsonObject, {});
-  const custom = presets && field(presets, "custom", isJsonObject, {});
-  const defaults = DEFAULT_SETTINGS.presets.custom;
-  const baseUrl = custom && field(custom, "baseUrl", isString, defaults.baseUrl);
-  const model = custom && field(custom, "model", isString, defaults.model);
+  if (!presets) return null;
+  const values = { ...DEFAULT_SETTINGS.presets };
+  for (const preset of PRESETS) {
+    const stored = field(presets, preset, isJsonObject, {});
+    if (!stored) return null;
+    const model = field(stored, "model", isString, DEFAULT_SETTINGS.presets[preset].model);
+    const keyCiphertext = field(
+      stored,
+      "keyCiphertext",
+      (value): value is string | null => value === null || isString(value),
+      null,
+    );
+    const reasoningEffort = field(
+      stored,
+      "reasoningEffort",
+      (value): value is ReasoningEffort | null => isReasoningEffort(preset, value),
+      DEFAULT_SETTINGS.presets[preset].reasoningEffort,
+    );
+    if (model === undefined || reasoningEffort === undefined || keyCiphertext === undefined) return null;
+    if (preset === "custom") {
+      const baseUrl = field(stored, "baseUrl", isString, DEFAULT_SETTINGS.presets.custom.baseUrl);
+      if (baseUrl === undefined) return null;
+      values.custom = { model, baseUrl, reasoningEffort, keyCiphertext };
+    } else values[preset] = { model, reasoningEffort, keyCiphertext };
+  }
   const activePreset = field(document, "activePreset", isPreset, DEFAULT_SETTINGS.activePreset);
+  const storedProxy = field(document, "proxy", isJsonObject, {});
+  if (!storedProxy) return null;
+  const mode = field(
+    storedProxy,
+    "mode",
+    (value): value is "system" | "manual" => value === "system" || value === "manual",
+    "system",
+  );
+  const url = field(storedProxy, "url", isString, "");
+  const username = field(storedProxy, "username", isString, "");
+  const passwordCiphertext = field(
+    storedProxy,
+    "passwordCiphertext",
+    (value): value is string | null => value === null || isString(value),
+    null,
+  );
   const targetLanguage = field(document, "targetLanguage", isTargetLanguage, DEFAULT_SETTINGS.targetLanguage);
-  if (baseUrl === undefined || model === undefined || activePreset === undefined || targetLanguage === undefined) {
+  const hotkey = field(
+    document,
+    "hotkey",
+    (value): value is string | null => value === null || isString(value),
+    DEFAULT_SETTINGS.hotkey,
+  );
+  const displayMode = field(
+    document,
+    "displayMode",
+    (value): value is DisplayMode => DISPLAY_MODES.includes(value as DisplayMode),
+    DEFAULT_SETTINGS.displayMode,
+  );
+  const automaticUpdates = field(
+    document,
+    "automaticUpdates",
+    (value): value is boolean => typeof value === "boolean",
+    DEFAULT_SETTINGS.automaticUpdates,
+  );
+  if (
+    activePreset === undefined ||
+    targetLanguage === undefined ||
+    hotkey === undefined ||
+    displayMode === undefined ||
+    automaticUpdates === undefined ||
+    mode === undefined ||
+    url === undefined ||
+    username === undefined ||
+    passwordCiphertext === undefined
+  ) {
     return null;
   }
-  return { schemaVersion: SCHEMA_VERSION, activePreset, presets: { custom: { baseUrl, model } }, targetLanguage };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    activePreset,
+    presets: values,
+    proxy: { mode, url, username, passwordCiphertext },
+    targetLanguage,
+    hotkey,
+    displayMode,
+    automaticUpdates,
+  };
+}
+
+/** The settings a Round runs with; the Display mode, hotkey and update checks change nothing it sends. */
+export function roundSettings({ activePreset, presets, proxy, targetLanguage }: Settings) {
+  return { activePreset, presets, proxy, targetLanguage };
 }
 
 /**
- * How to reach the active Preset's Provider, or null when a Round can't send anything.
- * Only Custom, which needs no key, is reachable so far; #44 adds the keyed Presets and #45
- * says why nothing was sent.
+ * How to reach the active Preset's Provider, or why a Round can't send anything.
+ * The connection producer selects credentials before either Provider operation sends.
  */
-export function providerConfiguration(settings: Settings): ProviderConfiguration | null {
-  if (settings.activePreset !== "custom") return null;
-  const { baseUrl, model } = settings.presets.custom;
-  return baseUrl && model ? { baseUrl, model } : null;
+export function providerConfiguration(
+  settings: Settings,
+  keySources?: KeySourcesSnapshot,
+  proxyPassword: string | null = null,
+): { configuration: ProviderConfiguration } | { error: ConfigurationFailure } {
+  const preset = settings.activePreset;
+  if (preset && !settings.presets[preset].model) return { error: { kind: "missing-model" } };
+  return resolveProviderConnection(settings, keySources, proxyPassword);
+}
+
+export type ConnectionFailure =
+  | { kind: "no-provider" }
+  | { kind: "missing-base-url" }
+  | { kind: "missing-key"; cause: "environment-unset"; variable: KeyVariable }
+  | { kind: "missing-key"; cause: "saved-key-could-not-decrypt"; variable: KeyVariable | null };
+
+export type ConfigurationFailure = ConnectionFailure | { kind: "missing-model" };
+
+/** Connection readiness shared by Rounds and model lists; a list needs no selected model. */
+export function resolveProviderConnection(
+  settings: Settings,
+  keySources?: KeySourcesSnapshot,
+  proxyPassword: string | null = null,
+): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
+  const preset = settings.activePreset;
+  if (!preset) return { error: { kind: "no-provider" } };
+  const variable = PRESET_REGISTRY[preset].keyVariable;
+  const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
+  if (!baseUrl) return { error: { kind: "missing-base-url" } };
+  const savedKeyCiphertext = settings.presets[preset].keyCiphertext;
+  const enteredKey = keySources?.enteredKey;
+  if (savedKeyCiphertext !== null && enteredKey == null) {
+    return { error: { kind: "missing-key", cause: "saved-key-could-not-decrypt", variable } };
+  }
+  const key = enteredKey || (variable ? keySources?.environment?.[variable] : null);
+  if (variable && !key) return { error: { kind: "missing-key", cause: "environment-unset", variable } };
+  const { model, reasoningEffort } = settings.presets[preset];
+  return {
+    configuration: { preset, baseUrl, model, reasoningEffort, key, proxy: proxyConfiguration(settings, proxyPassword) },
+  };
+}
+
+/** The selected global proxy, carrying this connection's decrypted password. */
+export function proxyConfiguration(settings: Settings, password: string | null): Proxy | undefined {
+  if (settings.proxy.mode === "system") return undefined;
+  const { url, username } = settings.proxy;
+  return { all: { url, ...(username || password ? { basicAuth: { username, password: password ?? "" } } : {}) } };
 }

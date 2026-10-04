@@ -1,5 +1,25 @@
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../node_modules/streamdown/dist/*.js";
+@source "../node_modules/@streamdown/cjk/dist/*.js";
+
 html,
 body {
   margin: 0;
   height: 100%;
+}
+
+.fui-FluentProvider {
+  --background: var(--colorNeutralBackground1);
+  --foreground: var(--colorNeutralForeground1);
+  --card: var(--colorNeutralBackground2);
+  --card-foreground: var(--colorNeutralForeground1);
+  --muted: var(--colorNeutralBackground3);
+  --muted-foreground: var(--colorNeutralForeground3);
+  --border: var(--colorNeutralStroke1);
+  --input: var(--colorNeutralStroke1);
+  --primary: var(--colorBrandBackground);
+  --primary-foreground: var(--colorNeutralForegroundOnBrand);
+  --radius: var(--borderRadiusMedium);
 }

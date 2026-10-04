@@ -1,11 +1,15 @@
-use crate::clipboard;
+use crate::{autostart, clipboard};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::utils::config::WindowEffectsConfig;
 use tauri::window::Effect;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalSize, WebviewUrl, WebviewWindow,
-    WebviewWindowBuilder, Window, WindowEvent,
+    AppHandle, LogicalSize, Manager, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    Window, WindowEvent,
+};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+use windows::Win32::UI::WindowsAndMessaging::{
+    SetWindowPos, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
 };
 #[cfg(not(feature = "desktop-dev"))]
 use windows::{
@@ -13,15 +17,45 @@ use windows::{
     Win32::UI::WindowsAndMessaging::{CreateWindowExW, WINDOW_EX_STYLE, WS_POPUP},
 };
 
-const LABEL: &str = "pin";
+pub const LABEL: &str = "pin";
+pub const STATE_FLAGS: StateFlags = StateFlags::SIZE.union(StateFlags::POSITION);
 static MINIMUM_SIZE: Mutex<Option<PhysicalSize<u32>>> = Mutex::new(None);
 const MIN_WIDTH: f64 = 230.0;
 /// Room for the toolbar and a few lines.
 const MIN_HEIGHT: f64 = 120.0;
-/// Tells the front end the Pin window was hidden.
-const HIDDEN: &str = "pin-window-hidden";
 /// Set once the front end listens for Inputs, so the first `show` reaches it.
 static READY: AtomicBool = AtomicBool::new(false);
+
+/// Initialize the hidden borderless frame before the window-state plugin sizes it.
+pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::new("pin-window-frame")
+        .on_window_ready(|window| {
+            if window.label() != LABEL {
+                return;
+            }
+            // Windows initially calculates a hidden window's client area with
+            // its native caption. Force WM_NCCALCSIZE before Tao computes the
+            // insets for restoring an undecorated window's inner size.
+            let result = window.hwnd().and_then(|hwnd| {
+                unsafe {
+                    SetWindowPos(
+                        hwnd,
+                        None,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+                    )
+                }
+                .map_err(|error| tauri::Error::Anyhow(error.into()))
+            });
+            if let Err(error) = result {
+                eprintln!("failed to initialize Pin window frame: {error}");
+            }
+        })
+        .build()
+}
 
 /// Creates the Pin window, hidden until its front end is ready. It lives as long
 /// as the process and only ever hides.
@@ -51,6 +85,19 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         }
         .map_err(|e| tauri::Error::Anyhow(e.into()))?;
         window.owner_raw(owner)
+    };
+
+    // The plugin restores a saved position only when it intersects an existing
+    // monitor. Give its rejected-position path an explicit primary default.
+    let window = if let Some(primary) = app.primary_monitor()? {
+        let position = primary.position().to_logical::<f64>(primary.scale_factor());
+        let size = primary.size().to_logical::<f64>(primary.scale_factor());
+        window.position(
+            position.x + (size.width - 360.0) / 2.0,
+            position.y + (size.height - 240.0) / 2.0,
+        )
+    } else {
+        window
     };
 
     let window = window
@@ -135,7 +182,11 @@ pub fn hide(app: &AppHandle) {
         }
         let _ = window.hide();
         clipboard::hidden();
-        let _ = window.emit(HIDDEN, ());
+        // Hiding is the normal "leave the Pin here" operation. Persist now as
+        // well as on the plugin's normal process-exit path.
+        if let Err(error) = app.save_window_state(STATE_FLAGS) {
+            eprintln!("failed to save Pin window state: {error}");
+        }
     }
 }
 
@@ -143,7 +194,9 @@ pub fn hide(app: &AppHandle) {
 #[tauri::command]
 pub fn pin_window_ready(app: AppHandle) {
     READY.store(true, Ordering::SeqCst);
-    show(&app);
+    if !autostart::is_launch() {
+        show(&app);
+    }
 }
 
 /// Esc, the close button, and a double-click on the content.
