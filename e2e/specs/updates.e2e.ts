@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { capabilities, dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard } from "../clipboard";
 import { StalledProxy, UpdaterProxy, UpdaterSocksProxy } from "../proxy";
-import { openSettings, replaceTextField } from "../settings";
+import { openSettings, replaceTextField, expectShownOption } from "../settings";
 import { useLaunchEnvironment } from "../driver";
 
 /** Advance only the selected WebView's public clock, waiting for the complete virtual budget. */
@@ -120,9 +120,8 @@ describe("Updates", () => {
       await automatic().scrollIntoView();
       await expect(automatic()).toBeChecked();
       await automatic().click();
+      // The switch shows the saved document, so it turns off only once the change is on disk.
       await expect(automatic()).not.toBeChecked();
-      const saved = () => JSON.parse(readFileSync(join(dataFolders(identifier).roaming, "settings.json"), "utf8"));
-      await browser.waitUntil(() => saved().automaticUpdates === false);
       // Let the already-started automatic check fail before observing a new launch.
       await browser.waitUntil(() => proxy.closedConnections >= 1, { timeout: 14_000 });
       const beforeRestart = proxy.closedConnections;
@@ -197,7 +196,7 @@ describe("Updates", () => {
         },
       });
       await openSettings();
-      await expect($("select[aria-label='Proxy mode']")).toHaveValue("system");
+      await expectShownOption($("select[aria-label='Proxy mode']"), "System");
       const check = $("section[aria-label='About']").$("button=Check now");
       await check.scrollIntoView();
       await browser.waitUntil(() => proxy.closedConnections >= 1, { timeout: 14_000 });

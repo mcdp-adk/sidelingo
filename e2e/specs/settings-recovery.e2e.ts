@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard } from "../clipboard";
-import { openSettings } from "../settings";
+import { openSettings, expectShownOption } from "../settings";
 
 describe("settings recovery", () => {
   it("sets aside invalid JSON, loads defaults, and writes a fresh file on the next save", async () => {
@@ -11,7 +11,7 @@ describe("settings recovery", () => {
 
     await openSettings();
     const preset = $("select[aria-label='Preset']");
-    await expect(preset).toHaveValue("");
+    await expectShownOption(preset, "Choose a Provider");
 
     const folder = dataFolders(identifier).roaming;
     const brokenFile = join(folder, "settings.json.broken");
@@ -19,7 +19,7 @@ describe("settings recovery", () => {
     expect(existsSync(brokenFile)).toBe(true);
     expect(readFileSync(brokenFile, "utf8")).toBe("{bad json");
 
-    await preset.selectByAttribute("value", "custom");
+    await preset.selectByVisibleText("Custom");
     await browser.waitUntil(() => existsSync(settingsFile), { timeout: 5_000 });
 
     expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toMatchObject({
@@ -39,7 +39,7 @@ describe("settings recovery", () => {
 
     await openSettings();
     const preset = $("select[aria-label='Preset']");
-    await expect(preset).toHaveValue("");
+    await expectShownOption(preset, "Choose a Provider");
 
     const folder = dataFolders(identifier).roaming;
     const brokenFile = join(folder, "settings.json.broken");
@@ -47,7 +47,7 @@ describe("settings recovery", () => {
     expect(existsSync(brokenFile)).toBe(true);
     expect(readFileSync(brokenFile, "utf8")).toBe(rejected);
 
-    await preset.selectByAttribute("value", "custom");
+    await preset.selectByVisibleText("Custom");
     await browser.waitUntil(() => existsSync(settingsFile), { timeout: 5_000 });
     expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toMatchObject({
       schemaVersion: 1,
@@ -60,14 +60,14 @@ describe("settings recovery", () => {
     await relaunch();
 
     await openSettings();
-    await expect($("select[aria-label='Preset']")).toHaveValue("");
+    await expectShownOption($("select[aria-label='Preset']"), "Choose a Provider");
     const folder = dataFolders(identifier).roaming;
     const brokenFile = join(folder, "settings.json.broken");
     expect(existsSync(brokenFile)).toBe(false);
 
     await relaunch({ settingsText: "null" });
     await openSettings();
-    await expect($("select[aria-label='Preset']")).toHaveValue("");
+    await expectShownOption($("select[aria-label='Preset']"), "Choose a Provider");
     expect(existsSync(brokenFile)).toBe(true);
     expect(readFileSync(brokenFile, "utf8")).toBe("null");
   });

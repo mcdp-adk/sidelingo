@@ -2,7 +2,7 @@ import { relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider } from "../provider";
 import { StalledProxy } from "../proxy";
-import { replaceTextField } from "../settings";
+import { replaceTextField, expectShownOption } from "../settings";
 
 const noNamedKeys = {
   OPENAI_API_KEY: null,
@@ -26,6 +26,7 @@ const locales = [
     settings: "Settings",
     provider: "Provider",
     preset: "Preset",
+    custom: "Custom",
     model: "Model",
   },
   {
@@ -42,6 +43,7 @@ const locales = [
     settings: "设置",
     provider: "服务商",
     preset: "预设",
+    custom: "自定义",
     model: "模型",
   },
 ];
@@ -93,10 +95,10 @@ describe("Round configuration readiness", () => {
 
     const { pin } = await openProviderSettings();
     const preset = $("select[aria-label='Preset']");
-    await expect(preset).toHaveValue("");
+    await expectShownOption(preset, "Choose a Provider");
     expect(provider.requests).toHaveLength(0);
 
-    await preset.selectByAttribute("value", "custom");
+    await preset.selectByVisibleText("Custom");
     await $("input[aria-label='Base URL']").waitForExist();
     await replaceTextField("Base URL", provider.baseUrl);
     await browser.keys("Enter");
@@ -139,7 +141,7 @@ describe("Round configuration readiness", () => {
         expect(provider.requests).toHaveLength(0);
 
         const { pin, settings } = await openProviderSettings(ui);
-        await expect($(`select[aria-label='${ui.preset}']`)).toHaveValue("custom");
+        await expectShownOption($(`select[aria-label='${ui.preset}']`), ui.custom);
         await expect($("input[aria-label='Base URL']")).toHaveValue("baseUrl" in missing ? "" : provider.baseUrl);
         await expect($(`input[aria-label='${ui.model}']`)).toHaveValue("model" in missing ? "" : "fake-model");
         if (ui.language === "en-US" && field === "model") {
@@ -176,7 +178,7 @@ describe("Round configuration readiness", () => {
     await expect(notice).toHaveText("Enter a model", { containing: true });
     expect(provider.requests).toHaveLength(0);
     await openProviderSettings();
-    await expect($("select[aria-label='Preset']")).toHaveValue("openai");
+    await expectShownOption($("select[aria-label='Preset']"), "OpenAI");
     await expect($("input[aria-label='Model']")).toHaveValue("");
     expect(provider.requests).toHaveLength(0);
   });
@@ -208,7 +210,7 @@ describe("Round configuration readiness", () => {
         expect(proxy.connectedAt).toBeNull();
 
         await openProviderSettings(ui);
-        await expect($(`select[aria-label='${ui.preset}']`)).toHaveValue("openai");
+        await expectShownOption($(`select[aria-label='${ui.preset}']`), "OpenAI");
         await expect($(`input[aria-label='${ui.model}']`)).toHaveValue("readiness-model");
         await expect($("input[aria-label='Key']")).toHaveValue("");
         expect(proxy.connectedAt).toBeNull();
@@ -295,7 +297,7 @@ describe("Round configuration readiness", () => {
     expect(provider.requests).toHaveLength(0);
 
     await openProviderSettings();
-    await expect($("select[aria-label='Preset']")).toHaveValue("custom");
+    await expectShownOption($("select[aria-label='Preset']"), "Custom");
     const key = $("input[aria-label='Key']");
     await expect(key).toHaveValue("");
     await expect(key).toHaveAttribute("aria-invalid", "true");
@@ -314,7 +316,7 @@ describe("Round configuration readiness", () => {
     await expect($("[role=group]")).toHaveText(ui.chooseProvider, { containing: true });
     expect(provider.requests).toHaveLength(0);
     await openProviderSettings(ui);
-    await expect($(`select[aria-label='${ui.preset}']`)).toHaveValue("");
+    await expectShownOption($(`select[aria-label='${ui.preset}']`), ui.chooseProvider);
     expect(provider.requests).toHaveLength(0);
   });
 });

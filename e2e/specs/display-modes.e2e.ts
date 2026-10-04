@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { appExe, capabilities, relaunch } from "../app";
 import { writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
+import { expectShownOption } from "../settings";
 import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../window";
 
 async function scrollPosition(pane: WebdriverIO.Element) {
@@ -12,6 +13,9 @@ async function scrollPosition(pane: WebdriverIO.Element) {
   ]);
   return { top: Number(top), proportion: Number(top) / (Number(height) - Number(client)) };
 }
+
+/** A Display mode tab, found by its visible name as a user finds it. */
+const tab = (name: string) => $(`//*[@role="tab"][.//text()[normalize-space()="${name}"]]`);
 
 describe("Display modes", () => {
   let provider: FakeProvider;
@@ -32,13 +36,13 @@ describe("Display modes", () => {
     setWindowBounds(appExe, "sidelingo", { x: 120, y: 160, width: 800, height: 500 });
     await $("[role=toolbar]").moveTo();
     await expect($$("[role=tab]")).toBeElementsArrayOfSize(3);
-    await $("[role=tab][value=source]").click();
+    await tab("Source").click();
     await expect($$("p")).toBeElementsArrayOfSize(1);
     await expect($("p")).toHaveText("Source result");
-    await $("[role=tab][value=translation]").click();
+    await tab("Translation").click();
     await expect($$("p")).toBeElementsArrayOfSize(1);
     await expect($("p")).toHaveText("Translated result");
-    await $("[role=tab][value=both]").click();
+    await tab("Side-by-side").click();
     await expect($$("p")).toBeElementsArrayOfSize(2);
     const panes = await $$("p");
     await expect(panes[0]).toHaveText("Source result");
@@ -61,13 +65,13 @@ describe("Display modes", () => {
     await $("[role=toolbar]").moveTo();
 
     await browser.keys(["Control", "1"]);
-    await expect($("[role=tab][value=source]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Source")).toHaveAttribute("aria-selected", "true");
     await expect($("p")).toHaveText("Remembered Source");
     await browser.keys(["Control", "2"]);
-    await expect($("[role=tab][value=translation]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Translation")).toHaveAttribute("aria-selected", "true");
     await expect($("p")).toHaveText("Remembered Translation");
     await browser.keys(["Control", "3"]);
-    await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Side-by-side")).toHaveAttribute("aria-selected", "true");
     await expect($$("p")).toBeElementsArrayOfSize(2);
     expect(provider.requests).toHaveLength(2);
 
@@ -75,13 +79,13 @@ describe("Display modes", () => {
     await browser.waitUntil(() => inspectWindows(appExe, "sidelingo").every((window) => !window.visible));
     execFileSync(appExe, [], { stdio: "ignore", timeout: 5000 });
     await expect($("button[aria-label='Copy translation']")).toBeEnabled();
-    await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Side-by-side")).toHaveAttribute("aria-selected", "true");
     await expect($$("p")).toBeElementsArrayOfSize(2);
 
     // Keep only what the app really saved; the harness supplies no chosen mode.
     await browser.reloadSession(capabilities());
     await expect($("button[aria-label='Copy translation']")).toBeEnabled();
-    await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Side-by-side")).toHaveAttribute("aria-selected", "true");
     await expect($$("p")).toBeElementsArrayOfSize(2);
     const panes = await $$("p");
     await expect(panes[0]).toHaveText("Remembered Source");
@@ -96,7 +100,7 @@ describe("Display modes", () => {
     await relaunch({ settings: customSettings(provider) });
     await expect($("button[aria-label='Copy translation']")).toBeEnabled();
     await browser.keys(["Control", "3"]);
-    await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Side-by-side")).toHaveAttribute("aria-selected", "true");
 
     for (const [width, height] of [
       [800, 500],
@@ -244,7 +248,7 @@ describe("Display modes", () => {
     await relaunch({ settings: customSettings(provider) });
     await expect($("button[aria-label='Copy translation']")).toBeEnabled();
     await browser.keys(["Control", "3"]);
-    await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Side-by-side")).toHaveAttribute("aria-selected", "true");
     const bounds = { x: 120, y: 100, width: 1000, height: 600 };
     setWindowBounds(appExe, "sidelingo", bounds);
     const source = $("[role=region][aria-label=Source]");
@@ -293,10 +297,11 @@ describe("Display modes", () => {
     expect(provider.requests).toHaveLength(2);
   });
 
-  for (const { language, label, actions } of [
+  for (const { language, label, modes, actions } of [
     {
       language: "en-US",
       label: "Display mode",
+      modes: ["Source", "Translation", "Side-by-side"],
       actions: [
         "Copy source",
         "Copy translation",
@@ -309,6 +314,7 @@ describe("Display modes", () => {
     {
       language: "zh-CN",
       label: "显示模式",
+      modes: ["原文", "译文", "对照"],
       actions: ["复制原文", "复制译文", "暂停监视剪贴板", "重新生成 (Ctrl+R / F5)", "设置 (Ctrl+,)", "关闭 (Esc)"],
     },
   ]) {
@@ -330,7 +336,7 @@ describe("Display modes", () => {
       await $("[role=toolbar]").moveTo();
       const dropdown = $(`select[aria-label='${label}']`);
       await expect(dropdown).toBeDisplayed();
-      await expect(dropdown).toHaveValue("translation");
+      await expectShownOption(dropdown, modes[1]);
       await expect($("[role=tablist]")).not.toBeDisplayed();
 
       const viewport = await $("body").getSize();
@@ -347,22 +353,22 @@ describe("Display modes", () => {
         }
         occupied.push({ left: at.x, right: at.x + size.width });
       }
-      await dropdown.selectByAttribute("value", "source");
+      await dropdown.selectByVisibleText(modes[0]);
       await expect($$("p")).toBeElementsArrayOfSize(1);
       await expect($("p")).toHaveText("Compact Source");
-      await dropdown.selectByAttribute("value", "translation");
+      await dropdown.selectByVisibleText(modes[1]);
       await expect($$("p")).toBeElementsArrayOfSize(1);
       await expect($("p")).toHaveText("Compact Translation");
-      await dropdown.selectByAttribute("value", "both");
+      await dropdown.selectByVisibleText(modes[2]);
       await expect($$("p")).toBeElementsArrayOfSize(2);
       const results = await $$("p");
       await expect(results[0]).toHaveText("Compact Source");
       await expect(results[1]).toHaveText("Compact Translation");
       await browser.keys(["Control", "1"]);
-      await expect(dropdown).toHaveValue("source");
+      await expectShownOption(dropdown, modes[0]);
       await expect($("p")).toHaveText("Compact Source");
       await browser.keys(["Control", "3"]);
-      await expect(dropdown).toHaveValue("both");
+      await expectShownOption(dropdown, modes[2]);
       await expect($$("p")).toBeElementsArrayOfSize(2);
 
       const wide = { x: 120, y: 100, width: 800, height: 500 };
@@ -370,7 +376,7 @@ describe("Display modes", () => {
       expect(windowBounds(appExe, "sidelingo")).toEqual([wide]);
       await expect(dropdown).not.toExist();
       await expect($("[role=tablist]")).toBeDisplayed();
-      await expect($("[role=tab][value=both]")).toHaveAttribute("aria-selected", "true");
+      await expect(tab(modes[2])).toHaveAttribute("aria-selected", "true");
       expect(provider.requests).toHaveLength(2);
     });
   }

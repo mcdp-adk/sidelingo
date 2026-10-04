@@ -4,7 +4,7 @@ import { capabilities, dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
 import { HttpProxy, SocksProxy, StalledProxy } from "../proxy";
-import { openSettings, replaceTextField } from "../settings";
+import { openSettings, replaceTextField, expectShownOption } from "../settings";
 import { useLaunchEnvironment } from "../driver";
 
 describe("Provider proxy", () => {
@@ -24,7 +24,7 @@ describe("Provider proxy", () => {
     const { pin } = await openSettings();
     try {
       const mode = () => $("select[aria-label='Proxy mode']");
-      await expect(mode()).toHaveValue("system");
+      await expectShownOption(mode(), "System");
       await expect($("input[aria-label='Proxy URL']")).not.toExist();
       provider.models({ ids: ["proxied-model"] });
       await configureManualProxy(proxy.url);
@@ -111,7 +111,7 @@ describe("Provider proxy", () => {
         },
       });
       const { pin } = await openSettings();
-      await expect($("select[aria-label='Proxy mode']")).toHaveValue("system");
+      await expectShownOption($("select[aria-label='Proxy mode']"), "System");
       await expect($("input[aria-label='Proxy URL']")).not.toExist();
       await $("input[role=combobox][aria-label='Model']").click();
       await expect($("//*[@role='option' and normalize-space(.)='system-model']")).toBeDisplayed();
@@ -166,7 +166,7 @@ describe("Provider proxy", () => {
       expect(provider.modelRequests).toHaveLength(0);
 
       provider.models({ ids: ["after-mode-change"] });
-      await $("select[aria-label='Proxy mode']").selectByAttribute("value", "system");
+      await $("select[aria-label='Proxy mode']").selectByVisibleText("System");
       await expect($("input[aria-label='Proxy URL']")).not.toExist();
       await $("input[role=combobox][aria-label='Model']").click();
       await expect($("//*[@role='option' and normalize-space(.)='after-mode-change']")).toBeDisplayed();
@@ -200,7 +200,7 @@ describe("Provider proxy", () => {
 });
 
 async function configureManualProxy(url: string): Promise<void> {
-  await $("select[aria-label='Proxy mode']").selectByAttribute("value", "manual");
+  await $("select[aria-label='Proxy mode']").selectByVisibleText("Manual");
   await replaceTextField("Proxy URL", url);
   await browser.keys("Enter");
   await replaceTextField("Proxy username", "proxy-user");

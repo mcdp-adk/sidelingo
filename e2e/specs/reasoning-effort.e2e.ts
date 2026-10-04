@@ -1,7 +1,7 @@
 import { capabilities, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { customSettings, FakeProvider, gate } from "../provider";
-import { openSettings } from "../settings";
+import { openSettings, PRESET_NAMES, expectShownOption } from "../settings";
 
 describe("Reasoning effort", () => {
   let provider: FakeProvider;
@@ -22,7 +22,7 @@ describe("Reasoning effort", () => {
     const { pin, settings } = await openSettings();
     const effort = () => $("select[aria-label='Reasoning effort']");
     try {
-      await expect(effort()).toHaveValue("");
+      await expectShownOption(effort(), "Default");
       await browser.switchToWindow(pin);
       writeClipboardText(`Default input ${Date.now()}\nsecond line`);
       await expect($("p")).toHaveText("translated-default");
@@ -33,8 +33,8 @@ describe("Reasoning effort", () => {
       }
 
       await browser.switchToWindow(settings);
-      await effort().selectByAttribute("value", "low");
-      await expect(effort()).toHaveValue("low");
+      await effort().selectByVisibleText("low");
+      await expectShownOption(effort(), "low");
       provider.reset(({ body }) =>
         Array.isArray(body.messages[1].content)
           ? [{ wait: held.wait }, { delta: { content: "structured-low" } }]
@@ -44,8 +44,8 @@ describe("Reasoning effort", () => {
       writeClipboardText(`Low input ${Date.now()}\nsecond line`);
       await browser.waitUntil(() => provider.requests.length === 1);
       await browser.switchToWindow(settings);
-      await effort().selectByAttribute("value", "high");
-      await expect(effort()).toHaveValue("high");
+      await effort().selectByVisibleText("high");
+      await expectShownOption(effort(), "high");
       held.open();
       await browser.switchToWindow(pin);
       await expect($("p")).toHaveText("translated-low");
@@ -90,9 +90,9 @@ describe("Reasoning effort", () => {
       ["ollama-cloud", "max"],
     ] as const;
     for (const [name, level] of choices) {
-      await preset().selectByAttribute("value", name);
-      await expect(preset()).toHaveValue(name);
-      await expect(effort()).toHaveValue("");
+      await preset().selectByVisibleText(PRESET_NAMES[name]);
+      await expectShownOption(preset(), PRESET_NAMES[name]);
+      await expectShownOption(effort(), "Default");
       const levels = await effort()
         .$$("option")
         .map((option) => option.getText());
@@ -101,11 +101,11 @@ describe("Reasoning effort", () => {
           ? ["Default", "none", "low", "high", "max"]
           : ["Default", "none", "low", "medium", "high", "xhigh", "max"],
       );
-      await effort().selectByAttribute("value", level);
-      await expect(effort()).toHaveValue(level);
+      await effort().selectByVisibleText(level);
+      await expectShownOption(effort(), level);
     }
-    await preset().selectByAttribute("value", "custom");
-    await expect(effort()).toHaveValue("none");
+    await preset().selectByVisibleText("Custom");
+    await expectShownOption(effort(), "none");
     await browser.switchToWindow(pin);
     writeClipboardText(`Explicit none ${Date.now()}`);
     await expect($("p")).toHaveText(expect.stringContaining("Explicit none"));
@@ -117,12 +117,12 @@ describe("Reasoning effort", () => {
     await browser.reloadSession(capabilities());
     ({ pin } = await openSettings());
     for (const [name, level] of choices) {
-      await preset().selectByAttribute("value", name);
-      await expect(effort()).toHaveValue(level);
+      await preset().selectByVisibleText(PRESET_NAMES[name]);
+      await expectShownOption(effort(), level);
     }
-    await preset().selectByAttribute("value", "custom");
-    await effort().selectByAttribute("value", "");
-    await expect(effort()).toHaveValue("");
+    await preset().selectByVisibleText("Custom");
+    await effort().selectByVisibleText("Default");
+    await expectShownOption(effort(), "Default");
     provider.reset();
     await browser.switchToWindow(pin);
     writeClipboardText(`Back to Default ${Date.now()}`);

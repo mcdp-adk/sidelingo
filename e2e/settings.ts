@@ -17,3 +17,20 @@ export async function replaceTextField(label: string, value: string): Promise<vo
   await browser.keys(["Control", "a"]);
   await browser.keys(value);
 }
+
+/** Preset names as the Preset dropdown shows them in English. */
+export const PRESET_NAMES: Record<string, string> = {
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  deepseek: "DeepSeek",
+  "ollama-cloud": "Ollama Cloud",
+  custom: "Custom",
+};
+
+/** Waits until a closed dropdown shows `text`, as a user reads it. */
+export async function expectShownOption(dropdown: ReturnType<typeof $>, text: string): Promise<void> {
+  // Query the chosen option afresh each time; a controlled dropdown changes it after a save.
+  await browser.waitUntil(async () => (await dropdown.$("option:checked").getProperty("text")) === text, {
+    timeoutMsg: `the dropdown never showed "${text}"`,
+  });
+}

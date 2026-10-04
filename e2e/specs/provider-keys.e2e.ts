@@ -5,7 +5,7 @@ import { dataFolders, identifier, relaunch } from "../app";
 import { clearClipboard, writeClipboardText } from "../clipboard";
 import { StalledProxy } from "../proxy";
 import { customSettings, FakeProvider } from "../provider";
-import { openSettings, replaceTextField } from "../settings";
+import { openSettings, replaceTextField, expectShownOption } from "../settings";
 
 describe("Provider keys", () => {
   let provider: FakeProvider;
@@ -70,7 +70,7 @@ describe("Provider keys", () => {
         expect(proxy.connectedAt).toBeNull();
 
         await openSettings();
-        await expect($("select[aria-label='Preset']")).toHaveValue("openai");
+        await expectShownOption($("select[aria-label='Preset']"), "OpenAI");
         const key = $("input[aria-label='Key']");
         await expect(key).toHaveValue("");
         await expect(key).toHaveAttribute("placeholder", item.placeholder);

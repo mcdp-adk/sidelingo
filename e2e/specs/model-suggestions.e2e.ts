@@ -91,10 +91,10 @@ describe("Provider model suggestions", () => {
     await model().click();
     await expect($("//*[@role='option' and normalize-space(.)='reopened-model']")).toBeDisplayed();
     await browser.keys("Escape");
-    await $("select[aria-label='Preset']").selectByAttribute("value", "openai");
+    await $("select[aria-label='Preset']").selectByVisibleText("OpenAI");
     await expect(model()).toHaveValue("");
     provider.models({ ids: ["chosen-again-model"] });
-    await $("select[aria-label='Preset']").selectByAttribute("value", "custom");
+    await $("select[aria-label='Preset']").selectByVisibleText("Custom");
     await expect(model()).toHaveValue("fake-model");
     await model().click();
     await expect($("//*[@role='option' and normalize-space(.)='chosen-again-model']")).toBeDisplayed();
