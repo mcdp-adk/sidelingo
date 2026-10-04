@@ -13,8 +13,8 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { strings } from "./i18n";
-import { requestUpdateCheck, requestUpdateInstall, useUpdateStatus } from "./updates";
+import { strings } from "../i18n";
+import { requestUpdateCheck, requestUpdateInstall, useUpdateStatus } from "../updates/updates";
 
 const sourceUrl = "https://github.com/mcdp-adk/sidelingo";
 const useStyles = makeStyles({

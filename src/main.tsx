@@ -5,12 +5,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FluentProvider } from "@fluentui/react-components";
 import "./global.css";
 import { strings, uiLanguage } from "./i18n";
-import { PinWindow } from "./PinWindow";
-import { SettingsWindow } from "./SettingsWindow";
-import { startSession } from "./session";
-import { currentSettings, startSettingsStore } from "./settings-store";
+import { PinWindow } from "./pin-window/PinWindow";
+import { SettingsWindow } from "./settings-window/SettingsWindow";
+import { startSession } from "./session/session";
+import { currentSettings, startSettingsStore } from "./settings/settings-store";
 import { useSystemTheme } from "./theme";
-import { startUpdateChecks, startUpdateStatus } from "./updates";
+import { startUpdateChecks, startUpdateStatus } from "./updates/updates";
 
 /** Windows' default accent, for when the system's can't be read. */
 const DEFAULT_ACCENT = "#0078d4";

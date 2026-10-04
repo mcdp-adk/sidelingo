@@ -1,15 +1,15 @@
 import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { run, type Input, type RoundState } from "./round";
+import { run, type Input, type RoundState } from "../round/round";
 import {
   DEFAULT_SETTINGS,
   parseSettings,
   providerConfiguration,
   roundSettings,
   type ConfigurationFailure,
-} from "./settings";
-import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
+} from "../settings/settings";
+import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "../settings/settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };

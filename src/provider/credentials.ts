@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "./presets";
-import type { Settings } from "./settings";
+import type { Settings } from "../settings/settings";
 
 /** Plaintext is held only in the running app; settings contain DPAPI ciphertext. */
 export type EnteredKeys = Record<Preset, string | null>;

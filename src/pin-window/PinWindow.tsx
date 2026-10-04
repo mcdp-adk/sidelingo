@@ -33,11 +33,11 @@ import {
 } from "@fluentui/react-icons";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
-import { strings } from "./i18n";
-import type { RoundError } from "./round";
-import { regenerate, toggleClipboardPause, useSession } from "./session";
-import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "./settings";
-import { patchSettings, useSettings } from "./settings-store";
+import { strings } from "../i18n";
+import type { RoundError } from "../round/round";
+import { regenerate, toggleClipboardPause, useSession } from "../session/session";
+import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
+import { patchSettings, useSettings } from "../settings/settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;

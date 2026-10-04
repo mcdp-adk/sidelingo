@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { proxyConfiguration } from "./settings";
-import { currentProxyPassword, currentSettings, waitForSettings } from "./settings-store";
+import { proxyConfiguration } from "../settings/settings";
+import { currentProxyPassword, currentSettings, waitForSettings } from "../settings/settings-store";
 
 interface UpdateStatus {
   checking: boolean;

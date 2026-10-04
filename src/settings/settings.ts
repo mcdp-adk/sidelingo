@@ -1,8 +1,8 @@
-import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "./languages";
-import type { ProviderConfiguration } from "./provider";
-import type { KeySourcesSnapshot } from "./credentials";
+import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "../languages";
+import type { ProviderConfiguration } from "../provider/provider";
+import type { KeySourcesSnapshot } from "../provider/credentials";
 import type { Proxy } from "@tauri-apps/plugin-http";
-import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
+import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "../provider/presets";
 
 /**
  * The settings model, shared by both windows: the document's schema, its defaults, its
@@ -13,7 +13,7 @@ export const SCHEMA_VERSION = 1;
 export const DISPLAY_MODES = ["source", "translation", "both"] as const;
 export type DisplayMode = (typeof DISPLAY_MODES)[number];
 
-export type { Preset } from "./presets";
+export type { Preset } from "../provider/presets";
 
 type KeyVariable = NonNullable<(typeof PRESET_REGISTRY)[Preset]["keyVariable"]>;
 

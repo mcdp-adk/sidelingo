@@ -1,7 +1,7 @@
 import { Field, Select } from "@fluentui/react-components";
-import { strings } from "./i18n";
-import type { Settings } from "./settings";
-import { currentProxyPassword } from "./settings-store";
+import { strings } from "../i18n";
+import type { Settings } from "../settings/settings";
+import { currentProxyPassword } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 import { TextSetting } from "./TextSetting";
 

@@ -10,11 +10,11 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { strings } from "./i18n";
+import { strings } from "../i18n";
 import { AboutSection } from "./AboutSection";
 import { AutostartSetting } from "./AutostartSetting";
-import { PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "./presets";
-import { patchSettings, useSettings } from "./settings-store";
+import { PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "../provider/presets";
+import { patchSettings, useSettings } from "../settings/settings-store";
 import { ModelField } from "./ModelField";
 import { KeyField } from "./KeyField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";

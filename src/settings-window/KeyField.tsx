@@ -1,6 +1,6 @@
-import { strings } from "./i18n";
-import { PRESET_REGISTRY, type Preset } from "./presets";
-import { currentEnteredKey, currentKeySources } from "./settings-store";
+import { strings } from "../i18n";
+import { PRESET_REGISTRY, type Preset } from "../provider/presets";
+import { currentEnteredKey, currentKeySources } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 
 export function KeyField({

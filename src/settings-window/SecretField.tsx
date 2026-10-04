@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Field, Input } from "@fluentui/react-components";
 import { EyeRegular, EyeOffRegular } from "@fluentui/react-icons";
-import { protectSecret } from "./credentials";
+import { protectSecret } from "../provider/credentials";
 
 /** Entered secrets are masked in the UI and encrypted before a settings patch. */
 export function SecretField({

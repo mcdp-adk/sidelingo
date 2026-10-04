@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Combobox, Field, Option, makeStyles, tokens } from "@fluentui/react-components";
-import { strings, uiLanguage } from "./i18n";
-import { englishName, languageOptions, type TargetLanguage } from "./languages";
+import { strings, uiLanguage } from "../i18n";
+import { englishName, languageOptions, type TargetLanguage } from "../languages";
 
 const options = languageOptions(uiLanguage);
 const useStyles = makeStyles({

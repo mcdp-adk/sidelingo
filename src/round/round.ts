@@ -1,6 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import { englishName, type TargetLanguage } from "./languages";
-import { ProviderError, providerClient, type ChatMessage, type ProviderConfiguration } from "./provider";
+import { englishName, type TargetLanguage } from "../languages";
+import { ProviderError, providerClient, type ChatMessage, type ProviderConfiguration } from "../provider/provider";
 import * as structuring from "./prompts/structuring";
 import * as translation from "./prompts/translation";
 

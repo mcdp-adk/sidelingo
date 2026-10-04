@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Field, Switch } from "@fluentui/react-components";
-import { strings } from "./i18n";
+import { strings } from "../i18n";
 
 export function AutostartSetting() {
   const [enabled, setEnabled] = useState(false);

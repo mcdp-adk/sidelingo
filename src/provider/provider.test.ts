@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { providerClient } from "./provider";
 import type { Preset } from "./presets";
-import { DEFAULT_SETTINGS, resolveProviderConnection } from "./settings";
+import { DEFAULT_SETTINGS, resolveProviderConnection } from "../settings/settings";
 
 describe("Named Preset keys", () => {
   it.each<[Preset, string]>([

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type Ref } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Field, makeStyles, tokens } from "@fluentui/react-components";
-import { strings } from "./i18n";
+import { strings } from "../i18n";
 
 const useStyles = makeStyles({
   controls: { display: "flex", columnGap: tokens.spacingHorizontalS },

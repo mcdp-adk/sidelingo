@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
-import { PRESETS, PRESET_REGISTRY, type Preset } from "./presets";
+import { PRESETS, PRESET_REGISTRY, type Preset } from "../provider/presets";
 import {
   readEnteredKeys,
   readKeyEnvironment,
@@ -10,8 +10,8 @@ import {
   type EnteredKeys,
   type KeyEnvironmentSnapshot,
   type KeySourcesSnapshot,
-} from "./credentials";
-import { strings } from "./i18n";
+} from "../provider/credentials";
+import { strings } from "../i18n";
 
 let settings: Settings = DEFAULT_SETTINGS;
 let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;

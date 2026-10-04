@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { fetch } from "@tauri-apps/plugin-http";
 import { Combobox, Field, Option, Spinner } from "@fluentui/react-components";
-import { strings } from "./i18n";
-import { providerClient } from "./provider";
-import { resolveProviderConnection, type ConnectionFailure, type Preset, type Settings } from "./settings";
-import { currentKeySources, currentProxyPassword } from "./settings-store";
+import { strings } from "../i18n";
+import { providerClient } from "../provider/provider";
+import { resolveProviderConnection, type ConnectionFailure, type Preset, type Settings } from "../settings/settings";
+import { currentKeySources, currentProxyPassword } from "../settings/settings-store";
 
 const client = providerClient(fetch);
 function connectionMessage(failure: ConnectionFailure): string {
