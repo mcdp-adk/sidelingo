@@ -72,7 +72,10 @@ export function resetDataFolders({ settingsText }: Launch = {}): void {
   }
 }
 
-/** Quits the app and launches it again from fresh data folders, returning once the Pin window shows. */
+/**
+ * Quits the app and launches it again from fresh data folders, returning once the Pin window shows. An element found
+ * before a relaunch belongs to the ended session; find elements after it, or through a function that finds them afresh.
+ */
 export async function relaunch(launch: Launch = {}): Promise<void> {
   await browser.deleteSession();
   await useLaunchEnvironment(launch.environment);

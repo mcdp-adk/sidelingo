@@ -43,6 +43,7 @@ describe("Task 4: recovering from a Provider error", () => {
 
     // Settings, still open from the setup and since scrolled down to About, comes back on Provider with nothing focused.
     await browser.switchToWindow(settings);
+    // A section is found by its heading: aria/<section> finds the section's own label first.
     await $("h2=About").scrollIntoView();
     await expect($("h2=Provider")).not.toBeDisplayedInViewport();
     await browser.switchToWindow(pin);
