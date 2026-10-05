@@ -6,6 +6,7 @@ import {
   makeStyles,
   mergeClasses,
   Button,
+  Dropdown,
   Menu,
   MenuItem,
   MenuList,
@@ -14,7 +15,7 @@ import {
   MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
-  Select,
+  Option,
   Tab,
   TabList,
   Text,
@@ -44,6 +45,8 @@ const DRAG_THRESHOLD = 4;
 const SCROLL_INTENT_LINGER = 400;
 /** How far from a pane's right edge a press reaches its overlay scrollbar, which takes no layout width. */
 const SCROLLBAR_REACH = 16;
+/** How far below the toolbar the pointer still shows it: the top band the user reaches into. */
+const TOOLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
 const modeLabels: Record<DisplayMode, string> = {
@@ -94,7 +97,8 @@ const useStyles = makeStyles({
       pointerEvents: "none",
     },
   },
-  // Overlays the content with no reserved space, shown while the pointer is over the window.
+  // Overlays the content with no reserved space, as an opaque layer on the window's base colour with a divider below,
+  // shown only while the user reaches for it.
   toolbar: {
     position: "absolute",
     top: 0,
@@ -102,8 +106,8 @@ const useStyles = makeStyles({
     right: 0,
     justifyContent: "space-between",
     columnGap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-    backdropFilter: "blur(20px)",
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
     opacity: 0,
     transitionProperty: "opacity",
     transitionDuration: tokens.durationNormal,
@@ -116,7 +120,7 @@ const useStyles = makeStyles({
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
-  dropdownInput: { minWidth: 0, textOverflow: "ellipsis" },
+  dropdownButton: { minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" },
   actions: { display: "flex", flexShrink: 0 },
   panes: { display: "grid", height: "100%", gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
@@ -173,7 +177,8 @@ export function PinWindow({ session }: { session: Session }) {
   const scrollDriver = useRef<{ index: number; until: number } | null>(null);
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
-  const [pointerOver, setPointerOver] = useState(false);
+  const [pointerNearTop, setPointerNearTop] = useState(false);
+  const [modeListOpen, setModeListOpen] = useState(false);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -188,10 +193,12 @@ export function PinWindow({ session }: { session: Session }) {
       const style = getComputedStyle(bar);
       const spacing =
         parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + (parseFloat(style.columnGap) || 0);
-      setCompact(
+      const compact =
         tabs.current!.getBoundingClientRect().width + actions.current!.getBoundingClientRect().width + spacing >
-          bar.clientWidth,
-      );
+        bar.clientWidth;
+      setCompact(compact);
+      // The dropdown goes with its list open, and reports no closing.
+      if (!compact) setModeListOpen(false);
     };
     const observer = new ResizeObserver(measure);
     [toolbar.current!, tabs.current!, actions.current!].forEach((element) => observer.observe(element));
@@ -243,7 +250,8 @@ export function PinWindow({ session }: { session: Session }) {
     };
     // A hidden window hears no mouseleave, and shows again with neither toolbar nor menu.
     const unlistenHidden = listen("pin-window-hidden", () => {
-      setPointerOver(false);
+      setPointerNearTop(false);
+      setModeListOpen(false);
       setMenu(null);
       onPointerCancel();
     });
@@ -417,8 +425,10 @@ export function PinWindow({ session }: { session: Session }) {
     <div
       ref={root}
       className={mergeClasses(styles.root, paused && styles.paused)}
-      onMouseEnter={() => setPointerOver(true)}
-      onMouseLeave={() => setPointerOver(false)}
+      // The top band: the toolbar's height plus a reach below it. Reading never shows the toolbar, wheel-scrolling
+      // with the pointer mid-window included.
+      onMouseMove={(e) => setPointerNearTop(e.clientY <= toolbar.current!.offsetHeight + TOOLBAR_REACH)}
+      onMouseLeave={() => setPointerNearTop(false)}
       onContextMenu={onContextMenu}
     >
       <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
@@ -434,7 +444,7 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
+        className={mergeClasses(styles.toolbar, (pointerNearTop || modeListOpen) && styles.shown)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -444,6 +454,7 @@ export function PinWindow({ session }: { session: Session }) {
             className={mergeClasses(styles.tabs, compact && styles.measuringTabs)}
             aria-hidden={compact || undefined}
             inert={compact}
+            appearance="subtle"
             size="small"
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
@@ -455,20 +466,23 @@ export function PinWindow({ session }: { session: Session }) {
             ))}
           </TabList>
           {compact && (
-            <Select
+            <Dropdown
               aria-label={strings.displayMode}
               size="small"
               className={styles.dropdown}
-              select={{ className: styles.dropdownInput }}
-              value={mode}
-              onChange={(_, data) => selectMode(data.value as DisplayMode)}
+              button={{ className: styles.dropdownButton }}
+              value={modeLabels[mode]}
+              selectedOptions={[mode]}
+              onOptionSelect={(_, data) => data.optionValue && selectMode(data.optionValue as DisplayMode)}
+              // Its list hangs below the top band, so the toolbar stays while the list is open.
+              onOpenChange={(_, data) => setModeListOpen(data.open)}
             >
               {DISPLAY_MODES.map((value) => (
-                <option key={value} value={value}>
+                <Option key={value} value={value}>
                   {modeLabels[value]}
-                </option>
+                </Option>
               ))}
-            </Select>
+            </Dropdown>
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>

@@ -35,7 +35,7 @@ Inside the module, in order of preference:
 | Window | both windows' backgrounds | Mica (the page is transparent) | the window frame |
 | Page | text, MessageBars, controls placed on the page | controls opaque, raised: `#2C2C2C` dark, `#F9F9F9` light | control stroke |
 | Card | code blocks | CardBackgroundFillColorDefault (translucent: only Mica is under it) | card stroke, 8 px corners |
-| Toolbar | the Pin window's toolbar, over the results | opaque on the base: `#202020` dark, `#F3F3F3` light | a divider below, no blur |
+| Toolbar | the Pin window's toolbar, over the results; its tab list subtle: a subtle fill on hover, the pill under the selected Display mode | opaque on the base: `#202020` dark, `#F3F3F3` light | a divider below, no blur |
 | Overlay | menus, dropdown lists, tooltips, dialogs | opaque, raised | flyout stroke, 8 px corners, Fluent's shadow |
 | Smoke | behind a dialog | SmokeFillColorDefault, `#4D000000` | — |
 
@@ -185,7 +185,7 @@ The whole list, in `baseline.css` § 3:
 
 The prototype on branch `prototype/winui-look` settled these, reviewed by the owner on the desktop on 2026-10-05:
 
-- **Toolbar reveal.** The Pin window's toolbar shows while the pointer is within the toolbar's height plus 16 px of the top, over the toolbar itself, or while keyboard focus is in it (`:focus-visible`), so reading never shows it, wheel-scrolling with the pointer mid-window included. This top band was chosen over showing it while the pointer is anywhere over the window and over showing it on pointer movement.
+- **Toolbar reveal.** The Pin window's toolbar shows while the pointer is within the toolbar's height plus 16 px of the top, over the toolbar itself, or while keyboard focus is in it (`:focus-visible`), so reading never shows it, wheel-scrolling with the pointer mid-window included. It also stays while the narrow window's Display mode list is open, since that list hangs below the band. This top band was chosen over showing it while the pointer is anywhere over the window and over showing it on pointer movement.
 - **Toolbar layer.** The toolbar is opaque on the base colour with a divider below. A translucent, blurred (acrylic) layer let the toolbar and the text show through each other, and neither was readable.
 - **Content and theme.** WinUI's values on Fluent, as above, over Fluent 2's defaults and the earlier web chrome.
 - **Links.** Clicking a link opens it in the default browser at once, as WinUI's Hyperlink does; the URL shows on hover. A confirming Fluent dialog was tried and dropped.

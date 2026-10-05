@@ -1,3 +1,5 @@
+import { chooseOption } from "./dropdown";
+
 /** Opens Settings through its focused Pin shortcut, waiting for the user-visible toolbar first. */
 export async function openSettings(): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
@@ -24,14 +26,6 @@ export async function replaceTextField(label: string, value: string): Promise<vo
   await browser.keys(value);
 }
 
-/** Waits until a closed dropdown, found by its accessible name, shows `text`, as a user reads it. */
-export async function expectShownOption(dropdown: ReturnType<typeof $>, text: string): Promise<void> {
-  // Ask afresh each time; a controlled dropdown changes its choice after a save.
-  await browser.waitUntil(() => dropdown.$(`option=${text}`).isSelected(), {
-    timeoutMsg: `the dropdown never showed "${text}"`,
-  });
-}
-
 /** The Model `setUpCustomProvider` enters. */
 export const TASK_MODEL = "task-model";
 
@@ -48,7 +42,7 @@ export async function setUpCustomProvider(
   await $("[role=toolbar]").moveTo();
   await $("aria/Settings (Ctrl+,)").click();
   const settings = await switchToSettingsWindow(pin);
-  await $("aria/Preset").selectByVisibleText("Custom");
+  await chooseOption("Preset", "Custom");
   await replaceTextField("Base URL", baseUrl);
   await browser.keys("Enter");
   await replaceTextField("Model", TASK_MODEL);

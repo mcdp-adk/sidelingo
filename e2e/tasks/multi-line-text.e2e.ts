@@ -1,7 +1,8 @@
 import { appExe, capabilities, relaunch } from "../support/app";
+import { chooseOption, dropdown, expectChosen } from "../support/dropdown";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate } from "../support/provider";
-import { expectShownOption, setUpCustomProvider } from "../support/settings";
+import { setUpCustomProvider } from "../support/settings";
 import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../support/window";
 
 const paragraphs = (count: number, name: string) =>
@@ -169,16 +170,18 @@ describe("Task 2: multi-line text", () => {
     const [minimum] = minimumTrackingSizes(appExe, "sidelingo");
     setWindowBounds(appExe, "sidelingo", { ...wide, width: minimum.width });
     await $("[role=toolbar]").moveTo();
-    const dropdown = $("aria/Display mode");
-    await expect(dropdown).toBeDisplayed();
+    await expect(dropdown("Display mode")).toBeDisplayed();
     await expect($("[role=tablist]")).not.toBeDisplayed();
-    await expectShownOption(dropdown, "Side-by-side");
-    await dropdown.selectByVisibleText("Source");
+    await expectChosen("Display mode", "Side-by-side");
+    await chooseOption("Display mode", "Source");
     await showsSource();
-    await dropdown.selectByVisibleText("Side-by-side");
+    // The user reaches for the toolbar again, since choosing left the pointer below the top band.
+    await $("[role=toolbar]").moveTo();
+    await chooseOption("Display mode", "Side-by-side");
     await showsBoth();
     setWindowBounds(appExe, "sidelingo", wide);
-    await expect(dropdown).not.toExist();
+    await $("[role=toolbar]").moveTo();
+    await expect(dropdown("Display mode")).not.toExist();
     await expect($("[role=tablist]")).toBeDisplayed();
     expect(provider.requests).toHaveLength(2);
 
