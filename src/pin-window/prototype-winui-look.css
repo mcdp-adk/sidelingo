@@ -184,31 +184,32 @@
   top: 4px;
   right: 4px;
 }
-.proto-content-winui [data-streamdown="table-wrapper"] {
+/* Tables read like a WinUI list with column headers: no frame, no card, dividers between rows,
+   the first column aligned with the paragraph text. */
+.proto-table {
   margin: 0 0 12px;
-  border: 1px solid var(--proto-card-stroke);
-  border-radius: 4px;
-  background: var(--proto-card);
   overflow-x: auto;
 }
-.proto-content-winui table {
+.proto-table table {
   border-collapse: collapse;
   width: 100%;
-  border: 0;
 }
-.proto-content-winui :is(th, td) {
-  padding: 6px 12px;
+.proto-table :is(th, td) {
+  padding: 8px 16px 8px 0;
   text-align: left;
+  vertical-align: top;
   border: 0;
   border-bottom: 1px solid var(--proto-divider);
   font-size: 14px;
   line-height: 20px;
   background: transparent;
 }
-.proto-content-winui th {
+.proto-table th {
   font-weight: 600;
+  color: var(--proto-text-secondary);
+  padding-top: 0;
 }
-.proto-content-winui tr:last-child td {
+.proto-table tr:last-child td {
   border-bottom: 0;
 }
 

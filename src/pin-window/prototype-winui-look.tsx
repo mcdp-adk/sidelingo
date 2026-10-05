@@ -2,7 +2,7 @@
 // Question: how should the Pin window's toolbar reveal and look, and how should its content read,
 // once the web-style parts move toward WinUI 3? Each axis below is switchable from a floating bar
 // shown only in dev builds; the choice lives in the URL's search params, so a reload keeps it.
-import { useState, type ComponentProps } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -134,6 +134,17 @@ function componentsFor(links: number): Components {
       const text = String(props.children ?? "").replace(/\n$/, "");
       return <CodeBlock code={text} />;
     },
+    // Plain table elements: Streamdown's own table adds a framed wrapper and a control bar.
+    table: ({ children }: { children?: ReactNode }) => (
+      <div className="proto-table">
+        <table>{children}</table>
+      </div>
+    ),
+    thead: "thead",
+    tbody: "tbody",
+    tr: "tr",
+    th: "th",
+    td: "td",
     // A task list's box is a read-only mark, not a web checkbox.
     input: ({ type, checked }: { type?: string; checked?: boolean }) =>
       type === "checkbox" ? (

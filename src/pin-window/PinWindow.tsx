@@ -196,6 +196,8 @@ export function PinWindow({ session }: { session: Session }) {
   const movingTimer = useRef<number>(undefined);
   const md = (text: string) => (
     <Streamdown
+      // Streamdown memoizes rendered blocks, so a new variant needs a fresh instance.
+      key={`${proto.content}-${proto.links}`}
       plugins={plugins}
       {...(proto.content === 1
         ? { components: winuiComponents[proto.links], controls: winuiControls, lineNumbers: false }
