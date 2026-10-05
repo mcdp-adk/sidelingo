@@ -1,12 +1,13 @@
-/** A closed dropdown, found by its role and accessible name, as a user finds it. */
+/** A closed dropdown, found by its accessible name, as a user finds it. */
 export function dropdown(name: string): ReturnType<typeof $> {
-  return $(`[role=combobox][aria-label="${name}"]`);
+  return $(`aria/${name}`);
 }
 
 /** Opens the dropdown named `name` and chooses the option reading `text`, as a user does with the pointer. */
 export async function chooseOption(name: string, text: string): Promise<void> {
   await dropdown(name).click();
-  await $(`//*[@role="listbox"]//*[@role="option"][normalize-space()="${text}"]`).click();
+  // Within the open list, so a tab or pane named like the option is never chosen instead.
+  await $("[role=listbox]").$(`aria/${text}`).click();
   await expectChosen(name, text);
 }
 
