@@ -17,7 +17,6 @@ import { startUpdateChecks, startUpdateStatus } from "./updates/updates";
 const DEFAULT_ACCENT = "#0078d4";
 
 document.documentElement.lang = uiLanguage;
-const isSettingsWindow = getCurrentWindow().label === "settings";
 
 function App({ accent, session }: { accent: string; session: Session | null }) {
   const theme = useSystemTheme(accent);
@@ -31,9 +30,9 @@ function App({ accent, session }: { accent: string; session: Session | null }) {
 
 const accent = (await invoke<string | null>("accent_color")) ?? DEFAULT_ACCENT;
 await startSettingsStore();
-if (isSettingsWindow) await startUpdateStatus();
-// The Round, and so the Session, runs only in the Pin webview.
-const session = isSettingsWindow ? null : createSession(fetch);
+// The Round, and so the Session, runs only in the Pin webview; the settings window has none.
+const session = getCurrentWindow().label === "settings" ? null : createSession(fetch);
+if (!session) await startUpdateStatus();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
