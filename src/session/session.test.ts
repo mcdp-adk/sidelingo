@@ -38,7 +38,7 @@ const asked = ({ body }: SentRequest) => {
   const [, language, source] = /^Translate to (\w+):\n[\s\S]*\n(.*)$/.exec(user)!;
   return `${language}: ${source}`;
 };
-const round = (input: string, language = "English") => [`Structuring: ${input}`, `${language}: ${input}`];
+const requestsFor = (input: string, language = "English") => [`Structuring: ${input}`, `${language}: ${input}`];
 
 interface Row {
   name: string;
@@ -63,7 +63,7 @@ const rows: Row[] = [
       await shows(core, "Done");
       await core.copy("Same");
     },
-    asked: round("Same"),
+    asked: requestsFor("Same"),
     shown: "Done",
   },
   {
@@ -77,7 +77,7 @@ const rows: Row[] = [
       await shows(core, "Second done");
       first.release();
     },
-    asked: [...round("First"), ...round("Second")],
+    asked: [...requestsFor("First"), ...requestsFor("Second")],
     cancelled: [0, 1],
     shown: "Second done",
   },
@@ -90,7 +90,7 @@ const rows: Row[] = [
       await core.hide();
       await core.show("Reused");
     },
-    asked: round("Reused"),
+    asked: requestsFor("Reused"),
     shown: "Done",
   },
   {
@@ -103,7 +103,7 @@ const rows: Row[] = [
       await core.hide();
       await core.show("Reused");
     },
-    asked: round("Reused"),
+    asked: requestsFor("Reused"),
     shown: "Done",
   },
   {
@@ -115,7 +115,7 @@ const rows: Row[] = [
       await core.hide();
       await core.show(null);
     },
-    asked: round("Kept"),
+    asked: requestsFor("Kept"),
     shown: "Done",
   },
   {
@@ -130,7 +130,7 @@ const rows: Row[] = [
       pending.release();
       await shows(core, "Partial and the rest");
     },
-    asked: round("Running"),
+    asked: requestsFor("Running"),
     shown: "Partial and the rest",
   },
   {
@@ -145,7 +145,7 @@ const rows: Row[] = [
       await shows(core, "Partial and the rest");
       await core.show("Hidden");
     },
-    asked: round("Hidden"),
+    asked: requestsFor("Hidden"),
     shown: "Partial and the rest",
   },
   {
@@ -158,7 +158,7 @@ const rows: Row[] = [
       await core.show("Failing");
       await shows(core, "Retried");
     },
-    asked: ["Structuring: Failing", ...round("Failing")],
+    asked: ["Structuring: Failing", ...requestsFor("Failing")],
     shown: "Retried",
   },
   {
@@ -173,7 +173,7 @@ const rows: Row[] = [
       await core.show("Dropping");
       await shows(core, "Retried");
     },
-    asked: [...round("Dropping"), ...round("Dropping")],
+    asked: [...requestsFor("Dropping"), ...requestsFor("Dropping")],
     shown: "Retried",
   },
   {
@@ -185,7 +185,7 @@ const rows: Row[] = [
       core.session.toggleClipboardPause();
       await core.copy("Ignored");
     },
-    asked: round("Before"),
+    asked: requestsFor("Before"),
     shown: "Done",
     paused: true,
   },
@@ -200,7 +200,7 @@ const rows: Row[] = [
       await core.copy("After");
       await shows(core, "Followed");
     },
-    asked: [...round("Before"), ...round("After")],
+    asked: [...requestsFor("Before"), ...requestsFor("After")],
     shown: "Followed",
   },
   {
@@ -210,7 +210,7 @@ const rows: Row[] = [
       await core.copy(LONGEST);
       await shows(core, "Done");
     },
-    asked: round(LONGEST),
+    asked: requestsFor(LONGEST),
     shown: "Done",
   },
   {
@@ -221,7 +221,7 @@ const rows: Row[] = [
       await shows(core, "Done");
       await core.copy(OVERLONG);
     },
-    asked: round("Short"),
+    asked: requestsFor("Short"),
     shown: null,
     overlong: true,
   },
@@ -234,7 +234,7 @@ const rows: Row[] = [
       core.session.regenerate();
       await shows(core, "Processed");
     },
-    asked: round(OVERLONG),
+    asked: requestsFor(OVERLONG),
     shown: "Processed",
   },
   {
@@ -245,7 +245,7 @@ const rows: Row[] = [
       await core.copy("Next");
       await shows(core, "Followed");
     },
-    asked: round("Next"),
+    asked: requestsFor("Next"),
     shown: "Followed",
   },
   {
@@ -259,7 +259,7 @@ const rows: Row[] = [
       core.session.regenerate();
       await shows(core, "Regenerated");
     },
-    asked: [...round("Again"), ...round("Again")],
+    asked: [...requestsFor("Again"), ...requestsFor("Again")],
     shown: "Regenerated",
   },
   {
@@ -273,7 +273,7 @@ const rows: Row[] = [
       await shows(core, "Regenerated");
       first.release();
     },
-    asked: [...round("Again"), ...round("Again")],
+    asked: [...requestsFor("Again"), ...requestsFor("Again")],
     cancelled: [0, 1],
     shown: "Regenerated",
   },
@@ -286,7 +286,7 @@ const rows: Row[] = [
       core.session.regenerate();
       await shows(core, "Retried");
     },
-    asked: ["Structuring: Failing", ...round("Failing")],
+    asked: ["Structuring: Failing", ...requestsFor("Failing")],
     shown: "Retried",
   },
   {
@@ -301,7 +301,7 @@ const rows: Row[] = [
       await core.show("Again");
       await shows(core, "Rerun");
     },
-    asked: [...round("Again"), "Structuring: Again", ...round("Again")],
+    asked: [...requestsFor("Again"), "Structuring: Again", ...requestsFor("Again")],
     shown: "Rerun",
   },
   {
@@ -320,7 +320,7 @@ const rows: Row[] = [
       await core.show("Configured");
       await shows(core, "Japanese");
     },
-    asked: [...round("Configured"), ...round("Configured", "Japanese")],
+    asked: [...requestsFor("Configured"), ...requestsFor("Configured", "Japanese")],
     shown: "Japanese",
   },
   {
@@ -337,7 +337,7 @@ const rows: Row[] = [
       await core.show("Configured");
       await shows(core, "Japanese");
     },
-    asked: [...round("Configured"), ...round("Configured", "Japanese")],
+    asked: [...requestsFor("Configured"), ...requestsFor("Configured", "Japanese")],
     shown: "Japanese",
   },
 ];
