@@ -1,9 +1,13 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import type { Input, RoundState } from "../round/round";
 import { createSession, type Session, type SessionState } from "../session/session";
 import { startSettingsStore } from "../settings/settings-store";
+import { startUpdateChecks, type useUpdateStatus } from "../updates/updates";
 import { FakeTransport } from "./fake-transport";
+
+/** What the Pin webview publishes about update checks, as the settings window receives it. */
+type UpdateStatus = ReturnType<typeof useUpdateStatus>;
 
 export { FakeTransport, type Reply, type SentRequest, type Step } from "./fake-transport";
 
@@ -36,6 +40,8 @@ export interface Core {
   provider: FakeTransport;
   /** Every Rust command the core invoked, in order. */
   invoked: { command: string; args: unknown }[];
+  /** Every update status the core published to the settings window, in order. */
+  updateStatuses: UpdateStatus[];
   /** Rust's Input event for a copy; a string is a text Input. */
   copy(input: Input | string): Promise<void>;
   /** Rust's Input event when the Pin window shows, with the clipboard's Input or nothing usable. */
@@ -53,8 +59,8 @@ export interface Core {
 const toInput = (input: Input | string): Input => (typeof input === "string" ? { kind: "text", text: input } : input);
 
 /**
- * Starts the Pin webview's core as `main.tsx` does: the settings store, then one Session on a
- * fake transport. The Rust side is played through Tauri's IPC mocks, with event mocking.
+ * Starts the Pin webview's core as `main.tsx` does: the settings store, one Session on a fake
+ * transport, then update checks. The Rust side is played through Tauri's IPC mocks, with event mocking.
  */
 export async function startCore(options: CoreOptions = {}): Promise<Core> {
   const provider = new FakeTransport();
@@ -74,6 +80,9 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     }),
     unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext] ?? null,
     pin_window_ready: () => null,
+    // The updater finds no update unless a test plays otherwise.
+    "plugin:updater|check": () => null,
+    set_update_offer: () => null,
     ...options.commands,
   };
   clearMocks();
@@ -87,9 +96,13 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     { shouldMockEvents: true },
   );
 
+  const updateStatuses: UpdateStatus[] = [];
+  await listen<UpdateStatus>("update-status-changed", ({ payload }) => void updateStatuses.push(payload));
+
   await startSettingsStore();
   const session = createSession(provider.fetch);
   await session.start();
+  await startUpdateChecks();
 
   const until: Core["until"] = (predicate) =>
     new Promise((resolve) => {
@@ -108,6 +121,7 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     session,
     provider,
     invoked,
+    updateStatuses,
     copy: (input) => emit("input", { origin: "copy", input: toInput(input) }),
     show: (input) => emit("input", { origin: "show", input: input === null ? null : toInput(input) }),
     hide: () => emit("pin-window-hidden"),

@@ -23,7 +23,7 @@ Tests come in five layers, and each contract has one owning test at the layer th
 
 ### Webview core (`pnpm test`)
 
-- Tests start the core with `startCore` (`src/testing/core.ts`): the settings store and one Session, as the Pin webview starts them. The Rust side is played through Tauri's IPC mocks and the network through `FakeTransport`. No test mocks an app module or a plugin.
+- Tests start the core with `startCore` (`src/testing/core.ts`): the settings store, one Session and the update checks, as the Pin webview starts them. The Rust side is played through Tauri's IPC mocks and the network through `FakeTransport`. No test mocks an app module or a plugin.
 - A test observes only the Session's published state, the requests the fake transport received, and the Rust commands the core invoked.
 - Each rule is a row in a table-driven case (`it.each`). A new rule adds a row rather than a test of its own.
 - A test never depends on the machine's locale. The setup file sets `navigator.language` to `en-US`, and a test about another locale stubs it and re-imports the modules.
