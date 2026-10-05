@@ -10,6 +10,7 @@ const RETRY_DELAY_MS = 50;
 
 const nativeClipboardWriter = `using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -24,6 +25,8 @@ public static class SidelingoClipboardWriter {
   [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern uint RegisterClipboardFormatW(string format);
   [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SetClipboardData(uint format, IntPtr memory);
   [DllImport("user32.dll", SetLastError = true)] private static extern bool CloseClipboard();
+  [DllImport("user32.dll")] private static extern IntPtr GetOpenClipboardWindow();
+  [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
   [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
   [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GlobalLock(IntPtr memory);
   [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GlobalUnlock(IntPtr memory);
@@ -59,8 +62,32 @@ public static class SidelingoClipboardWriter {
 
   private static void OpenWithRetry() {
     for (int attempt = 0; !OpenClipboard(OwnerWindow()); attempt++) {
-      if (attempt >= ${RETRIES}) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if (attempt >= ${RETRIES}) {
+        string reason = new Win32Exception(Marshal.GetLastWin32Error()).Message;
+        throw new InvalidOperationException(reason + "; the clipboard is held open by " + Holder());
+      }
       Thread.Sleep(${RETRY_DELAY_MS});
+    }
+  }
+
+  // Names the program a failed run waited for, such as another test run or a clipboard manager.
+  private static string Holder() {
+    uint processId;
+    IntPtr window = GetOpenClipboardWindow();
+    if (window == IntPtr.Zero || GetWindowThreadProcessId(window, out processId) == 0) return "a window-less process";
+    try {
+      return "process " + processId + " (" + Process.GetProcessById((int)processId).ProcessName + ")";
+    } catch (ArgumentException) {
+      return "process " + processId;
+    }
+  }
+
+  public static void Clear() {
+    OpenWithRetry();
+    try {
+      if (!EmptyClipboard()) throw new Win32Exception(Marshal.GetLastWin32Error());
+    } finally {
+      CloseClipboard();
     }
   }
 
@@ -277,11 +304,7 @@ export function writeClipboardTextAndHold(
 
 /** Empties the real Windows clipboard, so it holds nothing to show. */
 export function clearClipboard(): void {
-  runPowerShell(`Add-Type -AssemblyName System.Windows.Forms
-for ($attempt = 1; ; $attempt++) {
-  try { [Windows.Forms.Clipboard]::Clear(); break }
-  catch { if ($attempt -ge ${RETRIES}) { throw }; Start-Sleep -Milliseconds ${RETRY_DELAY_MS} }
-}`);
+  runPowerShell(withNativeClipboardWriter("[SidelingoClipboardWriter]::Clear()"));
 }
 
 /** Reads the real Windows clipboard's text, or "" when it holds none. */
