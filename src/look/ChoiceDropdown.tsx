@@ -1,8 +1,15 @@
-import { Dropdown, Option, type DropdownProps } from "@fluentui/react-components";
+import { Dropdown, Option, makeStyles, type DropdownProps } from "@fluentui/react-components";
+
+const useStyles = makeStyles({
+  // The closed button may be narrower than its label, as in the Pin window's compact toolbar.
+  button: { minWidth: 0 },
+  // The label shrinks and ends in an ellipsis, so the arrow beside it always shows whole.
+  label: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+});
 
 type ChoiceDropdownProps<T extends string> = Omit<
   DropdownProps,
-  "value" | "selectedOptions" | "onOptionSelect" | "children" | "multiselect"
+  "value" | "selectedOptions" | "onOptionSelect" | "children" | "multiselect" | "button"
 > & {
   /** Every choice, in the order the list shows them. */
   choices: readonly T[];
@@ -21,10 +28,16 @@ export function ChoiceDropdown<T extends string>({
   onChoose,
   ...dropdown
 }: ChoiceDropdownProps<T>) {
+  const styles = useStyles();
+  const label = value === null ? "" : labelOf(value);
   return (
     <Dropdown
       {...dropdown}
-      value={value === null ? "" : labelOf(value)}
+      value={label}
+      button={{
+        className: styles.button,
+        children: <span className={styles.label}>{label || dropdown.placeholder}</span>,
+      }}
       selectedOptions={value === null ? [] : [value]}
       onOptionSelect={(_, data) => {
         const choice = choices.find((c) => c === data.optionValue);

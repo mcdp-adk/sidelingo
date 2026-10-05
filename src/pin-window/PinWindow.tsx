@@ -91,7 +91,6 @@ const useStyles = makeStyles({
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
-  dropdownButton: { minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" },
   actions: { display: "flex", flexShrink: 0 },
   panes: { display: "grid", flexGrow: 1, minHeight: 0, gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
@@ -424,7 +423,6 @@ export function PinWindow({ session }: { session: Session }) {
               aria-label={strings.displayMode}
               size="small"
               className={styles.dropdown}
-              button={{ className: styles.dropdownButton }}
               choices={DISPLAY_MODES}
               value={mode}
               labelOf={(value) => modeLabels[value]}
