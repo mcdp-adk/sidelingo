@@ -85,7 +85,9 @@ function stream(steps: Step[], signal: AbortSignal): ReadableStream<Uint8Array> 
     else controller.error(reason);
   };
   signal.addEventListener("abort", () => end(signal.reason), { once: true });
-  const send = (data: string) => controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+  /** Sends one server-sent line, with the blank line that ends it. */
+  const line = (text: string) => controller.enqueue(encoder.encode(`${text}\n\n`));
+  const send = (data: string) => line(`data: ${data}`);
   return new ReadableStream(
     {
       start(started) {
@@ -103,12 +105,7 @@ function stream(steps: Step[], signal: AbortSignal): ReadableStream<Uint8Array> 
           else if ("content" in step) {
             return send(JSON.stringify({ choices: [{ delta: { content: step.content } }] }));
           } else if ("error" in step) return send(JSON.stringify({ error: { message: step.error } }));
-          else if ("comment" in step)
-            return controller.enqueue(
-              encoder.encode(`: ${step.comment}
-
-`),
-            );
+          else if ("comment" in step) return line(`: ${step.comment}`);
           else return send(step.data);
         }
       },
