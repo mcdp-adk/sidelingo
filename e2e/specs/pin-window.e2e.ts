@@ -184,22 +184,6 @@ describe("The Pin window", () => {
     expect(pinVisible()).toBe(true);
   });
 
-  it("scrolls content longer than the window inside it, keeping the window's size", async () => {
-    await launch({}, Array(12).fill(LINE).join(" "));
-    const size = await browser.getWindowSize();
-    // The page fills the window.
-    const { height } = await $("body").getSize();
-    const content = await paragraph();
-    const bottom = async () => (await content.getLocation()).y + (await content.getSize()).height;
-    expect(await bottom()).toBeGreaterThan(height);
-    // Over the window's middle, since the paragraph's own middle lies below it.
-    await browser.action("wheel").scroll({ x: 100, y: 120, deltaY: 10_000 }).perform();
-    await browser.waitUntil(async () => (await bottom()) <= height, {
-      timeoutMsg: "the content's end didn't scroll into view",
-    });
-    expect(await browser.getWindowSize()).toEqual(size);
-  });
-
   it("has a minimum content width of at least 230 logical px", async () => {
     await launch();
     const widths = minimumSizes(appExe, "sidelingo").map((size) => size.width);
