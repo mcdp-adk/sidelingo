@@ -43,7 +43,7 @@ import { patchSettings, useSettings } from "../settings/settings-store";
 const DRAG_THRESHOLD = 4;
 /** Includes trailing scroll events after a wheel, key or pointer release. */
 const SCROLL_INTENT_LINGER = 400;
-/** How far from a pane's right edge a press reaches its overlay scrollbar, which takes no layout width. */
+/** How far from a scroller's right or bottom edge a press reaches its overlay scrollbar, which takes no layout width. */
 const SCROLLBAR_REACH = 16;
 /** How far below the toolbar the pointer still shows it: the top band the user reaches into. */
 const TOOLBAR_REACH = 16;
@@ -133,13 +133,20 @@ const useStyles = makeStyles({
   errorDetail: { whiteSpace: "pre-wrap" },
 });
 
-/** A press on the content's own scrollbar, which drags the thumb rather than the window. */
+/**
+ * A press on a scrollbar in the content, the pane's own or a code block's or table's, which drags the thumb rather
+ * than the window: the press lands on the scroller itself, near its right edge if it scrolls down or its bottom edge
+ * if it scrolls sideways.
+ */
 function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
-  const content = e.currentTarget;
+  const scroller = e.target;
+  if (!(scroller instanceof HTMLElement)) return false;
+  const { overflowX, overflowY } = getComputedStyle(scroller);
+  const scrolls = (overflow: string) => overflow === "auto" || overflow === "scroll";
+  const box = scroller.getBoundingClientRect();
   return (
-    e.target === content &&
-    content.scrollHeight > content.clientHeight &&
-    content.getBoundingClientRect().right - e.clientX <= SCROLLBAR_REACH
+    (scrolls(overflowY) && scroller.scrollHeight > scroller.clientHeight && box.right - e.clientX <= SCROLLBAR_REACH) ||
+    (scrolls(overflowX) && scroller.scrollWidth > scroller.clientWidth && box.bottom - e.clientY <= SCROLLBAR_REACH)
   );
 }
 
@@ -328,8 +335,8 @@ export function PinWindow({ session }: { session: Session }) {
         onScroll={() => onScroll(index)}
         onMouseDown={(e) => {
           if (onScrollbar(e)) {
-            // A native thumb drag owns scrolling until mouse-up, however long it is held.
-            if (e.button === 0) scrollDriver.current = { index, until: Infinity };
+            // A native thumb drag on the pane's own scrollbar owns its scrolling until mouse-up, however long it is held.
+            if (e.button === 0 && e.target === e.currentTarget) scrollDriver.current = { index, until: Infinity };
           } else onDragMouseDown(e);
         }}
         onClick={onClick}

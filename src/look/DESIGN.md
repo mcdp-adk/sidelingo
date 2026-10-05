@@ -170,7 +170,7 @@ The whole list, in `baseline.css` § 3:
 
 | Behaviour | How |
 | --- | --- |
-| Classic scrollbars with arrows and a track | WebView2's Fluent overlay scrollbar, as in Edge (`webview_defaults`). A press within 16 px of a scrollable pane's right edge counts as a scrollbar press, not a window drag, because the overlay scrollbar takes no layout width |
+| Classic scrollbars with arrows and a track | WebView2's Fluent overlay scrollbar, as in Edge (`webview_defaults`). In the Pin window, a press on a scroller (a pane, a code block or a table) within 16 px of its right edge when it scrolls down, or of its bottom edge when it scrolls sideways, counts as a scrollbar press, not a window drag, because the overlay scrollbar takes no layout width |
 | Page context menu (Back, Reload, Save as, Print, Inspect) | suppressed except in inputs, textareas and editable content, which keep cut, copy and paste; the Pin window keeps its own Copy selection menu |
 | F3, F5, F7, Ctrl + R/F/G/P/S/U/J/H/O/N/T/W, Alt+Left/Right and the browser keys | the default is prevented at capture, so the app's own handlers still run: the Pin window regenerates on F5 and Ctrl+R |
 | Ctrl+Shift+I/J/C (developer tools) | suppressed outside dev builds |
