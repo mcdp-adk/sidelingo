@@ -1,7 +1,7 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate } from "../support/provider";
-import { expectShownOption, replaceTextField } from "../support/settings";
+import { expectShownOption, replaceTextField, switchToSettingsWindow } from "../support/settings";
 
 // The WebView's language stands in for Windows' display language, which picks the UI language.
 const locales = [
@@ -60,9 +60,7 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await expect(notice).toHaveText(ui.chooseProvider, { containing: true });
 
       await notice.$(`button=${ui.openSettings}`).click();
-      await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
-      const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
-      await browser.switchToWindow(settings);
+      await switchToSettingsWindow(pin);
       await expect($("h1")).toHaveText(ui.settings);
       await expect($(`h2=${ui.provider}`)).toBeDisplayed();
       const preset = $(`aria/${ui.preset}`);

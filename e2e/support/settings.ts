@@ -4,11 +4,17 @@ export async function openSettings(): Promise<{ pin: string; settings: string }>
   await $("[role=toolbar]").moveTo();
   await expect($("button[aria-label='Settings (Ctrl+,)']")).toBeDisplayed();
   await browser.keys(["Control", ","]);
+  const settings = await switchToSettingsWindow(pin);
+  await expect($("h1")).toHaveText("Settings");
+  return { pin, settings };
+}
+
+/** Waits for the settings window to open beside the Pin window `pin`, switches to it, and returns its handle. */
+export async function switchToSettingsWindow(pin: string): Promise<string> {
   await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
   const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
   await browser.switchToWindow(settings);
-  await expect($("h1")).toHaveText("Settings");
-  return { pin, settings };
+  return settings;
 }
 
 /** Replace a controlled text field as a user does, without WebDriver's synthetic clear. */
@@ -38,9 +44,7 @@ export async function setUpCustomProvider(
   const pin = await browser.getWindowHandle();
   await $("[role=toolbar]").moveTo();
   await $("aria/Settings (Ctrl+,)").click();
-  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
-  const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
-  await browser.switchToWindow(settings);
+  const settings = await switchToSettingsWindow(pin);
   await $("aria/Preset").selectByVisibleText("Custom");
   await replaceTextField("Base URL", baseUrl);
   await browser.keys("Enter");
@@ -60,9 +64,7 @@ export async function followOpenSettings(): Promise<{ pin: string; settings: str
   // The user waits to see the notice or error before pressing its button.
   await $("[role=group]").waitForDisplayed();
   await $("[role=group]").$("button=Open settings").click();
-  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
-  const settings = (await browser.getWindowHandles()).find((handle) => handle !== pin)!;
-  await browser.switchToWindow(settings);
+  const settings = await switchToSettingsWindow(pin);
   await expect($("h1")).toHaveText("Settings");
   return { pin, settings };
 }

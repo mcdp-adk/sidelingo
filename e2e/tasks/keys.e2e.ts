@@ -4,7 +4,7 @@ import { capabilities, dataFolders, identifier, quit, relaunch } from "../suppor
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
 import { runPowerShell } from "../support/powershell";
 import { FakeProvider } from "../support/provider";
-import { expectShownOption, replaceTextField } from "../support/settings";
+import { expectShownOption, followOpenSettings, replaceTextField } from "../support/settings";
 
 const launchKey = "synthetic-openai-launch-key";
 const enteredKey = "synthetic-custom-key-for-e2e-only";
@@ -31,14 +31,6 @@ function decryptForThisUser(ciphertext: string): string {
   );
 }
 
-/** Switches to the Settings window the Pin window's notice opens. */
-async function openSettingsFromNotice(pin: string): Promise<void> {
-  await $("[role=group]").$("button=Open settings").click();
-  await browser.waitUntil(async () => (await browser.getWindowHandles()).length === 2);
-  await browser.switchToWindow((await browser.getWindowHandles()).find((handle) => handle !== pin)!);
-  await expect($("h1")).toHaveText("Settings");
-}
-
 describe("Task 10: the user's Provider keys", () => {
   let provider: FakeProvider;
   before(async () => {
@@ -61,7 +53,7 @@ describe("Task 10: the user's Provider keys", () => {
     let pin = await browser.getWindowHandle();
     writeClipboardText(`A line before any Provider ${Date.now()}`);
     await expect($("[role=group]")).toHaveText("Choose a Provider", { containing: true });
-    await openSettingsFromNotice(pin);
+    await followOpenSettings();
 
     // The launch environment's key: its variable is named, its value is never shown or saved.
     const preset = () => $("aria/Preset");
@@ -117,7 +109,7 @@ describe("Task 10: the user's Provider keys", () => {
     pin = await browser.getWindowHandle();
     await expect($("[role=group]")).toHaveText(undecryptable, { containing: true });
     expect(provider.requests).toHaveLength(0);
-    await openSettingsFromNotice(pin);
+    await followOpenSettings();
     await expect($("body")).toHaveText(undecryptable, { containing: true });
     await expect(key()).toHaveValue("");
     await expect(key()).toHaveAttribute("aria-invalid", "true");
