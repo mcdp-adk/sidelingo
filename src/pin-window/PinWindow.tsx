@@ -45,8 +45,6 @@ const DRAG_THRESHOLD = 4;
 const SCROLL_INTENT_LINGER = 400;
 /** How far from a scroller's right or bottom edge a press reaches its overlay scrollbar, which takes no layout width. */
 const SCROLLBAR_REACH = 16;
-/** How far below the toolbar the pointer still shows it: the top band the user reaches into. */
-const TOOLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
 const modeLabels: Record<DisplayMode, string> = {
@@ -86,30 +84,16 @@ function configurationFailureMessage(failure: ConfigurationFailure): string {
 }
 
 const useStyles = makeStyles({
-  root: { position: "relative", height: "100vh", overflow: "hidden" },
-  // Overlays the content with no reserved space, on the toolbar layer, shown only while the user reaches for it.
-  toolbar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    justifyContent: "space-between",
-    columnGap: tokens.spacingHorizontalXS,
-    opacity: 0,
-    transitionProperty: "opacity",
-    transitionDuration: tokens.durationNormal,
-    transitionTimingFunction: tokens.curveEasyEase,
-    // Keyboard focus shows it too; a mouse click leaves it to fade with the pointer.
-    ":has(:focus-visible)": { opacity: 1 },
-  },
-  shown: { opacity: 1 },
+  root: { position: "relative", display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" },
+  // Always shown above the text, which starts below its divider.
+  toolbar: { flexShrink: 0, justifyContent: "space-between", columnGap: tokens.spacingHorizontalXS },
   modeControls: { position: "relative", flexGrow: 1, minWidth: 0 },
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
   dropdownButton: { minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" },
   actions: { display: "flex", flexShrink: 0 },
-  panes: { display: "grid", height: "100%", gridTemplateColumns: "minmax(0, 1fr)" },
+  panes: { display: "grid", flexGrow: 1, minHeight: 0, gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
   rows: { gridTemplateRows: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
   divider: { backgroundColor: tokens.colorNeutralStroke2 },
@@ -172,8 +156,6 @@ export function PinWindow({ session }: { session: Session }) {
   const scrollDriver = useRef<{ index: number; until: number } | null>(null);
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
-  const [pointerNearTop, setPointerNearTop] = useState(false);
-  const [modeListOpen, setModeListOpen] = useState(false);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -192,8 +174,6 @@ export function PinWindow({ session }: { session: Session }) {
         tabs.current!.getBoundingClientRect().width + actions.current!.getBoundingClientRect().width + spacing >
         bar.clientWidth;
       setCompact(compact);
-      // The dropdown goes with its list open, and reports no closing.
-      if (!compact) setModeListOpen(false);
     };
     const observer = new ResizeObserver(measure);
     [toolbar.current!, tabs.current!, actions.current!].forEach((element) => observer.observe(element));
@@ -243,10 +223,8 @@ export function PinWindow({ session }: { session: Session }) {
       pressedAt.current = null;
       scrollDriver.current = null;
     };
-    // A hidden window hears no mouseleave, and shows again with neither toolbar nor menu.
+    // A hidden window shows again with no menu.
     const unlistenHidden = listen("pin-window-hidden", () => {
-      setPointerNearTop(false);
-      setModeListOpen(false);
       setMenu(null);
       onPointerCancel();
     });
@@ -417,29 +395,10 @@ export function PinWindow({ session }: { session: Session }) {
   };
 
   return (
-    <div
-      ref={root}
-      className={mergeClasses(styles.root, paused && layers.pausedFrame)}
-      // The top band: the toolbar's height plus a reach below it. Reading never shows the toolbar, wheel-scrolling
-      // with the pointer mid-window included.
-      onMouseMove={(e) => setPointerNearTop(e.clientY <= toolbar.current!.offsetHeight + TOOLBAR_REACH)}
-      onMouseLeave={() => setPointerNearTop(false)}
-      onContextMenu={onContextMenu}
-    >
-      <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
-        {mode === "both" ? (
-          <>
-            {pane("source")}
-            <div role="separator" aria-orientation={tall ? "horizontal" : "vertical"} className={styles.divider} />
-            {pane("translation")}
-          </>
-        ) : (
-          pane(mode)
-        )}
-      </div>
+    <div ref={root} className={mergeClasses(styles.root, paused && layers.pausedFrame)} onContextMenu={onContextMenu}>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(layers.toolbar, styles.toolbar, (pointerNearTop || modeListOpen) && styles.shown)}
+        className={mergeClasses(layers.toolbar, styles.toolbar)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -470,8 +429,6 @@ export function PinWindow({ session }: { session: Session }) {
               value={mode}
               labelOf={(value) => modeLabels[value]}
               onChoose={selectMode}
-              // Its list hangs below the top band, so the toolbar stays while the list is open.
-              onOpenChange={(_, data) => setModeListOpen(data.open)}
             />
           )}
         </div>
@@ -525,6 +482,17 @@ export function PinWindow({ session }: { session: Session }) {
           </Tooltip>
         </div>
       </Toolbar>
+      <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
+        {mode === "both" ? (
+          <>
+            {pane("source")}
+            <div role="separator" aria-orientation={tall ? "horizontal" : "vertical"} className={styles.divider} />
+            {pane("translation")}
+          </>
+        ) : (
+          pane(mode)
+        )}
+      </div>
       <Menu
         open={menu !== null}
         onOpenChange={(_, { open }) => open || setMenu(null)}
