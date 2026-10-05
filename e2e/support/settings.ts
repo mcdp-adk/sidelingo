@@ -2,7 +2,7 @@
 export async function openSettings(): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
   await $("[role=toolbar]").moveTo();
-  await expect($("button[aria-label='Settings (Ctrl+,)']")).toBeDisplayed();
+  await expect($("aria/Settings (Ctrl+,)")).toBeDisplayed();
   await browser.keys(["Control", ","]);
   const settings = await switchToSettingsWindow(pin);
   await expect($("h1")).toHaveText("Settings");
@@ -24,10 +24,10 @@ export async function replaceTextField(label: string, value: string): Promise<vo
   await browser.keys(value);
 }
 
-/** Waits until a closed dropdown shows `text`, as a user reads it. */
+/** Waits until a closed dropdown, found by its accessible name, shows `text`, as a user reads it. */
 export async function expectShownOption(dropdown: ReturnType<typeof $>, text: string): Promise<void> {
-  // Query the chosen option afresh each time; a controlled dropdown changes it after a save.
-  await browser.waitUntil(async () => (await dropdown.$("option:checked").getProperty("text")) === text, {
+  // Ask afresh each time; a controlled dropdown changes its choice after a save.
+  await browser.waitUntil(() => dropdown.$(`option=${text}`).isSelected(), {
     timeoutMsg: `the dropdown never showed "${text}"`,
   });
 }
@@ -71,7 +71,7 @@ export async function followOpenSettings(): Promise<{ pin: string; settings: str
 
 /** Waits until keyboard input goes to no control, as on arriving in a window that focuses nothing. */
 export async function expectNothingFocused(): Promise<void> {
-  await browser.waitUntil(async () => (await $(await browser.getActiveElement()).getTagName()) === "body", {
+  await browser.waitUntil(() => browser.execute<boolean, []>("return document.activeElement === document.body"), {
     timeoutMsg: "a control has keyboard focus",
   });
 }
