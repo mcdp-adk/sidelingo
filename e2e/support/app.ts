@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
@@ -103,8 +103,21 @@ export async function relaunch(launch: Launch = {}): Promise<void> {
   resetDataFolders(launch);
   // reloadSession's own attempt to end the already ended session is logged and ignored.
   await browser.reloadSession(capabilities(launch));
+  usesItsOwnDataFolders();
   // An Autostart launch stays in the tray, so there is no window to wait for.
   if (!launch.args?.includes("--autostart")) await pinWindowShows();
+}
+
+/**
+ * Fails every launch whose app doesn't create the e2e identifier's WebView2 folder, emptied just before, so a build
+ * made without `tauri.e2e.conf.json` can't go on using and changing the owner's own sidelingo data.
+ */
+function usesItsOwnDataFolders(): void {
+  if (!existsSync(dataFolders(identifier).local)) {
+    throw new Error(
+      `The app started without creating ${dataFolders(identifier).local}, so it isn't the e2e build (${identifier}). Rebuild it with pnpm test:e2e before it touches your own sidelingo's data.`,
+    );
+  }
 }
 
 /** Quits the app keeping its data, returning once its process has exited and its files are free. */
