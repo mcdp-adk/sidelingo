@@ -45,6 +45,8 @@ const DRAG_THRESHOLD = 4;
 const SCROLL_INTENT_LINGER = 400;
 /** How far from a pane's right edge a press reaches its overlay scrollbar, which takes no layout width. */
 const SCROLLBAR_REACH = 16;
+/** How far below the toolbar the pointer still shows it: the top band the user reaches into. */
+const TOOLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
 const plugins = { cjk };
@@ -97,7 +99,7 @@ const useStyles = makeStyles({
     },
   },
   // Overlays the content with no reserved space, as an opaque layer on the window's base colour with a divider below,
-  // shown while the pointer is over the window.
+  // shown only while the user reaches for it.
   toolbar: {
     position: "absolute",
     top: 0,
@@ -176,7 +178,7 @@ export function PinWindow({ session }: { session: Session }) {
   const scrollDriver = useRef<{ index: number; until: number } | null>(null);
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
-  const [pointerOver, setPointerOver] = useState(false);
+  const [pointerNearTop, setPointerNearTop] = useState(false);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -246,7 +248,7 @@ export function PinWindow({ session }: { session: Session }) {
     };
     // A hidden window hears no mouseleave, and shows again with neither toolbar nor menu.
     const unlistenHidden = listen("pin-window-hidden", () => {
-      setPointerOver(false);
+      setPointerNearTop(false);
       setMenu(null);
       onPointerCancel();
     });
@@ -422,8 +424,10 @@ export function PinWindow({ session }: { session: Session }) {
     <div
       ref={root}
       className={mergeClasses(styles.root, paused && styles.paused)}
-      onMouseEnter={() => setPointerOver(true)}
-      onMouseLeave={() => setPointerOver(false)}
+      // The top band: the toolbar's height plus a reach below it. Reading never shows the toolbar, wheel-scrolling
+      // with the pointer mid-window included.
+      onMouseMove={(e) => setPointerNearTop(e.clientY <= toolbar.current!.offsetHeight + TOOLBAR_REACH)}
+      onMouseLeave={() => setPointerNearTop(false)}
       onContextMenu={onContextMenu}
     >
       <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
@@ -439,7 +443,7 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
+        className={mergeClasses(styles.toolbar, pointerNearTop && styles.shown)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
