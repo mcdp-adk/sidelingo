@@ -39,3 +39,12 @@ Tests come in five layers, and each contract has one owning test at the layer th
 ### Desktop checklist
 
 - What needs real input, or shows only outside the webview, is a checklist item run with computer-use, not a test. Each release runs the whole checklist, and each PR runs the items it touches.
+
+## Structuring eval (`pnpm eval:structuring`)
+
+The eval sits outside the five layers and has no pass or fail (ADR 0006).
+
+- It runs only through its own script, never through `pnpm test`, `pnpm test:real` or CI. It reads both reference models' keys from the environment and never prints or writes them.
+- Its fixtures are synthetic, with no real screenshot, document, log, path or clipboard content, and each carries a short note on what good output looks like.
+- Its outputs stay local, in the gitignored `eval/structuring/output/`. A PR states the eval's conclusions as sanitized text, never the raw outputs.
+- It is judged by reading each output against its fixture's note, with no LLM judge and no deterministic check.
