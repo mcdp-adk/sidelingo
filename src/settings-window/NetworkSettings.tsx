@@ -1,4 +1,4 @@
-import { Field, Select } from "@fluentui/react-components";
+import { Dropdown, Field, Option } from "@fluentui/react-components";
 import { strings } from "../i18n";
 import type { Settings } from "../settings/settings";
 import { currentProxyPassword } from "../settings/settings-store";
@@ -23,17 +23,19 @@ export function NetworkSettings({
   commit: (patch: Record<string, unknown>) => Promise<void>;
 }) {
   const proxy = settings.proxy;
+  const modeLabels = { system: strings.systemProxy, manual: strings.manualProxy };
   return (
     <>
       <Field label={strings.proxyMode}>
-        <Select
+        <Dropdown
           aria-label={strings.proxyMode}
-          value={proxy.mode}
-          onChange={(_, data) => void commit({ proxy: { mode: data.value } })}
+          value={modeLabels[proxy.mode]}
+          selectedOptions={[proxy.mode]}
+          onOptionSelect={(_, data) => void commit({ proxy: { mode: data.optionValue } })}
         >
-          <option value="system">{strings.systemProxy}</option>
-          <option value="manual">{strings.manualProxy}</option>
-        </Select>
+          <Option value="system">{modeLabels.system}</Option>
+          <Option value="manual">{modeLabels.manual}</Option>
+        </Dropdown>
       </Field>
       {proxy.mode === "manual" && (
         <>

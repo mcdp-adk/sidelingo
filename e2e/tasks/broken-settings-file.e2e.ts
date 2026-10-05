@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dataFolders, identifier, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
-import { expectShownOption, switchToSettingsWindow } from "../support/settings";
+import { chooseOption, expectChosen } from "../support/dropdown";
+import { switchToSettingsWindow } from "../support/settings";
 
 describe("Task 11: sidelingo starts from a broken settings file", () => {
   it("starts with defaults, sets the broken file aside, and writes a fresh file on the next change", async () => {
@@ -24,11 +25,10 @@ describe("Task 11: sidelingo starts from a broken settings file", () => {
 
     await notice.$("button=Open settings").click();
     await switchToSettingsWindow(pin);
-    const preset = $("aria/Preset");
-    await expectShownOption(preset, "Choose a Provider");
+    await expectChosen("Preset", "Choose a Provider");
     await expect($("aria/Hotkey")).toHaveText("Win+Alt+Q");
 
-    await preset.selectByVisibleText("Custom");
+    await chooseOption("Preset", "Custom");
     await browser.waitUntil(() => existsSync(settingsFile), { timeoutMsg: "no fresh settings file was written" });
     expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toMatchObject({ schemaVersion: 1, activePreset: "custom" });
     expect(readFileSync(brokenFile, "utf8")).toBe(brokenText);

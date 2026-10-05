@@ -4,7 +4,8 @@ import { capabilities, dataFolders, identifier, quit, relaunch } from "../suppor
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
 import { runPowerShell } from "../support/powershell";
 import { FakeProvider, keepingText } from "../support/provider";
-import { expectShownOption, followOpenSettings, replaceTextField } from "../support/settings";
+import { chooseOption } from "../support/dropdown";
+import { followOpenSettings, replaceTextField } from "../support/settings";
 
 const launchKey = "synthetic-openai-launch-key";
 const enteredKey = "synthetic-custom-key-for-e2e-only";
@@ -56,22 +57,21 @@ describe("Task 10: the user's Provider keys", () => {
     await followOpenSettings();
 
     // The launch environment's key: its variable is named, its value is never shown or saved.
-    const preset = () => $("aria/Preset");
     const key = () => $("aria/Key");
-    await preset().selectByVisibleText("OpenAI");
+    await chooseOption("Preset", "OpenAI");
     await expect(key()).toHaveValue("");
     await expect(key()).toHaveAttribute("placeholder", "Using OPENAI_API_KEY; changes take effect after restart.");
     await browser.waitUntil(() => savedText().includes('"openai"'), { timeoutMsg: "choosing OpenAI was not saved" });
     expect(readFileSync(settingsFile, "utf8")).not.toContain(launchKey);
     // A Preset whose variable isn't set at launch says so.
-    await preset().selectByVisibleText("OpenRouter");
+    await chooseOption("Preset", "OpenRouter");
     await expect(key()).toHaveAttribute(
       "placeholder",
       "No key; environment variable changes take effect after restart.",
     );
 
     // A Custom key typed in Settings is masked, used, and saved only as DPAPI ciphertext.
-    await preset().selectByVisibleText("Custom");
+    await chooseOption("Preset", "Custom");
     await expect(key()).toHaveAttribute("placeholder", "No key.");
     await replaceTextField("Base URL", provider.baseUrl);
     await browser.keys("Enter");
@@ -115,7 +115,7 @@ describe("Task 10: the user's Provider keys", () => {
     await expect(key()).toHaveAttribute("aria-invalid", "true");
 
     // OpenAI's saved key is flagged too: the launch key doesn't stand in for it.
-    await preset().selectByVisibleText("OpenAI");
+    await chooseOption("Preset", "OpenAI");
     await expect(key()).toHaveAttribute(
       "placeholder",
       "No key; environment variable changes take effect after restart.",
@@ -124,8 +124,7 @@ describe("Task 10: the user's Provider keys", () => {
     await expect($("body")).toHaveText(undecryptable, { containing: true });
 
     // The user enters a replacement, checks it by revealing it, and saves it.
-    await preset().selectByVisibleText("Custom");
-    await expectShownOption(preset(), "Custom");
+    await chooseOption("Preset", "Custom");
     await replaceTextField("Key", replacementKey);
     await $("aria/Show key").click();
     await expect(key()).toHaveAttribute("type", "text");

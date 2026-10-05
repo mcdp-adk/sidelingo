@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  Dropdown,
   Field,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
-  Select,
+  Option,
   Subtitle1,
   Title2,
   makeStyles,
@@ -36,6 +37,13 @@ const useStyles = makeStyles({
     ":not(:last-child)": { marginBottom: tokens.spacingVerticalXXXL },
   },
 });
+
+/** Reasoning effort's option for no effort set, which saves as null. */
+const DEFAULT_EFFORT = "default";
+
+function presetLabel(id: Preset): string {
+  return id === "custom" ? strings.custom : PRESET_REGISTRY[id].label;
+}
 
 export function SettingsWindow() {
   const styles = useStyles();
@@ -97,20 +105,19 @@ export function SettingsWindow() {
         <section className={styles.section} aria-label={strings.provider}>
           <Subtitle1 as="h2">{strings.provider}</Subtitle1>
           <Field label={strings.preset}>
-            <Select
+            <Dropdown
               aria-label={strings.preset}
-              value={preset ?? ""}
-              onChange={(_, data) => void commit({ activePreset: data.value as Preset })}
+              placeholder={strings.chooseProvider}
+              value={preset ? presetLabel(preset) : ""}
+              selectedOptions={preset ? [preset] : []}
+              onOptionSelect={(_, data) => void commit({ activePreset: data.optionValue as Preset })}
             >
-              <option value="" disabled hidden>
-                {strings.chooseProvider}
-              </option>
               {PRESETS.map((id) => (
-                <option key={id} value={id}>
-                  {id === "custom" ? strings.custom : PRESET_REGISTRY[id].label}
-                </option>
+                <Option key={id} value={id}>
+                  {presetLabel(id)}
+                </Option>
               ))}
-            </Select>
+            </Dropdown>
           </Field>
           {preset === "custom" && (
             <TextSetting
@@ -134,22 +141,28 @@ export function SettingsWindow() {
                 commit={(model) => commit({ presets: { [preset]: { model } } })}
               />
               <Field label={strings.reasoningEffort}>
-                <Select
+                <Dropdown
                   aria-label={strings.reasoningEffort}
-                  value={settings.presets[preset].reasoningEffort ?? ""}
-                  onChange={(_, data) =>
+                  value={settings.presets[preset].reasoningEffort ?? strings.defaultEffort}
+                  selectedOptions={[settings.presets[preset].reasoningEffort ?? DEFAULT_EFFORT]}
+                  onOptionSelect={(_, data) =>
                     void commit({
-                      presets: { [preset]: { reasoningEffort: data.value ? (data.value as ReasoningEffort) : null } },
+                      presets: {
+                        [preset]: {
+                          reasoningEffort:
+                            data.optionValue === DEFAULT_EFFORT ? null : (data.optionValue as ReasoningEffort),
+                        },
+                      },
                     })
                   }
                 >
-                  <option value="">{strings.defaultEffort}</option>
+                  <Option value={DEFAULT_EFFORT}>{strings.defaultEffort}</Option>
                   {PRESET_REGISTRY[preset].efforts.map((effort) => (
-                    <option key={effort} value={effort}>
+                    <Option key={effort} value={effort}>
                       {effort}
-                    </option>
+                    </Option>
                   ))}
-                </Select>
+                </Dropdown>
               </Field>
             </>
           )}

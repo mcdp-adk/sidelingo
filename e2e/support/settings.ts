@@ -1,3 +1,5 @@
+import { chooseOption } from "./dropdown";
+
 /** Opens Settings through its focused Pin shortcut, waiting for the user-visible toolbar first. */
 export async function openSettings(): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
@@ -48,7 +50,7 @@ export async function setUpCustomProvider(
   await $("[role=toolbar]").moveTo();
   await $("aria/Settings (Ctrl+,)").click();
   const settings = await switchToSettingsWindow(pin);
-  await $("aria/Preset").selectByVisibleText("Custom");
+  await chooseOption("Preset", "Custom");
   await replaceTextField("Base URL", baseUrl);
   await browser.keys("Enter");
   await replaceTextField("Model", TASK_MODEL);
