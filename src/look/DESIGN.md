@@ -18,7 +18,7 @@ Inside the module, in order of preference:
 | --- | --- | --- |
 | `<LookProvider initialAccent>` | `main.tsx`, around both windows, with the accent read at startup | system light/dark and accent, both followed live; the WinUI → Fluent token map; the element baseline; the overlay rule; the component overrides; the context menu, browser shortcuts and spellcheck |
 | `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. No other component imports Streamdown |
-| `<ChoiceDropdown choices value labelOf onChoose>` | the Pin window's Display mode; Settings' Preset, Reasoning effort and Proxy mode | the Fluent Dropdown and its options for one of a fixed set of typed choices: the closed label, the selected option, and only a listed choice reaching `onChoose` |
+| `<ChoiceDropdown choices value labelOf onChoose>` | the Pin window's Display mode; Settings' Preset, Reasoning effort and Proxy mode | the Fluent Dropdown and its options for one of a fixed set of typed choices: the closed label, which ends in an ellipsis when the dropdown is narrower than it so the arrow always shows whole; the selected option; and only a listed choice reaching `onChoose` |
 | `useLayerStyles()` | the Pin window, for its toolbar and its paused state | the toolbar layer's fill and divider; the caution frame around a paused window |
 | `webview_defaults(builder)` | both Rust window builders | WebView2's Fluent overlay scrollbar; autofill off. Both windows must agree, because WebView2 fixes the scrollbar style per environment |
 | `accent_color`, `follow_accent(app)` | `main.tsx` at startup; the Rust setup | the system accent, which WebView2's CSS doesn't give; every change of it sent to both windows as `accent-changed`, from Windows' `UISettings.ColorValuesChanged` |
@@ -157,7 +157,7 @@ The whole list, in `baseline.css` § 3:
 | Lists, nested lists | 20 indent, 4 between items, tertiary markers |
 | Task list | Fluent's checkbox icons in the marker's place, in the secondary colour; exposed as read-only checkboxes, not inputs |
 | Quote, nested quote | a 3 px control stroke (ControlStrokeColorSecondary) on the left, 12 before the text, secondary text |
-| Code block | a card (CardBackgroundFillColorDefault, card stroke, 8 px corners), mono 12/20, scrolling inside itself sideways and beyond 400 px tall; one subtle Fluent copy button, whose copy goes through the app's own copy command and starts no Round; no line numbers, download button or language bar |
+| Code block | a card (CardBackgroundFillColorDefault, card stroke, 8 px corners), mono 12/20, scrolling inside itself sideways and beyond 400 px tall; one subtle Fluent copy button on an opaque raised backing (`--look-raised`), so code scrolled sideways passes behind it rather than through its icon, and whose copy goes through the app's own copy command and starts no Round; no line numbers, download button or language bar |
 | Table | plain table elements in a sideways scroller, no frame or fill; a semibold header in the secondary colour; dividers between rows; no copy, download or fullscreen controls |
 | Horizontal rule | a divider, 16 above and below |
 | Footnotes | Caption 12, secondary, after a divider with 16 above and below; the section's heading is for screen readers only, and back-references are dropped |
@@ -170,7 +170,7 @@ The whole list, in `baseline.css` § 3:
 
 | Behaviour | How |
 | --- | --- |
-| Classic scrollbars with arrows and a track | WebView2's Fluent overlay scrollbar, as in Edge (`webview_defaults`). In the Pin window, a press on a scroller (a pane, a code block or a table) within 16 px of its right edge when it scrolls down, or of its bottom edge when it scrolls sideways, counts as a scrollbar press, not a window drag, because the overlay scrollbar takes no layout width |
+| Classic scrollbars, always shown and taking layout width | WebView2's Fluent overlay scrollbar, as in Edge (`webview_defaults`): thin at rest, expanding on hover. In the Pin window, a press on a scroller (a pane, a code block or a table) within 16 px of its right edge when it scrolls down, or of its bottom edge when it scrolls sideways, counts as a scrollbar press, not a window drag, because the overlay scrollbar takes no layout width |
 | Page context menu (Back, Reload, Save as, Print, Inspect) | suppressed except in inputs, textareas and editable content, which keep cut, copy and paste; the Pin window keeps its own Copy selection menu |
 | F3, F5, F7, Ctrl + R/F/G/P/S/U/J/H/O/N/T/W, Alt+Left/Right and the browser keys | the default is prevented at capture, so the app's own handlers still run: the Pin window regenerates on F5 and Ctrl+R |
 | Ctrl+Shift+I/J/C (developer tools) | suppressed outside dev builds |
@@ -198,4 +198,6 @@ The prototype on branch `prototype/winui-look` settled these, reviewed by the ow
 - **Links without `href`.** A link carries no `href`, so WebView2 shows no status bar URL and opens no window; Enter opens it, and its URL shows in a tooltip.
 - **Footnote back-references.** Dropped; a footnote shows only its text.
 - **Tailwind.** Removed, since it only styled Streamdown's chrome, which `<Markdown>` replaces; `markdown.css` styles every element.
+- **Scrollbars.** The Fluent overlay scrollbar, as in Edge: thin at rest, and on hover it expands, as Edge's does, with its arrows and track. The owner accepted Edge's hover state on 2026-10-05, replacing the expectation of no arrows and no track.
+- **No dialog.** sidelingo shows no dialog, so the look has no dialog surface and no smoke behind one; the owner decided on 2026-10-05.
 - **Translucent control fills.** Tried, as WinUI uses them: Fluent shares their token with overlays, which then showed the content beneath. Over Mica the opaque values look the same.
