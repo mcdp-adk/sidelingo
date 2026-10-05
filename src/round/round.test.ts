@@ -365,12 +365,11 @@ const pipeline: PipelineRow[] = [
     sent: [structuringRequest(IMAGE_PART), translationRequest("Text in the image")],
   },
   {
-    name: "an image whose Source text is exactly NO_TEXT ends the Round as no text",
+    name: "an image whose Source text is exactly NO_TEXT ends the Round as no text, never showing NO_TEXT",
     input: IMAGE,
-    replies: [[{ content: " \nNO_TEXT\n " }]],
+    replies: [[{ content: " \nNO" }, { content: "_TEXT\n " }]],
     shown: [
       structuring(""),
-      structuring(" \nNO_TEXT\n "),
       {
         stage: "no-text",
         outcome: "no-text",
@@ -379,6 +378,13 @@ const pipeline: PipelineRow[] = [
       },
     ],
     sent: [structuringRequest(IMAGE_PART)],
+  },
+  {
+    name: "an image's Source text that starts like NO_TEXT shows once it differs",
+    input: IMAGE,
+    replies: [[{ content: "NO" }, { content: " entry" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("NO entry", "Translated"),
+    sent: [structuringRequest(IMAGE_PART), translationRequest("NO entry")],
   },
   {
     name: "an image whose Source text only contains NO_TEXT is translated",

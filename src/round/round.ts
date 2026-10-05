@@ -40,6 +40,9 @@ export interface RoundState {
   translation: RoundPane;
 }
 
+/** The Structuring prompt's whole answer for an image without text. */
+const NO_TEXT = "NO_TEXT";
+
 /** Read Frog's fallbacks for the Document Metadata, which a copy never has. */
 const METADATA_FALLBACKS = { webTitle: "No title available", webSummary: "No summary available" };
 
@@ -148,7 +151,9 @@ export async function* run(
         client.streamChat(configuration.provider, structuringMessages(input), signal),
       )) {
         sourceText = cleaned;
-        source = { text: sourceText, status: "streaming" };
+        // An image's answer that may still become NO_TEXT stays hidden, so NO_TEXT never shows as text.
+        const mayBeNoText = input.kind === "image" && NO_TEXT.startsWith(sourceText.trim());
+        source = { text: mayBeNoText ? "" : sourceText, status: "streaming" };
         yield { stage: "structuring", outcome: "running", source, translation };
       }
       if (!sourceText.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
@@ -164,7 +169,7 @@ export async function* run(
       return;
     }
     source = { text: sourceText, status: "done" };
-    if (input.kind === "image" && sourceText.trim() === "NO_TEXT") {
+    if (input.kind === "image" && sourceText.trim() === NO_TEXT) {
       yield {
         stage: "no-text",
         outcome: "no-text",
