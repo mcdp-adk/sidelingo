@@ -61,7 +61,11 @@ input::-ms-clear {
   min-width: 0;
 }
 /* Tabs: WinUI's SelectorBar marks the selected item with a short accent pill, not a full-width underline,
-   and its labels are regular weight, semibold when selected. */
+   shows hover and press by the subtle fill alone, and its labels are regular weight, semibold when selected. */
+:root .fui-Tab:hover::before,
+:root .fui-Tab:active::before {
+  display: none;
+}
 :root .fui-Tab::after {
   left: 50% !important;
   right: auto !important;

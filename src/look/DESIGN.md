@@ -138,7 +138,7 @@ The whole list, in `baseline.css` § 3:
 | Component | Fluent 2 | WinUI |
 | --- | --- | --- |
 | Button, MenuButton, ToggleButton | semibold, 96 px minimum width | regular weight, sized to the content |
-| Tab | a full-width underline under the selected tab, semibold labels | a 16 px accent pill under the label; regular weight, semibold when selected |
+| Tab | a full-width underline under the selected tab and under a hovered or pressed one, semibold labels | a 16 px accent pill under the selected label, and only the subtle fill on hover and press; regular weight, semibold when selected |
 
 ## Markdown
 
