@@ -6,6 +6,7 @@ import {
   makeStyles,
   mergeClasses,
   Button,
+  Dropdown,
   Menu,
   MenuItem,
   MenuList,
@@ -14,7 +15,7 @@ import {
   MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
-  Select,
+  Option,
   Tab,
   TabList,
   Text,
@@ -121,7 +122,7 @@ const useStyles = makeStyles({
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
-  dropdownInput: { minWidth: 0, textOverflow: "ellipsis" },
+  dropdownButton: { minWidth: 0, overflow: "hidden", whiteSpace: "nowrap" },
   actions: { display: "flex", flexShrink: 0 },
   panes: { display: "grid", height: "100%", gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
@@ -179,6 +180,7 @@ export function PinWindow({ session }: { session: Session }) {
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const [pointerNearTop, setPointerNearTop] = useState(false);
+  const [modeListOpen, setModeListOpen] = useState(false);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -193,10 +195,12 @@ export function PinWindow({ session }: { session: Session }) {
       const style = getComputedStyle(bar);
       const spacing =
         parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + (parseFloat(style.columnGap) || 0);
-      setCompact(
+      const compact =
         tabs.current!.getBoundingClientRect().width + actions.current!.getBoundingClientRect().width + spacing >
-          bar.clientWidth,
-      );
+        bar.clientWidth;
+      setCompact(compact);
+      // The dropdown goes with its list open, and reports no closing.
+      if (!compact) setModeListOpen(false);
     };
     const observer = new ResizeObserver(measure);
     [toolbar.current!, tabs.current!, actions.current!].forEach((element) => observer.observe(element));
@@ -249,6 +253,7 @@ export function PinWindow({ session }: { session: Session }) {
     // A hidden window hears no mouseleave, and shows again with neither toolbar nor menu.
     const unlistenHidden = listen("pin-window-hidden", () => {
       setPointerNearTop(false);
+      setModeListOpen(false);
       setMenu(null);
       onPointerCancel();
     });
@@ -443,7 +448,7 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, pointerNearTop && styles.shown)}
+        className={mergeClasses(styles.toolbar, (pointerNearTop || modeListOpen) && styles.shown)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -465,20 +470,23 @@ export function PinWindow({ session }: { session: Session }) {
             ))}
           </TabList>
           {compact && (
-            <Select
+            <Dropdown
               aria-label={strings.displayMode}
               size="small"
               className={styles.dropdown}
-              select={{ className: styles.dropdownInput }}
-              value={mode}
-              onChange={(_, data) => selectMode(data.value as DisplayMode)}
+              button={{ className: styles.dropdownButton }}
+              value={modeLabels[mode]}
+              selectedOptions={[mode]}
+              onOptionSelect={(_, data) => data.optionValue && selectMode(data.optionValue as DisplayMode)}
+              // Its list hangs below the top band, so the toolbar stays while the list is open.
+              onOpenChange={(_, data) => setModeListOpen(data.open)}
             >
               {DISPLAY_MODES.map((value) => (
-                <option key={value} value={value}>
+                <Option key={value} value={value}>
                   {modeLabels[value]}
-                </option>
+                </Option>
               ))}
-            </Select>
+            </Dropdown>
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>
