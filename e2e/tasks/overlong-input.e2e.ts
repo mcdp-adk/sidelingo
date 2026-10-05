@@ -1,6 +1,6 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
-import { FakeProvider } from "../support/provider";
+import { FakeProvider, keepingText } from "../support/provider";
 import { setUpCustomProvider } from "../support/settings";
 
 describe("Task 6: an overlong Input waits for the user", () => {
@@ -14,7 +14,7 @@ describe("Task 6: an overlong Input waits for the user", () => {
 
   it("waits for Process anyway before translating a copy of 10,001 characters", async () => {
     const translation = `The long text, translated ${Date.now()}`;
-    provider.reset([{ delta: { content: translation } }]);
+    provider.reset(keepingText([{ delta: { content: translation } }]));
     clearClipboard();
     await relaunch();
     await setUpCustomProvider(provider.baseUrl);
@@ -30,7 +30,8 @@ describe("Task 6: an overlong Input waits for the user", () => {
     await $("button=Process anyway").click();
     await expect($("p")).toHaveText(translation);
     await expect($("[role=group]")).not.toExist();
-    expect(provider.requests).toHaveLength(1);
-    expect(provider.requests[0].body.messages.at(-1).content).toContain(overlong);
+    // Structuring keeps the text, and Translation carries all of it.
+    expect(provider.requests).toHaveLength(2);
+    expect(provider.requests[1].body.messages.at(-1).content).toContain(overlong);
   });
 });

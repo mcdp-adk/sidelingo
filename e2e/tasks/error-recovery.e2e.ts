@@ -1,6 +1,6 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
-import { FakeProvider, gate } from "../support/provider";
+import { FakeProvider, gate, keepingText } from "../support/provider";
 import { expectNothingFocused, followOpenSettings, replaceTextField, setUpCustomProvider } from "../support/settings";
 
 describe("Task 4: recovering from a Provider error", () => {
@@ -19,10 +19,9 @@ describe("Task 4: recovering from a Provider error", () => {
     const rest = ` and the rest ${stamp}`;
     const held = gate();
     // The Provider takes only the right key.
-    provider.reset(({ headers }) =>
-      headers.authorization === "Bearer right-key"
-        ? [{ delta: { content: first } }, held, { delta: { content: rest } }]
-        : { status: 401, message: rejection },
+    const answer = keepingText([{ delta: { content: first } }, held, { delta: { content: rest } }]);
+    provider.reset((request) =>
+      request.headers.authorization === "Bearer right-key" ? answer(request) : { status: 401, message: rejection },
     );
 
     clearClipboard();
@@ -37,7 +36,7 @@ describe("Task 4: recovering from a Provider error", () => {
     writeClipboardText(line);
     const error = $("[role=group]");
     await expect(error).toHaveText(rejection, { containing: true });
-    await expect(error).toHaveText("Translation failed: Provider HTTP error 401", { containing: true });
+    await expect(error).toHaveText("Structuring failed: Provider HTTP error 401", { containing: true });
     expect(provider.requests).toHaveLength(1);
     expect(provider.requests[0].headers.authorization).toBe("Bearer wrong-key");
 
@@ -65,9 +64,13 @@ describe("Task 4: recovering from a Provider error", () => {
     held.open();
     await expect($("p")).toHaveText(first + rest);
     await expect(copyTranslation).toBeEnabled();
-    expect(provider.requests).toHaveLength(2);
-    expect(provider.requests[1].headers.authorization).toBe("Bearer right-key");
-    expect(provider.requests[1].body.messages.at(-1).content).toContain(line);
+    // Regenerate reran Structuring, then Translation, with the entered key.
+    expect(provider.requests).toHaveLength(3);
+    expect(provider.requests.slice(1).map(({ headers }) => headers.authorization)).toEqual([
+      "Bearer right-key",
+      "Bearer right-key",
+    ]);
+    expect(provider.requests[2].body.messages.at(-1).content).toContain(line);
 
     // The connection drops after some Source text has streamed.
     const partial = `Source text that streamed ${stamp}`;

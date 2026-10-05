@@ -1,6 +1,6 @@
 import { dataFolderLeaks, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
-import { FakeProvider, gate } from "../support/provider";
+import { FakeProvider, gate, keepingText } from "../support/provider";
 import { basicAuthorization, HttpProxy, SocksProxy, StalledProxy } from "../support/proxy";
 import { expectShownOption, replaceTextField, setUpCustomProvider } from "../support/settings";
 
@@ -94,7 +94,8 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
       const third = `Through the SOCKS5 proxy ${stamp}`;
       writeClipboardText(third);
       await expect($("p")).toHaveText(third);
-      expect(provider.requests).toHaveLength(roundsBefore + 1);
+      // Structuring, then Translation.
+      expect(provider.requests).toHaveLength(roundsBefore + 2);
       const endpoint = { host: "127.0.0.1", port: Number(new URL(provider.baseUrl).port) };
       // At least the model list and the Round.
       expect(socks.connections.length).toBeGreaterThanOrEqual(2);
@@ -121,23 +122,25 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
       await expect(failure).not.toExist();
       await browser.keys("Escape");
       let streamingAt = 0;
-      provider.reset([
-        { delta: { content: "slow-start" } },
-        {
-          wait: held.wait,
-          onReached: () => {
-            streamingAt = Date.now();
-            release = setTimeout(() => held.open(), 11_000);
+      provider.reset(
+        keepingText([
+          { delta: { content: "slow-start" } },
+          {
+            wait: held.wait,
+            onReached: () => {
+              streamingAt = Date.now();
+              release = setTimeout(() => held.open(), 11_000);
+            },
           },
-        },
-        { delta: { content: "-finished" } },
-      ]);
+          { delta: { content: "-finished" } },
+        ]),
+      );
       await browser.switchToWindow(pin);
       writeClipboardText(`A slow stream ${stamp}`);
       await expect($("p")).toHaveText("slow-start");
       await expect($("p")).toHaveText("slow-start-finished", { wait: 15_000 });
       expect(Date.now() - streamingAt).toBeGreaterThanOrEqual(11_000);
-      expect(provider.requests).toHaveLength(1);
+      expect(provider.requests).toHaveLength(2);
     } finally {
       clearTimeout(release);
       held.open();

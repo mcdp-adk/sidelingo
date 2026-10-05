@@ -1,6 +1,6 @@
 import { dataFolderLeaks, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardBitmap, writeClipboardText } from "../support/clipboard";
-import { FakeProvider } from "../support/provider";
+import { FakeProvider, keepingText } from "../support/provider";
 import { setUpCustomProvider } from "../support/settings";
 
 describe("Task 13: Rounds leave nothing private behind", () => {
@@ -19,12 +19,14 @@ describe("Task 13: Rounds leave nothing private behind", () => {
     const textResult = `private text result ${stamp}`;
     const imageSource = `private image source ${stamp}`;
     const imageResult = `private image result ${stamp}`;
-    // The image's Structuring returns its Source; each Translation returns its own result.
-    provider.reset(({ body }) => {
-      const content = body.messages.at(-1).content;
-      if (Array.isArray(content)) return [{ delta: { content: imageSource } }];
-      return [{ delta: { content: content.includes(copiedText) ? textResult : imageResult } }];
-    });
+    // The text's Structuring keeps it and the image's returns its Source; each Translation returns its own result.
+    provider.reset(
+      keepingText(({ body }) => {
+        const content = body.messages.at(-1).content;
+        if (Array.isArray(content)) return [{ delta: { content: imageSource } }];
+        return [{ delta: { content: content.includes(copiedText) ? textResult : imageResult } }];
+      }),
+    );
     clearClipboard();
     await relaunch();
     await setUpCustomProvider(provider.baseUrl);

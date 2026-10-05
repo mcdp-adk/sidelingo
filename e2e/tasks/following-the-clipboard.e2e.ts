@@ -9,7 +9,7 @@ import {
   writeClipboardTextAndHold,
   writeClipboardTextWithMarker,
 } from "../support/clipboard";
-import { FakeProvider } from "../support/provider";
+import { FakeProvider, keepingText } from "../support/provider";
 import { setUpCustomProvider } from "../support/settings";
 
 /** A single line, unique to this call, of `words` words: 300 run well past the window's height. */
@@ -31,14 +31,18 @@ describe("Task 5: the window follows the clipboard", () => {
   });
 
   it("follows each copy worth translating, and only those", async () => {
-    provider.reset(({ body }) => [{ delta: { content: translated(body.messages.at(-1).content.split("\n").at(-1)) } }]);
+    provider.reset(
+      keepingText(({ body }) => [{ delta: { content: translated(body.messages.at(-1).content.split("\n").at(-1)) } }]),
+    );
     /** The Translated text, as the window shows it. */
     const shownText = () => $("p");
+    /** The Rounds sent so far: each sends Structuring, then Translation. */
+    const expectRounds = (rounds: number) => expect(provider.requests).toHaveLength(2 * rounds);
     /** The user looks back at the window: nothing has changed and nothing more was sent. */
-    async function expectUnchanged(shown: string, requests: number) {
+    async function expectUnchanged(shown: string, rounds: number) {
       await browser.pause(500);
       await expect(shownText()).toHaveText(translated(shown));
-      expect(provider.requests).toHaveLength(requests);
+      expectRounds(rounds);
     }
 
     clearClipboard();
@@ -49,7 +53,7 @@ describe("Task 5: the window follows the clipboard", () => {
     const first = line(300);
     writeClipboardText(first);
     await expect(shownText()).toHaveText(translated(first));
-    expect(provider.requests).toHaveLength(1);
+    expectRounds(1);
     writeClipboardText(first);
     await expectUnchanged(first, 1);
 
@@ -62,7 +66,7 @@ describe("Task 5: the window follows the clipboard", () => {
     writeClipboardText(newer);
     await expect(shownText()).toHaveText(translated(newer));
     expect((await shownText().getLocation()).y).toBeGreaterThanOrEqual(0);
-    expect(provider.requests).toHaveLength(2);
+    expectRounds(2);
 
     // sidelingo's own Copy translation starts no Round.
     await $("[role=toolbar]").moveTo();
@@ -86,7 +90,7 @@ describe("Task 5: the window follows the clipboard", () => {
     writeClipboardTextWithMarker("CanIncludeInClipboardHistory", 1);
     const allowed = "private copy CanIncludeInClipboardHistory";
     await expect(shownText()).toHaveText(translated(allowed));
-    expect(provider.requests).toHaveLength(3);
+    expectRounds(3);
 
     // Data with no usable text starts no Round.
     for (const write of [
@@ -106,7 +110,7 @@ describe("Task 5: the window follows the clipboard", () => {
     const released = line();
     await writeClipboardTextAndHold(released, 350).finished;
     await expect(shownText()).toHaveText(translated(released));
-    expect(provider.requests).toHaveLength(4);
+    expectRounds(4);
 
     // A pause ignores copies.
     await $("[role=toolbar]").moveTo();
@@ -120,17 +124,17 @@ describe("Task 5: the window follows the clipboard", () => {
     const whileHidden = line();
     writeClipboardText(whileHidden);
     await browser.pause(1000);
-    expect(provider.requests).toHaveLength(4);
+    expectRounds(4);
     await showAgain();
     expect(pinWindowCount()).toBe(1);
     await expect(shownText()).toHaveText(translated(whileHidden));
-    expect(provider.requests).toHaveLength(5);
+    expectRounds(5);
 
     // Hiding the window reset the pause.
     const afterShowing = line();
     writeClipboardText(afterShowing);
     await expect(shownText()).toHaveText(translated(afterShowing));
-    expect(provider.requests).toHaveLength(6);
+    expectRounds(6);
 
     await $("[role=toolbar]").moveTo();
     await $("aria/Close (Esc)").click();

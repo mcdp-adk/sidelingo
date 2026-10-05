@@ -1,6 +1,6 @@
 import { capabilities, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
-import { FakeProvider } from "../support/provider";
+import { FakeProvider, keepingText } from "../support/provider";
 import { openSettings, setUpCustomProvider } from "../support/settings";
 
 describe("Task 7: the Target language", () => {
@@ -14,11 +14,13 @@ describe("Task 7: the Target language", () => {
 
   it("finds Japanese by its own name, regenerates into it with F5 and keeps it after a restart", async () => {
     // The fake Provider names the language it was asked for, as the start of its Translation.
-    provider.reset(({ body }) => {
-      const content: string = body.messages.at(-1).content;
-      const language = /^Translate to (.+):/.exec(content)?.[1];
-      return [{ delta: { content: `${language}: ${content.split("\n").at(-1)}` } }];
-    });
+    provider.reset(
+      keepingText(({ body }) => {
+        const content: string = body.messages.at(-1).content;
+        const language = /^Translate to (.+):/.exec(content)?.[1];
+        return [{ delta: { content: `${language}: ${content.split("\n").at(-1)}` } }];
+      }),
+    );
     clearClipboard();
     await relaunch();
     const { pin, settings } = await setUpCustomProvider(provider.baseUrl);
@@ -40,7 +42,8 @@ describe("Task 7: the Target language", () => {
     await browser.switchToWindow(pin);
     await browser.keys("F5");
     await expect($("p")).toHaveText(`Japanese: ${copied}`);
-    expect(provider.requests).toHaveLength(2);
+    // Two Rounds, each Structuring, then Translation.
+    expect(provider.requests).toHaveLength(4);
 
     // After a restart, the line still in the clipboard is translated into Japanese, and Settings shows it.
     await browser.reloadSession(capabilities());
