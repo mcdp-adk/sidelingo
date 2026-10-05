@@ -1,6 +1,6 @@
 # sidelingo look
 
-sidelingo should look like a Windows 11 app built with WinUI 3. It is built on Fluent UI React v9, which looks like Fluent 2 on the web, so this module maps WinUI's values onto Fluent's tokens (ADR 0007). Values come from [microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml/tree/main/controls/dev): `CommonStyles/Common_themeresources_any.xaml`, `CornerRadius_themeresources.xaml`, `TextBlock_themeresources.xaml`, `HyperlinkButton_themeresources.xaml`, `ContentDialog_themeresources.xaml` and `Materials/Acrylic/AcrylicBrush_themeresources.xaml`. `winui.ts` cites the resource behind each value.
+sidelingo should look like a Windows 11 app built with WinUI 3. It is built on Fluent UI React v9, which looks like Fluent 2 on the web, so this module maps WinUI's values onto Fluent's tokens (ADR 0007). Values come from [microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml/tree/main/controls/dev): `CommonStyles/Common_themeresources_any.xaml`, `CornerRadius_themeresources.xaml`, `TextBlock_themeresources.xaml`, `HyperlinkButton_themeresources.xaml` and `Materials/Acrylic/AcrylicBrush_themeresources.xaml`. `winui.ts` cites the resource behind each value.
 
 ## The rule
 
@@ -41,8 +41,7 @@ Inside the module, in order of preference:
 | Page | text, MessageBars, controls placed on the page | controls opaque, raised: `#2C2C2C` dark, `#F9F9F9` light | control stroke |
 | Card | code blocks | CardBackgroundFillColorDefault (translucent: only Mica is under it) | card stroke, 8 px corners |
 | Toolbar | the Pin window's toolbar, always shown above the results; its tab list subtle: a subtle fill on hover, the pill under the selected Display mode | opaque on the base: `#202020` dark, `#F3F3F3` light | a divider below, no blur |
-| Overlay | menus, dropdown lists, tooltips, dialogs | opaque, raised | flyout stroke, 8 px corners, Fluent's shadow |
-| Smoke | behind a dialog | SmokeFillColorDefault, `#4D000000` | — |
+| Overlay | menus, dropdown lists, tooltips | opaque, raised | flyout stroke, 8 px corners, Fluent's shadow |
 | Paused frame | over the whole Pin window while clipboard monitoring is paused | none | 2 px in the caution colour, 8 px corners |
 
 Only the window layer is transparent. Fluent draws controls and popover surfaces from one family of background tokens (`colorNeutralBackground1` and its siblings), so a translucent control fill makes every overlay translucent too. The token map therefore sets every Fluent background a control or overlay draws on to an opaque value: what WinUI's translucent fill composites to over the window's base.
@@ -86,10 +85,10 @@ Windows gives sidelingo only the accent itself, not its Light1–3 and Dark1–3
 | Thing | Radius | WinUI resource | Fluent token |
 | --- | --- | --- | --- |
 | Controls (buttons, fields, chips, inline code, images) | 4 px | ControlCornerRadius | `borderRadiusMedium` |
-| Overlays (menus, lists, tooltips, dialogs) and cards | 8 px | OverlayCornerRadius | `borderRadiusLarge`, `XLarge` |
+| Overlays (menus, lists, tooltips) and cards | 8 px | OverlayCornerRadius | `borderRadiusLarge`, `XLarge` |
 | Pills (the selected tab's marker) | full | — | `borderRadiusCircular` |
 
-Strokes are 1 px. Shadows are Fluent's per component (tooltip, flyout, dialog), which follow the same depth order as WinUI's.
+Strokes are 1 px. Shadows are Fluent's per component (tooltip, flyout), which follow the same depth order as WinUI's.
 
 ## Type
 
@@ -135,7 +134,7 @@ Hover, pressed, selected and disabled come from the token map. Focus uses WinUI'
 
 ## Overlays
 
-One treatment for every Fluent surface that floats over content, listed in `baseline.css` § 2: the menu popover, popover surface, listbox, tooltip and dialog surface. Each is the raised fill with a SurfaceStrokeColorFlyout outline and 8 px corners, over Fluent's shadow. A dialog has SmokeFillColorDefault behind it.
+One treatment for every Fluent surface that floats over content, listed in `baseline.css` § 2: the menu popover, popover surface, listbox and tooltip. Each is the raised fill with a SurfaceStrokeColorFlyout outline and 8 px corners, over Fluent's shadow. sidelingo shows no dialog, so there is no dialog surface and no smoke.
 
 ## Component overrides
 

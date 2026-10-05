@@ -37,18 +37,13 @@ input::-ms-clear {
 :root .fui-MenuPopover,
 :root .fui-PopoverSurface,
 :root .fui-Listbox,
-:root .fui-Tooltip__content,
-:root .fui-DialogSurface {
+:root .fui-Tooltip__content {
   background-color: var(--look-raised);
   border: 1px solid var(--look-flyout-stroke);
   border-radius: var(--borderRadiusXLarge);
 }
 :root .fui-Tooltip__content {
   color: var(--colorNeutralForeground1);
-}
-/* SmokeFillColorDefault behind a dialog. */
-:root .fui-DialogSurface__backdrop {
-  background-color: var(--look-smoke);
 }
 
 /* 3. Component overrides: where a Fluent 2 default differs from WinUI and no token reaches it.

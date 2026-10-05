@@ -4,7 +4,6 @@
 // - HyperlinkButton_themeresources.xaml: the link's colours by state;
 // - CornerRadius_themeresources.xaml: ControlCornerRadius, OverlayCornerRadius;
 // - TextBlock_themeresources.xaml: the type ramp and its font;
-// - ContentDialog_themeresources.xaml: the smoke behind a dialog;
 // - Materials/Acrylic/AcrylicBrush_themeresources.xaml: AcrylicInAppFillColorDefault's fallback colour.
 import { createDarkTheme, createLightTheme, type BrandVariants, type Theme } from "@fluentui/react-components";
 
@@ -28,7 +27,6 @@ const WINUI = {
     SubtleFillColorTertiary: "rgba(255, 255, 255, 0.039)", // #0AFFFFFF
     FocusStrokeColorOuter: "#ffffff",
     FocusStrokeColorInner: "rgba(0, 0, 0, 0.702)", // #B3000000
-    SmokeFillColorDefault: "rgba(0, 0, 0, 0.302)", // #4D000000
     SystemFillColorCaution: "#fce100",
     SystemFillColorCautionBackground: "#433519",
     SystemFillColorCritical: "#ff99a4",
@@ -52,7 +50,6 @@ const WINUI = {
     SubtleFillColorTertiary: "rgba(0, 0, 0, 0.024)", // #06000000
     FocusStrokeColorOuter: "rgba(0, 0, 0, 0.894)", // #E4000000
     FocusStrokeColorInner: "rgba(255, 255, 255, 0.702)", // #B3FFFFFF
-    SmokeFillColorDefault: "rgba(0, 0, 0, 0.302)", // #4D000000
     SystemFillColorCaution: "#9d5d00",
     SystemFillColorCautionBackground: "#fff4ce",
     SystemFillColorCritical: "#c42b1c",
@@ -95,7 +92,6 @@ export function lookVariables(scheme: Scheme): Record<string, string> {
   return {
     "--look-raised": SURFACES[scheme].raised,
     "--look-flyout-stroke": winui.SurfaceStrokeColorFlyout,
-    "--look-smoke": winui.SmokeFillColorDefault,
     "--look-card": winui.CardBackgroundFillColorDefault,
     "--look-card-stroke": winui.CardStrokeColorDefault,
   };
