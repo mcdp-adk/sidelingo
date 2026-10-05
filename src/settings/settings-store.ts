@@ -1,0 +1,129 @@
+import { useSyncExternalStore } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
+import { PRESETS, PRESET_REGISTRY, type Preset } from "../provider/presets";
+import {
+  readEnteredKeys,
+  readKeyEnvironment,
+  unprotectSecret,
+  type EnteredKeys,
+  type KeyEnvironmentSnapshot,
+  type KeySourcesSnapshot,
+} from "../provider/credentials";
+import { strings } from "../i18n";
+
+let settings: Settings = DEFAULT_SETTINGS;
+let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;
+let keyEnvironment: KeyEnvironmentSnapshot = Object.fromEntries(
+  PRESETS.map((preset) => PRESET_REGISTRY[preset].keyVariable)
+    .filter((variable): variable is NonNullable<typeof variable> => variable !== null)
+    .map((variable) => [variable, null]),
+) as KeyEnvironmentSnapshot;
+let proxyPassword: string | null = null;
+let revision = 0;
+let pending = Promise.resolve();
+const subscribers = new Set<() => void>();
+
+function accept(document: unknown): Promise<void> {
+  const current = ++revision;
+  const parsed = parseSettings(document);
+  const next = parsed ?? DEFAULT_SETTINGS;
+  pending = Promise.all([readEnteredKeys(next), unprotectSecret(next.proxy.passwordCiphertext)]).then(
+    ([keys, password]) => {
+      // A later document must not be replaced by an older, slower decryption.
+      if (current !== revision) return;
+      settings = next;
+      enteredKeys = keys;
+      proxyPassword = password;
+      for (const notify of subscribers) notify();
+    },
+  );
+  return pending;
+}
+
+type SettingsRead = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
+
+/** Both windows subscribe before reading, so a concurrent patch cannot be missed. */
+export async function startSettingsStore(): Promise<void> {
+  let changed = false;
+  await listen("settings-document-changed", ({ payload }) => {
+    changed = true;
+    void accept(payload);
+  });
+  keyEnvironment = await readKeyEnvironment();
+  const stored = await invoke<SettingsRead>("read_settings");
+  if (!changed) {
+    let document: unknown;
+    let brokenReason: "invalidJson" | "schema" | undefined;
+    if (stored.status === "invalidJson") {
+      brokenReason = "invalidJson";
+    } else if (stored.status === "document") {
+      document = stored.document;
+      if (document === null || parseSettings(document) === null) {
+        brokenReason = "schema";
+        document = undefined;
+      }
+    }
+    let quarantined = false;
+    if (brokenReason) {
+      quarantined = await invoke<boolean>("set_aside_broken_settings", {
+        reason: brokenReason,
+        expectedDocument: stored.status === "document" ? stored.document : null,
+      }).catch((error) => {
+        console.error("Could not set aside broken settings:", error);
+        return false;
+      });
+    }
+    if (!changed) accept(document);
+    if (quarantined && !changed) {
+      void invoke("show_native_notification", {
+        title: strings.settingsRecoveredTitle,
+        body: strings.settingsRecoveredBody,
+        target: null,
+      }).catch((error) => console.error("Could not show settings recovery notification:", error));
+    }
+  }
+  await waitForSettings();
+}
+
+/** Waits for the newest document's settings and decrypted credentials to publish together. */
+export async function waitForSettings(): Promise<void> {
+  let latest: Promise<void>;
+  do {
+    latest = pending;
+    await latest;
+  } while (latest !== pending);
+}
+
+export function currentSettings(): Settings {
+  return settings;
+}
+
+export function currentEnteredKey(preset: Preset | null): string | null {
+  return preset ? enteredKeys[preset] : null;
+}
+
+export function currentKeySources(preset: Preset | null): KeySourcesSnapshot {
+  const variable = preset ? PRESET_REGISTRY[preset].keyVariable : null;
+  return {
+    enteredKey: currentEnteredKey(preset),
+    ...(variable ? { environment: { [variable]: keyEnvironment[variable] } } : {}),
+  };
+}
+
+export function currentProxyPassword(): string | null {
+  return proxyPassword;
+}
+
+export function useSettings(): Settings {
+  return useSyncExternalStore((notify) => {
+    subscribers.add(notify);
+    return () => subscribers.delete(notify);
+  }, currentSettings);
+}
+
+/** Rust merges only the changed fields, preserving concurrent changes from the other window. */
+export async function patchSettings(patch: Record<string, unknown>): Promise<void> {
+  await invoke("patch_settings", { patch: { schemaVersion: SCHEMA_VERSION, ...patch } });
+}

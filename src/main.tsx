@@ -2,43 +2,45 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { fetch } from "@tauri-apps/plugin-http";
 import { FluentProvider } from "@fluentui/react-components";
 import "./global.css";
 import { strings, uiLanguage } from "./i18n";
-import { PinWindow } from "./PinWindow";
-import { SettingsWindow } from "./SettingsWindow";
-import { startSession } from "./session";
-import { currentSettings, startSettingsStore } from "./settings-store";
+import { PinWindow } from "./pin-window/PinWindow";
+import { SettingsWindow } from "./settings-window/SettingsWindow";
+import { createSession, type Session } from "./session/session";
+import { currentSettings, startSettingsStore } from "./settings/settings-store";
 import { useSystemTheme } from "./theme";
-import { startUpdateChecks, startUpdateStatus } from "./updates";
+import { startUpdateChecks, startUpdateStatus } from "./updates/updates";
 
 /** Windows' default accent, for when the system's can't be read. */
 const DEFAULT_ACCENT = "#0078d4";
 
 document.documentElement.lang = uiLanguage;
-const isSettingsWindow = getCurrentWindow().label === "settings";
 
-function App({ accent }: { accent: string }) {
+function App({ accent, session }: { accent: string; session: Session | null }) {
   const theme = useSystemTheme(accent);
   return (
     // Transparent, so the window's Mica shows through.
     <FluentProvider theme={theme} style={{ background: "transparent" }}>
-      {isSettingsWindow ? <SettingsWindow /> : <PinWindow />}
+      {session ? <PinWindow session={session} /> : <SettingsWindow />}
     </FluentProvider>
   );
 }
 
 const accent = (await invoke<string | null>("accent_color")) ?? DEFAULT_ACCENT;
 await startSettingsStore();
-if (isSettingsWindow) await startUpdateStatus();
+// The Round, and so the Session, runs only in the Pin webview; the settings window has none.
+const session = getCurrentWindow().label === "settings" ? null : createSession(fetch);
+if (!session) await startUpdateStatus();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App accent={accent} />
+    <App accent={accent} session={session} />
   </StrictMode>,
 );
 
-if (!isSettingsWindow) {
+if (session) {
   const hotkey = currentSettings().hotkey;
   await invoke("register_hotkey", { hotkey }).catch((reason) => {
     console.error(reason);
@@ -48,6 +50,6 @@ if (!isSettingsWindow) {
       target: "hotkey",
     }).catch((error) => console.error("Could not show hotkey registration notification:", error));
   });
-  await startSession();
+  await session.start();
   await startUpdateChecks();
 }

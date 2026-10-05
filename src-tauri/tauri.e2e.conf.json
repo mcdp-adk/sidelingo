@@ -1,3 +1,9 @@
 {
-  "identifier": "io.github.mcdp-adk.sidelingo.e2e"
+  "identifier": "io.github.mcdp-adk.sidelingo.e2e",
+  "plugins": {
+    "updater": {
+      "endpoints": ["http://127.0.0.1:47561/latest.json"],
+      "dangerousInsecureTransportProtocol": true
+    }
+  }
 }

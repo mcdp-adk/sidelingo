@@ -13,8 +13,10 @@
     "format:check": "prettier --check .",
     "tauri": "tauri",
     "build:local-installer": "tauri build --config src-tauri/tauri.local.conf.json",
-    "test:provider": "vitest run src/provider.test.ts",
-    "test:e2e": "wdio run e2e/wdio.conf.ts"
+    "test": "vitest run",
+    "test:e2e": "wdio run e2e/wdio.conf.ts",
+    "check:tasks": "node scripts/check-tasks.mjs",
+    "test:real": "vitest run --config vitest.real.config.ts"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",
@@ -42,7 +44,6 @@
     "@wdio/spec-reporter": "^9",
     "@wdio/types": "^9.32.0",
     "prettier": "^3.9.9",
-    "proxy-from-env": "1.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
