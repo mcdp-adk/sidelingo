@@ -41,9 +41,13 @@ describe("Task 4: recovering from a Provider error", () => {
     expect(provider.requests).toHaveLength(1);
     expect(provider.requests[0].headers.authorization).toBe("Bearer wrong-key");
 
-    // Settings, still open from the setup, comes back on Provider with nothing focused.
+    // Settings, still open from the setup and since scrolled down to About, comes back on Provider with nothing focused.
+    await browser.switchToWindow(settings);
+    await $("h2=About").scrollIntoView();
+    await expect($("h2=Provider")).not.toBeDisplayedInViewport();
+    await browser.switchToWindow(pin);
     expect((await followOpenSettings()).settings).toBe(settings);
-    await expect($("h2=Provider")).toBeDisplayed();
+    await expect($("h2=Provider")).toBeDisplayedInViewport();
     await expectNothingFocused();
     await replaceTextField("Key", "right-key");
     await browser.keys("Enter");
