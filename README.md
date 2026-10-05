@@ -35,7 +35,7 @@ pnpm tauri dev
 - `.github/`: the CI and release workflows.
 - `docs/`: architecture decision records (`docs/adr/`), agent guides (`docs/agents/`), and the desktop checklist (`docs/desktop-checklist.md`).
 - `e2e/`: the user task tests (`e2e/tasks/`, one file per task) and their harness (`e2e/support/`).
-- `scripts/`: build scripts, such as the third-party notice generator.
+- `scripts/`: build and check scripts, such as the third-party notice generator and the task test check (`check-tasks.mjs`).
 - `src/`: the front end. Its shared files (`main.tsx`, `global.css`, `i18n.ts`, `theme.ts`, `languages.ts`) sit at the top, and each concept from `GLOSSARY.md` has a folder:
   - `src/round/`: the Round pipeline and its prompts.
   - `src/session/`: following Inputs, reuse, cancellation and pause.
