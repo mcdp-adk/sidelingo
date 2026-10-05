@@ -1,6 +1,7 @@
 import { capabilities, relaunch } from "../support/app";
 import { clearClipboard } from "../support/clipboard";
 import { basicAuthorization, HttpProxy, SocksProxy } from "../support/proxy";
+import { chooseOption } from "../support/dropdown";
 import { openSettings, replaceTextField } from "../support/settings";
 import { FakeUpdateEndpoint } from "../support/updates";
 
@@ -46,7 +47,7 @@ describe("Task 12: update checks", () => {
 
       // A Manual proxy that refuses the check: Check now says why it failed.
       await openSettings();
-      await $("aria/Proxy mode").selectByVisibleText("Manual");
+      await chooseOption("Proxy mode", "Manual");
       await replaceTextField("Proxy URL", manual.url);
       await browser.keys("Enter");
       await clickCheckNow();
