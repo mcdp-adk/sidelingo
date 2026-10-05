@@ -2,9 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const DAY = 24 * 60 * 60 * 1_000;
 
-/** Lets the core finish what a timer started, such as a check and the status it publishes. */
-const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
-
 interface Row {
   name: string;
   /** Whether automatic checks are on in the stored document. */
@@ -49,6 +46,7 @@ describe("Automatic update checks", () => {
     // Each row starts a fresh Pin webview, with no check left over from another row.
     vi.resetModules();
     const harness = await import("../testing/core");
+    const { settle } = harness;
     const document = harness.customSettings({}, { automaticUpdates });
     const core = await harness.startCore({
       settings: document,

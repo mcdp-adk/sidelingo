@@ -57,6 +57,13 @@ export interface Core {
   roundEnds(): Promise<RoundState>;
 }
 
+/**
+ * Lets anything the core does next happen before a test looks, such as a request it shouldn't send.
+ * The core's own work chains promises (the IPC mocks and the fake Provider's streams included), and
+ * no timer of its own is involved, so one macrotask runs only after all of it has finished.
+ */
+export const settle = () => new Promise<void>((resolve) => setTimeout(resolve));
+
 const toInput = (input: Input | string): Input => (typeof input === "string" ? { kind: "text", text: input } : input);
 
 /**
@@ -131,8 +138,7 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     until,
     roundEnds: async () => {
       await until((state) => state.round !== null && state.round.state.outcome !== "running");
-      // Let anything the core does next happen before the test looks, such as a request it shouldn't send.
-      await new Promise((resolve) => setTimeout(resolve));
+      await settle();
       return session.state().round!.state;
     },
   };

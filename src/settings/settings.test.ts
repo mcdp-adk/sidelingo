@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationFailure } from "./settings";
-import { customSettings, startCore } from "../testing/core";
+import { customSettings, settle, startCore } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
 const UNDECRYPTABLE = "bm90LWEtRFBBUEktY2lwaGVydGV4dA==";
@@ -9,9 +9,6 @@ const CUSTOM_CHAT = "https://provider.test/v1/chat/completions";
 
 /** What one copy leads to: the readiness failure the Session publishes, or the request it sends. */
 type Outcome = { failure: ConfigurationFailure } | { sent: { url: string; authorization: string | null } };
-
-/** Lets anything the core does next happen, such as a request it shouldn't send. */
-const settle = () => new Promise((resolve) => setTimeout(resolve));
 
 /** Copies a line and waits until the Session either publishes a readiness failure or ends the Round. */
 async function copyOnce(core: Awaited<ReturnType<typeof startCore>>): Promise<Outcome> {

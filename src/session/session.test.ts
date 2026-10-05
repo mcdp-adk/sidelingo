@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customSettings, startCore, type Core, type SentRequest } from "../testing/core";
+import { customSettings, settle, startCore, type Core, type SentRequest } from "../testing/core";
 
 const OVERLONG = "x".repeat(10_001);
 const LONGEST = "a".repeat(10_000);
@@ -11,9 +11,6 @@ function held(partial: string, rest: string) {
   const wait = new Promise<void>((resolve) => (release = resolve));
   return { reply: [{ content: partial }, { wait }, { content: rest }], release };
 }
-
-/** Lets anything the Session does next happen, such as a request it shouldn't send. */
-const settle = () => new Promise((resolve) => setTimeout(resolve));
 
 /**
  * Resolves once the shown Round has stopped running with this Translated text, and the Session has
