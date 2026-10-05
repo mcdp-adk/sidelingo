@@ -26,7 +26,6 @@ describe("Task 4: recovering from a Provider error", () => {
 
     clearClipboard();
     await relaunch();
-    await $("[role=toolbar]").moveTo();
     for (const name of ["Regenerate (Ctrl+R / F5)", "Copy source", "Copy translation"]) {
       await expect($(`aria/${name}`)).toBeDisabled();
     }
@@ -56,7 +55,6 @@ describe("Task 4: recovering from a Provider error", () => {
     await browser.keys(["Control", "r"]);
     await expect($("p")).toHaveText(first);
     await expect(error).not.toExist();
-    await $("[role=toolbar]").moveTo();
     await expect($("aria/Copy source")).toBeEnabled();
     await expect($("aria/Regenerate (Ctrl+R / F5)")).toBeEnabled();
     const copyTranslation = $("aria/Copy translation");

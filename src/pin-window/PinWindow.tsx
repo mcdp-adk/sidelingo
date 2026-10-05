@@ -14,7 +14,6 @@ import {
   MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
-  Select,
   Tab,
   TabList,
   Text,
@@ -31,9 +30,10 @@ import {
   PauseRegular,
   SettingsRegular,
 } from "@fluentui/react-icons";
-import { Streamdown } from "streamdown";
-import { cjk } from "@streamdown/cjk";
 import { strings } from "../i18n";
+import { ChoiceDropdown } from "../look/ChoiceDropdown";
+import { useLayerStyles } from "../look/layers";
+import { Markdown } from "../look/Markdown";
 import type { RoundError } from "../round/round";
 import { useSession, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
@@ -41,13 +41,12 @@ import { patchSettings, useSettings } from "../settings/settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
-/** How long the scrollbar stays after the last scroll or pointer movement, in milliseconds. */
-const SCROLLBAR_LINGER = 1000;
 /** Includes trailing scroll events after a wheel, key or pointer release. */
 const SCROLL_INTENT_LINGER = 400;
+/** How far from a scroller's right or bottom edge a press reaches its overlay scrollbar, which takes no layout width. */
+const SCROLLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
-const plugins = { cjk };
 const modeLabels: Record<DisplayMode, string> = {
   source: strings.sourceMode,
   translation: strings.translationMode,
@@ -85,42 +84,15 @@ function configurationFailureMessage(failure: ConfigurationFailure): string {
 }
 
 const useStyles = makeStyles({
-  root: { position: "relative", height: "100vh", overflow: "hidden" },
-  paused: {
-    "::after": {
-      content: '""',
-      position: "absolute",
-      inset: 0,
-      border: `2px solid ${tokens.colorStatusWarningBorder2}`,
-      borderRadius: tokens.borderRadiusXLarge,
-      pointerEvents: "none",
-    },
-  },
-  // Overlays the content with no reserved space, shown while the pointer is over the window.
-  toolbar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    justifyContent: "space-between",
-    columnGap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-    backdropFilter: "blur(20px)",
-    opacity: 0,
-    transitionProperty: "opacity",
-    transitionDuration: tokens.durationNormal,
-    transitionTimingFunction: tokens.curveEasyEase,
-    // Keyboard focus shows it too; a mouse click leaves it to fade with the pointer.
-    ":has(:focus-visible)": { opacity: 1 },
-  },
-  shown: { opacity: 1 },
+  root: { position: "relative", display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" },
+  // Always shown above the text, which starts below its divider.
+  toolbar: { flexShrink: 0, justifyContent: "space-between", columnGap: tokens.spacingHorizontalXS },
   modeControls: { position: "relative", flexGrow: 1, minWidth: 0 },
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
-  dropdownInput: { minWidth: 0, textOverflow: "ellipsis" },
   actions: { display: "flex", flexShrink: 0 },
-  panes: { display: "grid", height: "100%", gridTemplateColumns: "minmax(0, 1fr)" },
+  panes: { display: "grid", flexGrow: 1, minHeight: 0, gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
   rows: { gridTemplateRows: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
   divider: { backgroundColor: tokens.colorNeutralStroke2 },
@@ -135,9 +107,6 @@ const useStyles = makeStyles({
     // Long paths and URLs wrap; only code blocks scroll sideways, inside themselves.
     overflowWrap: "anywhere",
     cursor: "default",
-    // A thin, rounded Fluent scrollbar with no arrow buttons, shown only while in use.
-    "::-webkit-scrollbar": { width: "6px" },
-    "::-webkit-scrollbar-thumb": { borderRadius: tokens.borderRadiusCircular },
   },
   status: {
     overflow: "hidden",
@@ -145,25 +114,36 @@ const useStyles = makeStyles({
     textOverflow: "ellipsis",
   },
   errorDetail: { whiteSpace: "pre-wrap" },
-  source: { color: tokens.colorNeutralForeground3 },
-  scrollbarShown: { "::-webkit-scrollbar-thumb": { backgroundColor: tokens.colorNeutralForeground3 } },
 });
 
-/** A press on the content's own scrollbar, which drags the thumb rather than the window. */
+/**
+ * A press on a scrollbar in the content, the pane's own or a code block's or table's, which drags the thumb rather
+ * than the window: the press lands on the scroller itself, near its right edge if it scrolls down or its bottom edge
+ * if it scrolls sideways.
+ */
 function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
-  const content = e.currentTarget;
-  return e.target === content && e.clientX - content.getBoundingClientRect().left >= content.clientWidth;
+  const scroller = e.target;
+  if (!(scroller instanceof HTMLElement)) return false;
+  const { overflowX, overflowY } = getComputedStyle(scroller);
+  const scrolls = (overflow: string) => overflow === "auto" || overflow === "scroll";
+  const box = scroller.getBoundingClientRect();
+  return (
+    (scrolls(overflowY) && scroller.scrollHeight > scroller.clientHeight && box.right - e.clientX <= SCROLLBAR_REACH) ||
+    (scrolls(overflowX) && scroller.scrollWidth > scroller.clientWidth && box.bottom - e.clientY <= SCROLLBAR_REACH)
+  );
 }
 
 /** Inline controls keep their normal pointer behavior rather than moving or hiding the window. */
 function interactiveTarget(target: EventTarget): boolean {
   return (
-    target instanceof Element && target.closest("button, a[href], input, select, textarea, [role=button]") !== null
+    target instanceof Element &&
+    target.closest("button, a[href], input, select, textarea, [role=button], [role=link]") !== null
   );
 }
 
 export function PinWindow({ session }: { session: Session }) {
   const styles = useStyles();
+  const layers = useLayerStyles();
   const { round, hasInput, paused, overlong, configurationFailure } = useSession(session);
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
@@ -175,9 +155,6 @@ export function PinWindow({ session }: { session: Session }) {
   const scrollDriver = useRef<{ index: number; until: number } | null>(null);
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
-  const [pointerOver, setPointerOver] = useState(false);
-  const [scrollbarShown, setScrollbarShown] = useState(false);
-  const scrollbarTimer = useRef<number>(undefined);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -192,10 +169,10 @@ export function PinWindow({ session }: { session: Session }) {
       const style = getComputedStyle(bar);
       const spacing =
         parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + (parseFloat(style.columnGap) || 0);
-      setCompact(
+      const compact =
         tabs.current!.getBoundingClientRect().width + actions.current!.getBoundingClientRect().width + spacing >
-          bar.clientWidth,
-      );
+        bar.clientWidth;
+      setCompact(compact);
     };
     const observer = new ResizeObserver(measure);
     [toolbar.current!, tabs.current!, actions.current!].forEach((element) => observer.observe(element));
@@ -245,9 +222,8 @@ export function PinWindow({ session }: { session: Session }) {
       pressedAt.current = null;
       scrollDriver.current = null;
     };
-    // A hidden window hears no mouseleave, and shows again with neither toolbar nor menu.
+    // A hidden window shows again with no menu.
     const unlistenHidden = listen("pin-window-hidden", () => {
-      setPointerOver(false);
       setMenu(null);
       onPointerCancel();
     });
@@ -257,7 +233,6 @@ export function PinWindow({ session }: { session: Session }) {
     window.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("blur", onPointerCancel);
     return () => {
-      clearTimeout(scrollbarTimer.current);
       void unlistenHidden.then((unlisten) => unlisten());
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousemove", onMouseMove);
@@ -273,14 +248,7 @@ export function PinWindow({ session }: { session: Session }) {
     contents.current.forEach((content) => content?.scrollTo({ top: 0 }));
   }, [round?.id]);
 
-  const showScrollbar = () => {
-    setScrollbarShown(true);
-    clearTimeout(scrollbarTimer.current);
-    scrollbarTimer.current = setTimeout(() => setScrollbarShown(false), SCROLLBAR_LINGER);
-  };
-
   const onScroll = (index: number) => {
-    showScrollbar();
     const driver = scrollDriver.current;
     if (mode !== "both" || driver?.index !== index || performance.now() >= driver.until) return;
     const content = contents.current[index]!;
@@ -334,7 +302,7 @@ export function PinWindow({ session }: { session: Session }) {
         role="region"
         aria-label={modeLabels[kind]}
         tabIndex={0}
-        className={mergeClasses(styles.content, scrollbarShown && styles.scrollbarShown)}
+        className={styles.content}
         onWheel={() => markScrollIntent(index)}
         onKeyDown={(e) => {
           if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", " "].includes(e.key)) {
@@ -342,11 +310,10 @@ export function PinWindow({ session }: { session: Session }) {
           }
         }}
         onScroll={() => onScroll(index)}
-        onMouseMove={showScrollbar}
         onMouseDown={(e) => {
           if (onScrollbar(e)) {
-            // A native thumb drag owns scrolling until mouse-up, however long it is held.
-            if (e.button === 0) scrollDriver.current = { index, until: Infinity };
+            // A native thumb drag on the pane's own scrollbar owns its scrolling until mouse-up, however long it is held.
+            if (e.button === 0 && e.target === e.currentTarget) scrollDriver.current = { index, until: Infinity };
           } else onDragMouseDown(e);
         }}
         onClick={onClick}
@@ -384,16 +351,14 @@ export function PinWindow({ session }: { session: Session }) {
             </MessageBar>
           ) : (
             <>
-              {result.text && <Streamdown plugins={plugins}>{result.text}</Streamdown>}
+              {result.text && <Markdown text={result.text} />}
               {!result.text && state.outcome === "running" && (
                 <Text as="p" block className={styles.status}>
                   {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
                 </Text>
               )}
               {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
-                <div className={styles.source}>
-                  <Streamdown plugins={plugins}>{state.source.text}</Streamdown>
-                </div>
+                <Markdown text={state.source.text} muted />
               )}
               {result.error && (
                 <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
@@ -429,27 +394,10 @@ export function PinWindow({ session }: { session: Session }) {
   };
 
   return (
-    <div
-      ref={root}
-      className={mergeClasses(styles.root, paused && styles.paused)}
-      onMouseEnter={() => setPointerOver(true)}
-      onMouseLeave={() => setPointerOver(false)}
-      onContextMenu={onContextMenu}
-    >
-      <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
-        {mode === "both" ? (
-          <>
-            {pane("source")}
-            <div role="separator" aria-orientation={tall ? "horizontal" : "vertical"} className={styles.divider} />
-            {pane("translation")}
-          </>
-        ) : (
-          pane(mode)
-        )}
-      </div>
+    <div ref={root} className={mergeClasses(styles.root, paused && layers.pausedFrame)} onContextMenu={onContextMenu}>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
+        className={mergeClasses(layers.toolbar, styles.toolbar)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -459,6 +407,7 @@ export function PinWindow({ session }: { session: Session }) {
             className={mergeClasses(styles.tabs, compact && styles.measuringTabs)}
             aria-hidden={compact || undefined}
             inert={compact}
+            appearance="subtle"
             size="small"
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
@@ -470,20 +419,15 @@ export function PinWindow({ session }: { session: Session }) {
             ))}
           </TabList>
           {compact && (
-            <Select
+            <ChoiceDropdown
               aria-label={strings.displayMode}
               size="small"
               className={styles.dropdown}
-              select={{ className: styles.dropdownInput }}
+              choices={DISPLAY_MODES}
               value={mode}
-              onChange={(_, data) => selectMode(data.value as DisplayMode)}
-            >
-              {DISPLAY_MODES.map((value) => (
-                <option key={value} value={value}>
-                  {modeLabels[value]}
-                </option>
-              ))}
-            </Select>
+              labelOf={(value) => modeLabels[value]}
+              onChoose={selectMode}
+            />
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>
@@ -536,6 +480,17 @@ export function PinWindow({ session }: { session: Session }) {
           </Tooltip>
         </div>
       </Toolbar>
+      <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
+        {mode === "both" ? (
+          <>
+            {pane("source")}
+            <div role="separator" aria-orientation={tall ? "horizontal" : "vertical"} className={styles.divider} />
+            {pane("translation")}
+          </>
+        ) : (
+          pane(mode)
+        )}
+      </div>
       <Menu
         open={menu !== null}
         onOpenChange={(_, { open }) => open || setMenu(null)}

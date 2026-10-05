@@ -1,7 +1,8 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate, keepingText } from "../support/provider";
-import { expectShownOption, replaceTextField, switchToSettingsWindow } from "../support/settings";
+import { chooseOption, expectChosen } from "../support/dropdown";
+import { replaceTextField, switchToSettingsWindow } from "../support/settings";
 
 // The WebView's language stands in for Windows' display language, which picks the UI language.
 const locales = [
@@ -63,14 +64,13 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await switchToSettingsWindow(pin);
       await expect($("h1")).toHaveText(ui.settings);
       await expect($(`h2=${ui.provider}`)).toBeDisplayed();
-      const preset = $(`aria/${ui.preset}`);
-      await expectShownOption(preset, ui.chooseProvider);
+      await expectChosen(ui.preset, ui.chooseProvider);
 
-      await preset.selectByVisibleText(ui.custom);
+      await chooseOption(ui.preset, ui.custom);
       // Leaving the Base URL field with Tab commits it, as Enter does.
       await replaceTextField("Base URL", provider.baseUrl);
       await browser.keys("Tab");
-      await $(`aria/${ui.reasoningEffort}`).selectByVisibleText("low");
+      await chooseOption(ui.reasoningEffort, "low");
       // The Provider's models are offered once the Base URL is committed; the user types a Model of their own,
       // commits it with Enter and copies straight away.
       await $(`aria/${ui.model}`).click();
@@ -82,7 +82,6 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       const line = `A line copied after setup ${stamp}`;
       writeClipboardText(line);
       await expect($("p")).toHaveText(first);
-      await $("[role=toolbar]").moveTo();
       const copyTranslation = $(`aria/${ui.copyTranslation}`);
       await expect(copyTranslation).toBeDisabled();
       held.open();

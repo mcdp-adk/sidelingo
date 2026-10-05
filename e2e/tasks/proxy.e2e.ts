@@ -2,7 +2,8 @@ import { dataFolderLeaks, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate, keepingText } from "../support/provider";
 import { basicAuthorization, HttpProxy, SocksProxy, StalledProxy } from "../support/proxy";
-import { expectShownOption, replaceTextField, setUpCustomProvider } from "../support/settings";
+import { chooseOption, expectChosen } from "../support/dropdown";
+import { replaceTextField, setUpCustomProvider } from "../support/settings";
 
 describe("Task 9: Provider traffic goes through the chosen proxy", () => {
   let provider: FakeProvider;
@@ -41,7 +42,7 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
       // System mode, the default, follows the proxy environment present at launch.
       const { pin, settings } = await setUpCustomProvider(provider.baseUrl);
       await browser.switchToWindow(settings);
-      await expectShownOption($("aria/Proxy mode"), "System");
+      await expectChosen("Proxy mode", "System");
       await $("aria/Model").click();
       await expect($("aria/through-system")).toBeDisplayed();
       await browser.keys("Escape");
@@ -62,7 +63,7 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
       // A Manual HTTP proxy with credentials carries the model list and the Round.
       provider.models({ ids: ["through-manual-http"] });
       await browser.switchToWindow(settings);
-      await $("aria/Proxy mode").selectByVisibleText("Manual");
+      await chooseOption("Proxy mode", "Manual");
       await replaceTextField("Proxy URL", manual.url);
       await browser.keys("Enter");
       await replaceTextField("Proxy username", credentials.username);
@@ -116,7 +117,7 @@ describe("Task 9: Provider traffic goes through the chosen proxy", () => {
 
       // Back in System mode the list comes again, and a stream longer than that limit still finishes.
       provider.models({ ids: ["after-mode-change"] });
-      await $("aria/Proxy mode").selectByVisibleText("System");
+      await chooseOption("Proxy mode", "System");
       await $("aria/Model").click();
       await expect($("aria/after-mode-change")).toBeDisplayed();
       await expect(failure).not.toExist();

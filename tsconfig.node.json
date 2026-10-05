@@ -8,6 +8,7 @@
     "moduleResolution": "bundler",
     "types": ["node", "@wdio/globals/types", "@wdio/mocha-framework"],
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "skipLibCheck": true,
     "strict": true,

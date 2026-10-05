@@ -1,4 +1,4 @@
-use crate::{autostart, clipboard};
+use crate::{autostart, clipboard, look};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::utils::config::WindowEffectsConfig;
@@ -20,9 +20,11 @@ use windows::{
 pub const LABEL: &str = "pin";
 pub const STATE_FLAGS: StateFlags = StateFlags::SIZE.union(StateFlags::POSITION);
 static MINIMUM_SIZE: Mutex<Option<PhysicalSize<u32>>> = Mutex::new(None);
-const MIN_WIDTH: f64 = 230.0;
-/// Room for the toolbar and a few lines.
-const MIN_HEIGHT: f64 = 120.0;
+/// The compact toolbar whole: its Display mode dropdown showing its longest label, in English
+/// or Chinese, with its arrow, beside every action button (`src/look/DESIGN.md` → Minimum size).
+const MIN_WIDTH: f64 = 264.0;
+/// The toolbar and, below it, the tallest notice: an error with a one-line detail and Open settings.
+const MIN_HEIGHT: f64 = 172.0;
 /// Set once the front end listens for Inputs, so the first `show` reaches it.
 static READY: AtomicBool = AtomicBool::new(false);
 
@@ -60,7 +62,8 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 /// Creates the Pin window, hidden until its front end is ready. It lives as long
 /// as the process and only ever hides.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default());
+    let window =
+        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()));
 
     #[cfg(not(feature = "desktop-dev"))]
     let window = {
@@ -118,6 +121,21 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         })
         .build()?;
     update_minimum_size(&window)?;
+    grow_to_minimum(&window)
+}
+
+/// A saved size from before the minimum grew is restored as it was, since Windows applies the
+/// minimum only to a user's resize; grow it to the minimum.
+fn grow_to_minimum(window: &WebviewWindow) -> tauri::Result<()> {
+    let inner = window
+        .inner_size()?
+        .to_logical::<f64>(window.scale_factor()?);
+    if inner.width < MIN_WIDTH || inner.height < MIN_HEIGHT {
+        window.set_size(LogicalSize::new(
+            inner.width.max(MIN_WIDTH),
+            inner.height.max(MIN_HEIGHT),
+        ))?;
+    }
     Ok(())
 }
 

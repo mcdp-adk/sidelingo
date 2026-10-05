@@ -1,7 +1,8 @@
 import { appExe, capabilities, relaunch } from "../support/app";
+import { chooseOption, dropdown, expectChosen } from "../support/dropdown";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
 import { FakeProvider, gate } from "../support/provider";
-import { expectShownOption, setUpCustomProvider } from "../support/settings";
+import { setUpCustomProvider } from "../support/settings";
 import { inspectWindows, minimumTrackingSizes, setWindowBounds, windowBounds } from "../support/window";
 
 const paragraphs = (count: number, name: string) =>
@@ -64,7 +65,6 @@ describe("Task 2: multi-line text", () => {
     writeClipboardText(`A copied line ${stamp}\nAnother copied line`);
     await expect($("p=Structuring…")).toBeDisplayed();
     await expect($("h1")).toHaveText("标题");
-    await $("[role=toolbar]").moveTo();
     const copySource = $("aria/Copy source");
     const copyTranslation = $("aria/Copy translation");
     await expect(copySource).toBeDisabled();
@@ -99,7 +99,7 @@ describe("Task 2: multi-line text", () => {
     const sourcePane = regions()[0];
     await expect(sourcePane.$$("li")).toBeElementsArrayOfSize(2);
     await expect(sourcePane.$$("td")).toBeElementsArrayOfSize(2);
-    await expect(sourcePane.$("button=链接")).toBeDisplayed();
+    await expect(sourcePane.$("[role=link]")).toHaveText("链接");
     // The bold before CJK punctuation renders, so no asterisk is left.
     await expect(sourcePane).toHaveText("强调，以及链接。", { containing: true });
     await expect(sourcePane).not.toHaveText("*", { containing: true });
@@ -168,17 +168,15 @@ describe("Task 2: multi-line text", () => {
     // 4. At its narrowest the window shows the Display modes in a dropdown.
     const [minimum] = minimumTrackingSizes(appExe, "sidelingo");
     setWindowBounds(appExe, "sidelingo", { ...wide, width: minimum.width });
-    await $("[role=toolbar]").moveTo();
-    const dropdown = $("aria/Display mode");
-    await expect(dropdown).toBeDisplayed();
+    await expect(dropdown("Display mode")).toBeDisplayed();
     await expect($("[role=tablist]")).not.toBeDisplayed();
-    await expectShownOption(dropdown, "Side-by-side");
-    await dropdown.selectByVisibleText("Source");
+    await expectChosen("Display mode", "Side-by-side");
+    await chooseOption("Display mode", "Source");
     await showsSource();
-    await dropdown.selectByVisibleText("Side-by-side");
+    await chooseOption("Display mode", "Side-by-side");
     await showsBoth();
     setWindowBounds(appExe, "sidelingo", wide);
-    await expect(dropdown).not.toExist();
+    await expect(dropdown("Display mode")).not.toExist();
     await expect($("[role=tablist]")).toBeDisplayed();
     expect(provider.requests).toHaveLength(2);
 

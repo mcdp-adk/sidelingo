@@ -4,11 +4,11 @@
 #[cfg(all(feature = "desktop-dev", not(debug_assertions)))]
 compile_error!("desktop-dev is only available in debug builds");
 
-mod accent_color;
 mod autostart;
 mod clipboard;
 mod data_folder;
 mod hotkey;
+mod look;
 mod notifications;
 mod pin_window;
 mod secrets;
@@ -48,6 +48,7 @@ fn main() {
         .on_page_load(|webview, _| clipboard::webview_loaded(webview))
         .setup(|app| {
             autostart::setup(app.handle())?;
+            look::follow_accent(app.handle())?;
             settings::load(app.handle())?;
             notifications::NotificationState::start(app.handle());
             hotkey::start(app.handle())?;
@@ -60,7 +61,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             autostart::read_autostart,
             autostart::set_autostart,
-            accent_color::accent_color,
+            look::accent_color,
             pin_window::hide_pin_window,
             pin_window::pin_window_ready,
             settings::read_settings,

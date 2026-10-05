@@ -119,9 +119,10 @@ export class FakeProvider {
     }
   });
 
-  static async start(): Promise<FakeProvider> {
+  /** Listens on 127.0.0.1 at `port`, or on a free port by default. */
+  static async start(port = 0): Promise<FakeProvider> {
     const provider = new FakeProvider();
-    provider.server.listen(0, "127.0.0.1");
+    provider.server.listen(port, "127.0.0.1");
     await once(provider.server, "listening");
     return provider;
   }

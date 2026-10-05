@@ -1,9 +1,12 @@
-import { Field, Select } from "@fluentui/react-components";
+import { Field } from "@fluentui/react-components";
 import { strings } from "../i18n";
+import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import type { Settings } from "../settings/settings";
 import { currentProxyPassword } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 import { TextSetting } from "./TextSetting";
+
+const PROXY_MODES: readonly Settings["proxy"]["mode"][] = ["system", "manual"];
 
 function validateUrl(value: string): string | null {
   try {
@@ -23,17 +26,17 @@ export function NetworkSettings({
   commit: (patch: Record<string, unknown>) => Promise<void>;
 }) {
   const proxy = settings.proxy;
+  const proxyModeLabels = { system: strings.systemProxy, manual: strings.manualProxy };
   return (
     <>
       <Field label={strings.proxyMode}>
-        <Select
+        <ChoiceDropdown
           aria-label={strings.proxyMode}
+          choices={PROXY_MODES}
           value={proxy.mode}
-          onChange={(_, data) => void commit({ proxy: { mode: data.value } })}
-        >
-          <option value="system">{strings.systemProxy}</option>
-          <option value="manual">{strings.manualProxy}</option>
-        </Select>
+          labelOf={(mode) => proxyModeLabels[mode]}
+          onChoose={(mode) => void commit({ proxy: { mode } })}
+        />
       </Field>
       {proxy.mode === "manual" && (
         <>

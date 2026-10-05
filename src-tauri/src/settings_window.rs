@@ -5,6 +5,7 @@ use tauri::{
     WindowEvent,
 };
 
+use crate::look;
 use crate::ui_language::UiLanguage;
 use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
@@ -32,17 +33,18 @@ pub fn show(app: &AppHandle) -> tauri::Result<()> {
         UiLanguage::ZhHans => "设置",
         UiLanguage::En => "Settings",
     };
-    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default())
-        .title(title)
-        .visible(false)
-        .inner_size(640.0, 640.0)
-        .min_inner_size(360.0, 300.0)
-        .transparent(true)
-        .effects(WindowEffectsConfig {
-            effects: vec![Effect::Mica],
-            ..Default::default()
-        })
-        .build()?;
+    let window =
+        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()))
+            .title(title)
+            .visible(false)
+            .inner_size(640.0, 640.0)
+            .min_inner_size(360.0, 300.0)
+            .transparent(true)
+            .effects(WindowEffectsConfig {
+                effects: vec![Effect::Mica],
+                ..Default::default()
+            })
+            .build()?;
     // Physical work-area coordinates keep centering on the Pin's monitor correct
     // when monitors use different scale factors.
     if let Some(pin) = app.get_webview_window("pin") {

@@ -20,7 +20,7 @@ What needs real input, or shows only outside the webview, is checked here with c
 - [ ] The window stays on top, and is absent from the taskbar and Alt+Tab, with no minimize or maximize button.
 - [ ] The window reopens at its last position and size after a hide and after a restart. A position that is off every monitor falls back onto the primary one, keeping the size.
 - [ ] Side by side, the two panes scroll in step from the keyboard (PageDown and Home in the focused pane, in either pane) and from a held pointer dragging either pane's scrollbar.
-- [ ] At the native minimum width, the compact toolbar's controls all fit without overlapping, in English and in Simplified Chinese.
+- [ ] At the native minimum size (264 × 172), the compact toolbar's controls all fit without overlapping, with the Display mode dropdown showing "Side-by-side" or 对照 whole beside its arrow, in English and in Simplified Chinese. In Source or Translation alone, an error with a one-line detail and Open settings shows whole below the toolbar. A size saved smaller than the minimum (from an earlier version) reopens at the minimum.
 - [ ] A refresh never takes focus.
 
 ## Hotkey and tray
@@ -31,9 +31,28 @@ What needs real input, or shows only outside the webview, is checked here with c
 
 ## Appearance
 
-- [ ] Mica, the light and dark themes, and the accent colour.
-- [ ] The pause border.
-- [ ] The toolbar fade.
+Run every item in the light theme and again in the dark theme, against the look sample. Start it with `pnpm look:sample` (or `pnpm look:sample <port>`); it plays the Provider at the Base URL it prints, with no key and no tokens. In Settings, choose the Custom Preset, enter that Base URL, leave the key empty and choose a model from the list. The script prints what to copy for each state:
+
+- any other text: Structuring returns a Markdown kitchen sink, and Translation a CJK sample;
+- any image: an image without text;
+- `sample:open-settings-error`: an HTTP error that offers Open settings;
+- `sample:error`: an HTTP error that doesn't;
+- `sample:partial`: a partial stream followed by an error.
+
+Then check:
+
+- [ ] Both windows show Mica behind their content, selected tabs, primary buttons, links and selections use the system accent, and switching the Windows theme or accent while sidelingo runs changes both windows at once.
+- [ ] Overlays are opaque, with a thin outline and 8 px corners, and never show the content beneath them: the Pin window's Copy selection menu (select over the kitchen sink); the dropdown lists of Preset, Reasoning effort, Proxy mode, Target language and Model in Settings, and of Display mode in the narrow toolbar (narrow the Pin window until the tabs give way to a dropdown); and the toolbar's tooltips (hover a Display mode tab and the pause button).
+- [ ] Panes, code blocks, tables and dropdown lists scroll with the Fluent overlay scrollbar, thin at rest and expanding on hover as in Edge (copy any text, then scroll the panes, the tall and the wide code blocks, the wide table, and an open dropdown list). Pressing or dragging the scrollbar of a pane, a code block (down and sideways) or a wide table scrolls it and never moves the Pin window.
+- [ ] The toolbar always shows above the text, opaque on the window's base colour with a divider below it, and nothing sits under it: the text, the MessageBars, the empty-window hint and the status line start below its divider, at every width and in each Display mode. Its controls are readable in both themes. Its Display mode tabs show a subtle fill on hover, with no line under a hovered or pressed tab, and a short accent pill under the selected one. In the narrow toolbar, a Display mode label longer than its dropdown ends in an ellipsis and the dropdown's arrow shows whole, in English and in Chinese.
+- [ ] Every Markdown element of the kitchen sink, side by side and in each pane alone, while it streams and once it's done: headings h1 to h6 on the type ramp, emphasis, strikethrough, inline code, every link form, the long URL and long word wrapping, nested and ordered lists, task lists as checkbox marks that can't be toggled, nested quotes, labelled, unlabelled, long and tall code blocks as cards with one copy button, which code scrolled sideways passes behind rather than through its icon, and no line numbers, download button or language bar, the mermaid fence as a code block, aligned and wide tables without a frame, the rule, the footnote, `kbd`, `sub`, `sup`, `mark`, `details` and the image fitting the pane. The CJK sample in the Translation pane mixes scripts, with its code in Cascadia Mono rather than SimSun. A code block's copy button copies its code and starts no Round. With Translation only, the muted Source text shown before the Translation starts uses the same layout in the tertiary colour.
+- [ ] Every Pin window state: `sample:open-settings-error` shows an error with Open settings; `sample:error` shows one without; `sample:partial` keeps the streamed part of the kitchen sink above its error; an image shows the no-text notice. The empty-window hint, the status line and the MessageBars share the look's colours, type and corners.
+- [ ] Settings: the page title and section headings on WinUI's Title and Subtitle, 24 px page padding, 32 px between sections and 16 px between fields, the data folder path in monospace, and Preset, Reasoning effort and Proxy mode as Fluent dropdowns, Preset reading "Choose a Provider" on a fresh data folder.
+- [ ] Right-clicking outside a field shows no page menu (Back, Reload, Save as, Print or Inspect), in either window. A Settings text field keeps its cut, copy and paste menu.
+- [ ] In Settings, F5, Ctrl+F and Ctrl+P do nothing. In the Pin window, F5 regenerates the shown Round.
+- [ ] Settings fields show no spelling squiggles under a typed URL, key or model name, no browser autofill suggestions, and in a secret field only sidelingo's own show-password button, never Edge's reveal button.
+- [ ] A link in the kitchen sink shows its URL on hover, and a click opens it in the default browser, with no "Open external link?" page.
+- [ ] The pause border, shown in the caution colour while the toolbar's pause button pauses clipboard monitoring.
 - [ ] No pane shows a horizontal scrollbar for ordinary text at 150 % display scaling.
 
 ## Settings window

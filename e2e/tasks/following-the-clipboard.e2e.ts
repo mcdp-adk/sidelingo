@@ -69,7 +69,6 @@ describe("Task 5: the window follows the clipboard", () => {
     expectRounds(2);
 
     // sidelingo's own Copy translation starts no Round.
-    await $("[role=toolbar]").moveTo();
     const copyTranslation = $("aria/Copy translation");
     await expect(copyTranslation).toBeEnabled();
     await copyTranslation.click();
@@ -113,7 +112,6 @@ describe("Task 5: the window follows the clipboard", () => {
     expectRounds(4);
 
     // A pause ignores copies.
-    await $("[role=toolbar]").moveTo();
     await $("aria/Pause clipboard monitoring").click();
     writeClipboardText(line());
     await expectUnchanged(released, 4);
@@ -136,7 +134,6 @@ describe("Task 5: the window follows the clipboard", () => {
     await expect(shownText()).toHaveText(translated(afterShowing));
     expectRounds(6);
 
-    await $("[role=toolbar]").moveTo();
     await $("aria/Close (Esc)").click();
     await pinWindowHides();
   });

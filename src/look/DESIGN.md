@@ -1,0 +1,215 @@
+# sidelingo look
+
+sidelingo should look like a Windows 11 app built with WinUI 3. It is built on Fluent UI React v9, which looks like Fluent 2 on the web, so this module maps WinUI's values onto Fluent's tokens (ADR 0007). Values come from [microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml/tree/main/controls/dev): `CommonStyles/Common_themeresources_any.xaml`, `CornerRadius_themeresources.xaml`, `TextBlock_themeresources.xaml`, `HyperlinkButton_themeresources.xaml` and `Materials/Acrylic/AcrylicBrush_themeresources.xaml`. `winui.ts` cites the resource behind each value.
+
+## The rule
+
+Every visual decision lives in `src/look/` (and its native half, `src-tauri/src/look.rs`): colour, transparency, corner radius, stroke, shadow, font, type size, focus ring, selection, scrollbar, and the browser behaviours a native window doesn't have. Other components use Fluent controls and this module's interface. Their own styles cover layout only: size, gap, padding, position. They may name Fluent tokens, never literal colours, radii, shadows or fonts.
+
+Inside the module, in order of preference:
+
+1. what Windows or WebView2 already provides;
+2. a Fluent token carrying WinUI's value (`winui.ts`);
+3. a per-component override, listed in `baseline.css` § 3 and nowhere else. An entry is added only when no token reaches the difference.
+
+## Interface
+
+| Piece | Callers | What it hides |
+| --- | --- | --- |
+| `<LookProvider initialAccent>` | `main.tsx`, around both windows, with the accent read at startup | system light/dark and accent, both followed live; the WinUI → Fluent token map; the element baseline; the overlay rule; the component overrides; the context menu, browser shortcuts and spellcheck |
+| `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. No other component imports Streamdown |
+| `<ChoiceDropdown choices value labelOf onChoose>` | the Pin window's Display mode; Settings' Preset, Reasoning effort and Proxy mode | the Fluent Dropdown and its options for one of a fixed set of typed choices: the closed label, which ends in an ellipsis when the dropdown is narrower than it so the arrow always shows whole; the selected option; and only a listed choice reaching `onChoose` |
+| `useLayerStyles()` | the Pin window, for its toolbar and its paused state | the toolbar layer's fill and divider; the caution frame around a paused window |
+| `webview_defaults(builder)` | both Rust window builders | WebView2's Fluent overlay scrollbar; autofill off. Both windows must agree, because WebView2 fixes the scrollbar style per environment |
+| `accent_color`, `follow_accent(app)` | `main.tsx` at startup; the Rust setup | the system accent, which WebView2's CSS doesn't give; every change of it sent to both windows as `accent-changed`, from Windows' `UISettings.ColorValuesChanged` |
+
+| File | Holds |
+| --- | --- |
+| `LookProvider.tsx` | the theme, the root variables, and the browser behaviours |
+| `winui.ts` | WinUI's values by resource name, the opaque surfaces, and the token map |
+| `ChoiceDropdown.tsx` | the dropdown for a fixed set of typed choices |
+| `layers.ts` | the looks no Fluent control draws: the toolbar layer and the paused frame |
+| `baseline.css` | the element baseline (§ 1), the overlay rule (§ 2) and the component overrides (§ 3) |
+| `Markdown.tsx` | Streamdown's configuration and the pieces that replace its web chrome: code block, table, task mark, link, image |
+| `markdown.css` | the style of every Markdown element |
+
+## Layers
+
+| Layer | What | Fill | Boundary |
+| --- | --- | --- | --- |
+| Window | both windows' backgrounds | Mica (the page is transparent) | the window frame |
+| Page | text, MessageBars, controls placed on the page | controls opaque, raised: `#2C2C2C` dark, `#F9F9F9` light | control stroke |
+| Card | code blocks | CardBackgroundFillColorDefault (translucent: only Mica is under it) | card stroke, 8 px corners |
+| Toolbar | the Pin window's toolbar, always shown above the results; its tab list subtle: a subtle fill on hover, the pill under the selected Display mode | opaque on the base: `#202020` dark, `#F3F3F3` light | a divider below, no blur |
+| Overlay | menus, dropdown lists, tooltips | opaque, raised | flyout stroke, 8 px corners, Fluent's shadow |
+| Paused frame | over the whole Pin window while clipboard monitoring is paused | none | 2 px in the caution colour, 8 px corners |
+
+Only the window layer is transparent. Fluent draws controls and popover surfaces from one family of background tokens (`colorNeutralBackground1` and its siblings), so a translucent control fill makes every overlay translucent too. The token map therefore sets every Fluent background a control or overlay draws on to an opaque value: what WinUI's translucent fill composites to over the window's base.
+
+| Role | Dark | Light | From |
+| --- | --- | --- | --- |
+| base (window base, toolbar) | `#202020` | `#F3F3F3` | SolidBackgroundFillColorBase |
+| raised (controls, overlays) | `#2C2C2C` | `#F9F9F9` | AcrylicInAppFillColorDefault fallback; ControlFillColorDefault over base |
+| raised hover | `#323232` | `#F6F6F6` | ControlFillColorSecondary over base |
+| raised pressed | `#272727` | `#F5F5F5` | ControlFillColorTertiary over base |
+
+Strokes, subtle hover fills and text stay translucent: they never cover content.
+
+## Colour
+
+| Role | Dark | Light | WinUI resource | Fluent token |
+| --- | --- | --- | --- | --- |
+| Text primary | `#FFFFFF` | `#E4000000` | TextFillColorPrimary | `colorNeutralForeground1` |
+| Text secondary | `#C5FFFFFF` | `#9E000000` | TextFillColorSecondary | `colorNeutralForeground2` |
+| Text tertiary | `#87FFFFFF` | `#72000000` | TextFillColorTertiary | `colorNeutralForeground3`, `4` |
+| Text disabled | `#5DFFFFFF` | `#5C000000` | TextFillColorDisabled | `colorNeutralForegroundDisabled` |
+| Link | accent Light3 | accent Dark2 | AccentTextFillColorPrimary | `colorBrandForegroundLink` |
+| Accent | system accent | system accent | SystemAccentColor | the brand ramp, accent at 80 |
+| Control stroke | `#18FFFFFF` | `#29000000` | ControlStrokeColorSecondary | `colorNeutralStroke1` |
+| Field and checkbox edge | `#8BFFFFFF` | `#72000000` | ControlStrongStrokeColorDefault | `colorNeutralStrokeAccessible` |
+| Divider | `#15FFFFFF` | `#0F000000` | DividerStrokeColorDefault | `colorNeutralStroke2`, `3`, `Subtle` |
+| Card fill | `#0DFFFFFF` | `#B3FFFFFF` | CardBackgroundFillColorDefault | `--look-card` |
+| Card stroke | `#19000000` | `#0F000000` | CardStrokeColorDefault | `--look-card-stroke` |
+| Flyout stroke | `#33000000` | `#0F000000` | SurfaceStrokeColorFlyout | `--look-flyout-stroke` |
+| Subtle hover / pressed | `#0FFFFFFF` / `#0AFFFFFF` | `#09000000` / `#06000000` | SubtleFillColorSecondary / Tertiary | `colorSubtleBackgroundHover` / `Pressed` |
+| Focus outer / inner | `#FFFFFF` / `#B3000000` | `#E4000000` / `#B3FFFFFF` | FocusStrokeColorOuter / Inner | `colorStrokeFocus2` / `1` |
+| Caution | `#FCE100` on `#433519` | `#9D5D00` on `#FFF4CE` | SystemFillColorCaution(Background) | `colorStatusWarning*` |
+| Critical | `#FF99A4` on `#442726` | `#C42B1C` on `#FDE7E9` | SystemFillColorCritical(Background) | `colorStatusDanger*` |
+| Success | `#6CCB5F` on `#393D1B` | `#0F7B0F` on `#DFF6DD` | SystemFillColorSuccess(Background) | `colorStatusSuccess*` |
+| Selection | accent fill, on-brand text | accent fill, on-brand text | text selection highlight | `::selection` in the baseline |
+
+Windows gives sidelingo only the accent itself, not its Light1–3 and Dark1–3 variants, so the brand ramp's steps stand in for them: 110/120/130 for Light1–3 and 70/60/50 for Dark1–3. A link is AccentTextFillColorPrimary at rest, Secondary on hover and Tertiary pressed, as HyperlinkButton is.
+
+## Shape
+
+| Thing | Radius | WinUI resource | Fluent token |
+| --- | --- | --- | --- |
+| Controls (buttons, fields, chips, inline code, images) | 4 px | ControlCornerRadius | `borderRadiusMedium` |
+| Overlays (menus, lists, tooltips) and cards | 8 px | OverlayCornerRadius | `borderRadiusLarge`, `XLarge` |
+| Pills (the selected tab's marker) | full | — | `borderRadiusCircular` |
+
+Strokes are 1 px. Shadows are Fluent's per component (tooltip, flyout), which follow the same depth order as WinUI's.
+
+## Type
+
+UI text is Segoe UI Variable Text, WinUI's XamlAutoFontFamily on Windows 11. Monospace is Cascadia Mono, then Consolas, wherever code, keys or paths appear; never the browser's monospace, which is SimSun on Chinese Windows.
+
+Fluent's type ramp already matches WinUI's sizes (TextBlock_themeresources.xaml), so components use Fluent's `Text` presets and typography tokens.
+
+| WinUI style | Size / line | Weight | Fluent | Used for |
+| --- | --- | --- | --- | --- |
+| Caption | 12 / 16 | regular | `Caption1` | footnotes |
+| Body | 14 / 20 | regular | `Body1` | everything by default |
+| BodyStrong | 14 / 20 | semibold | `Body1Strong` | Markdown h3–h6, table headers, the selected tab |
+| BodyLarge | 18 / 24 | semibold | none: Fluent's ramp has no 18, so `markdown.css` names it | Markdown h2 |
+| Subtitle | 20 / 28 | semibold | `Subtitle1` | Markdown h1, Settings section headings |
+| Title | 28 / 36 | semibold | `Title2` | the Settings page title |
+
+Code is mono 12/20. Buttons and tabs are regular weight, as in WinUI; Fluent 2's semibold buttons are overridden.
+
+## Space
+
+A 4 px grid, using Fluent's spacing tokens.
+
+| Where | Value |
+| --- | --- |
+| Pin content padding | 12 vertical, 16 horizontal |
+| Settings page padding | 24 |
+| Settings: title to first section, between sections | 24, 32 |
+| Settings: between fields in a section | 16 |
+| Markdown: between blocks | 12 |
+| Markdown: above / below a heading | 20 / 8 |
+| Markdown: list indent, between items | 20, 4 |
+| Markdown: around a horizontal rule | 16 above and below |
+| Table cells | 8 vertical, 16 between columns, first column on the text edge |
+| Code block padding | 8 vertical, 12 left, 40 right (room for the copy button) |
+
+## Minimum size
+
+Each window's minimum follows from what it must show whole, measured in the built app (logical px) and rounded up to the 4 px grid. The minimum is set in Rust (`pin_window.rs`, `settings_window.rs`); a saved Pin window size below it grows to it on restore, since Windows applies a minimum only to a user's resize.
+
+| Window | Must show whole | Measured | Minimum |
+| --- | --- | --- | --- |
+| Pin, width | the compact toolbar: 8 + 8 padding, a 4 gap, six 24 px action buttons (140 with their gaps), the Display mode dropdown's frame, padding and arrow (35.3) and its longest label, English "Side-by-side" (66.4; Chinese labels are 24) | 261.8 | 264 |
+| Pin, height | the toolbar and its divider (32.8), then the tallest notice in one pane with the pane's 12 + 12 padding: an error with a one-line detail and Open settings (112.7; the overlong notice with Process anyway is 36) | 169.5 | 172 |
+| Settings | the title, a section heading and a field with its dropdown inside the 24 px padding: everything fits at 360 × 300, the dropdown ending 24 px from the right edge | — | 360 × 300 |
+
+Side by side at the minimum, each pane is half as wide, so a notice wraps further and its pane scrolls; a longer error detail scrolls too. The dropdown's ellipsis stays as the safety net for a label wider than measured, such as in another font.
+
+## Icons
+
+Fluent System Icons (`@fluentui/react-icons`), the web counterpart of Segoe Fluent Icons. Regular style by default; 16 px in small buttons, 20 px in medium ones, as Fluent sizes them. A toggled-on state is shown by the button's fill, as WinUI's ToggleButton does, not by swapping to a filled icon.
+
+## States and focus
+
+Hover, pressed, selected and disabled come from the token map. Focus uses WinUI's focus colours (FocusStrokeColorOuter, FocusStrokeColorInner): Fluent controls draw their own ring in those tokens, and anything else focusable, such as the Pin window's panes, gets the two-tone ring from the baseline, drawn inside so a pane that fills the window still shows it. Fluent's motion durations and curves stay as they are.
+
+## Overlays
+
+One treatment for every Fluent surface that floats over content, listed in `baseline.css` § 2: the menu popover, popover surface, listbox and tooltip. Each is the raised fill with a SurfaceStrokeColorFlyout outline and 8 px corners, over Fluent's shadow. sidelingo shows no dialog, so there is no dialog surface and no smoke.
+
+## Component overrides
+
+The whole list, in `baseline.css` § 3:
+
+| Component | Fluent 2 | WinUI |
+| --- | --- | --- |
+| Button, MenuButton, ToggleButton | semibold, 96 px minimum width | regular weight, sized to the content |
+| Tab | a full-width underline under the selected tab and under a hovered or pressed one, semibold labels | a 16 px accent pill under the selected label, and only the subtle fill on hover and press; regular weight, semibold when selected |
+
+## Markdown
+
+| Element | Treatment |
+| --- | --- |
+| h1 / h2 / h3–h6 | Subtitle 20/28 / BodyLarge 18/24 / BodyStrong 14/20; h5–h6 in the secondary colour |
+| Paragraph, soft and hard breaks | Body 14/20, 12 between blocks |
+| Bold, italic, strikethrough | semibold; italic; strikethrough in the tertiary colour |
+| Inline code, `<kbd>` | mono 12 on a subtle 4 px chip; `kbd` adds a control stroke |
+| Link, autolink | Fluent Link in the link colour, underlined on hover, in the type of the text around it, URL in a description tooltip; a click or Enter opens it in the default browser and does nothing else. Only `http` and `https` links are links, and only those the Pin window may open (`src-tauri/capabilities/links.json`); an email address, a footnote reference or a link still streaming stays text. The element carries no `href`, so WebView2 shows no status bar URL and opens no window on Ctrl+click or middle-click |
+| Lists, nested lists | 20 indent, 4 between items, tertiary markers |
+| Task list | Fluent's checkbox icons in the marker's place, in the secondary colour; exposed as read-only checkboxes, not inputs |
+| Quote, nested quote | a 3 px control stroke (ControlStrokeColorSecondary) on the left, 12 before the text, secondary text |
+| Code block | a card (CardBackgroundFillColorDefault, card stroke, 8 px corners), mono 12/20, scrolling inside itself sideways and beyond 400 px tall; one subtle Fluent copy button on an opaque raised backing (`--look-raised`), so code scrolled sideways passes behind it rather than through its icon, and whose copy goes through the app's own copy command and starts no Round; no line numbers, download button or language bar |
+| Table | plain table elements in a sideways scroller, no frame or fill; a semibold header in the secondary colour; dividers between rows; no copy, download or fullscreen controls |
+| Horizontal rule | a divider, 16 above and below |
+| Footnotes | Caption 12, secondary, after a divider with 16 above and below; the section's heading is for screen readers only, and back-references are dropped |
+| `<mark>`, `<sub>`, `<sup>`, `<details>` | the caution background; small; small; a BodyStrong summary |
+| Image | fits the pane, 4 px corners, no download control |
+| Mermaid | shown as a code block, as its source |
+| Muted Source text | the same layout in the tertiary colour |
+
+## Browser behaviours removed
+
+| Behaviour | How |
+| --- | --- |
+| Classic scrollbars, always shown and taking layout width | WebView2's Fluent overlay scrollbar, as in Edge (`webview_defaults`): thin at rest, expanding on hover. In the Pin window, a press on a scroller (a pane, a code block or a table) within 16 px of its right edge when it scrolls down, or of its bottom edge when it scrolls sideways, counts as a scrollbar press, not a window drag, because the overlay scrollbar takes no layout width |
+| Page context menu (Back, Reload, Save as, Print, Inspect) | suppressed except in inputs, textareas and editable content, which keep cut, copy and paste; the Pin window keeps its own Copy selection menu |
+| F3, F5, F7, Ctrl + R/F/G/P/S/U/J/H/O/N/T/W, Alt+Left/Right and the browser keys | the default is prevented at capture, so the app's own handlers still run: the Pin window regenerates on F5 and Ctrl+R |
+| Ctrl+Shift+I/J/C (developer tools) | suppressed outside dev builds |
+| Spelling squiggles under URLs, keys and model names | `spellcheck` off on the document |
+| Autofill suggestions under text fields | WebView2's general autofill off (`webview_defaults`) |
+| Edge's own password reveal and clear buttons | hidden; SecretField has its own |
+| Browser select popups (white in dark mode) | no native `<select>`; Fluent Dropdown everywhere |
+| Browser monospace (SimSun) | the monospace token on `code`, `kbd`, `pre` and `samp` |
+| Browser focus ring | Fluent's ring, and the baseline's two-tone ring elsewhere |
+| Browser margins on headings, paragraphs, lists, quotes and `pre` | none, outside Markdown |
+| Browser text selection colour | the accent |
+| Streamdown's link-safety modal, code and table chrome | replaced by Fluent pieces in `<Markdown>`; its controls and line numbers are off |
+| Streamdown's utility classes | inert: sidelingo loads no Tailwind, so `markdown.css` is the only style a Markdown element has |
+| WebView2's status bar URL and new windows from links | links carry no `href` |
+
+## Decided in review
+
+The prototype on branch `prototype/winui-look` settled these, reviewed by the owner on the desktop on 2026-10-05:
+
+- **Toolbar always shown.** The Pin window's toolbar always shows above Source and Translated text and never overlaps them: the text and every notice start below its divider. The owner chose this on 2026-10-05, replacing the top band that showed the toolbar over the text only while the pointer was near the top. Over the text, the opaque toolbar covered controls at the top, such as the overlong notice's Process anyway; pushing the text down whenever it showed would have moved those controls away from the pointer.
+- **Toolbar layer.** The toolbar is opaque on the base colour with a divider below. A translucent, blurred (acrylic) layer let the toolbar and the text show through each other, and neither was readable.
+- **Content and theme.** WinUI's values on Fluent, as above, over Fluent 2's defaults and the earlier web chrome.
+- **Links.** Clicking a link opens it in the default browser at once, as WinUI's Hyperlink does; the URL shows on hover. A confirming Fluent dialog was tried and dropped.
+- **Email autolinks.** An email address renders as plain text: the Pin window opens only `http` and `https` links.
+- **Links without `href`.** A link carries no `href`, so WebView2 shows no status bar URL and opens no window; Enter opens it, and its URL shows in a tooltip.
+- **Footnote back-references.** Dropped; a footnote shows only its text.
+- **Tailwind.** Removed, since it only styled Streamdown's chrome, which `<Markdown>` replaces; `markdown.css` styles every element.
+- **Scrollbars.** The Fluent overlay scrollbar, as in Edge: thin at rest, and on hover it expands, as Edge's does, with its arrows and track. The owner accepted Edge's hover state on 2026-10-05, replacing the expectation of no arrows and no track.
+- **No dialog.** sidelingo shows no dialog, so the look has no dialog surface and no smoke behind one; the owner decided on 2026-10-05.
+- **Translucent control fills.** Tried, as WinUI uses them: Fluent shares their token with overlays, which then showed the content beneath. Over Mica the opaque values look the same.

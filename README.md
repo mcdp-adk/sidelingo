@@ -34,14 +34,15 @@ pnpm tauri dev
 
 - `.github/`: the CI and release workflows.
 - `docs/`: architecture decision records (`docs/adr/`), agent guides (`docs/agents/`), and the desktop checklist (`docs/desktop-checklist.md`).
-- `e2e/`: the user task tests (`e2e/tasks/`, one file per task) and their harness (`e2e/support/`).
+- `e2e/`: the user task tests (`e2e/tasks/`, one file per task), their harness (`e2e/support/`), and the look sample (`e2e/look-sample/`, run with `pnpm look:sample`), which plays the fake Provider with fixed replies for the desktop checklist's appearance items.
 - `scripts/`: build and check scripts, such as the third-party notice generator and the task test check (`check-tasks.mjs`).
-- `src/`: the front end. Its shared files (`main.tsx`, `global.css`, `i18n.ts`, `theme.ts`, `languages.ts`) sit at the top, and each concept from `GLOSSARY.md` has a folder:
+- `src/`: the front end. Its shared files (`main.tsx`, `global.css`, `i18n.ts`, `languages.ts`) sit at the top, and each concept from `GLOSSARY.md` has a folder:
   - `src/round/`: the Round pipeline and its prompts.
   - `src/session/`: following Inputs, reuse, cancellation and pause.
   - `src/provider/`: the Provider client, Presets and keys.
   - `src/settings/`: the settings document and its store.
   - `src/updates/`: update checks.
+  - `src/look/`: the look module, which decides every visual (ADR 0007); its design is `src/look/DESIGN.md`.
   - `src/pin-window/`: the Pin window UI.
   - `src/settings-window/`: the settings window and its sections.
   - `src/testing/`: the webview core's test harness: a fake transport for the Provider, and the Rust side played through Tauri's IPC mocks.
