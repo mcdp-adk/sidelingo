@@ -194,4 +194,8 @@ The prototype on branch `prototype/winui-look` settled these, reviewed by the ow
 - **Toolbar layer.** The toolbar is opaque on the base colour with a divider below. A translucent, blurred (acrylic) layer let the toolbar and the text show through each other, and neither was readable.
 - **Content and theme.** WinUI's values on Fluent, as above, over Fluent 2's defaults and the earlier web chrome.
 - **Links.** Clicking a link opens it in the default browser at once, as WinUI's Hyperlink does; the URL shows on hover. A confirming Fluent dialog was tried and dropped.
+- **Email autolinks.** An email address renders as plain text: the Pin window opens only `http` and `https` links.
+- **Links without `href`.** A link carries no `href`, so WebView2 shows no status bar URL and opens no window; Enter opens it, and its URL shows in a tooltip.
+- **Footnote back-references.** Dropped; a footnote shows only its text.
+- **Tailwind.** Removed, since it only styled Streamdown's chrome, which `<Markdown>` replaces; `markdown.css` styles every element.
 - **Translucent control fills.** Tried, as WinUI uses them: Fluent shares their token with overlays, which then showed the content beneath. Over Mica the opaque values look the same.
