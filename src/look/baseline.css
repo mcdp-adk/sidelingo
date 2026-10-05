@@ -1,0 +1,77 @@
+/* The look module's global styles. Fluent tokens (var(--colorX)) carry WinUI's values (winui.ts);
+   --look-* carries the few roles Fluent has no token for. Nothing outside src/look/ reads --look-*. */
+
+/* 1. The element baseline: every element starts from nothing the browser chose. */
+:where(h1, h2, h3, h4, h5, h6, p, ul, ol, blockquote, figure, pre) {
+  margin: 0;
+}
+:where(code, kbd, pre, samp) {
+  /* The browser's own monospace is SimSun on Chinese Windows. */
+  font-family: var(--fontFamilyMonospace);
+}
+::selection {
+  background: var(--colorBrandBackground);
+  color: var(--colorNeutralForegroundOnBrand);
+}
+/* Edge's own password reveal and clear buttons duplicate sidelingo's. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+/* Anything focusable that isn't a Fluent control gets WinUI's two-tone ring rather than the browser's,
+   drawn inside so a pane that fills the window still shows it. */
+:where([tabindex]:not([class*="fui-"])):focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 2px var(--colorStrokeFocus2),
+    inset 0 0 0 3px var(--colorStrokeFocus1);
+  border-radius: var(--borderRadiusMedium);
+}
+:where([tabindex]:not([class*="fui-"])):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 2. The overlay rule: every Fluent surface that floats over content is opaque, outlined and rounded, so it
+   never mixes with what it covers. Every such surface is listed here, and only here.
+   :root raises these above Fluent's atomic classes, which load later. */
+:root .fui-MenuPopover,
+:root .fui-PopoverSurface,
+:root .fui-Listbox,
+:root .fui-Tooltip,
+:root .fui-DialogSurface {
+  background-color: var(--look-raised);
+  border: 1px solid var(--look-flyout-stroke);
+  border-radius: var(--borderRadiusXLarge);
+}
+:root .fui-Tooltip {
+  color: var(--colorNeutralForeground1);
+}
+/* SmokeFillColorDefault behind a dialog. */
+:root .fui-DialogSurface__backdrop {
+  background-color: var(--look-smoke);
+}
+
+/* 3. Component overrides: where a Fluent 2 default differs from WinUI and no token reaches it.
+   This is the whole list. Add an entry only when no token reaches the difference. */
+/* Buttons: WinUI buttons use regular weight and size to their content. */
+:root .fui-Button,
+:root .fui-MenuButton,
+:root .fui-ToggleButton {
+  font-weight: var(--fontWeightRegular);
+  min-width: 0;
+}
+/* Tabs: WinUI's SelectorBar marks the selected item with a short accent pill, not a full-width underline,
+   and its labels are regular weight, semibold when selected. */
+:root .fui-Tab::after {
+  left: 50% !important;
+  right: auto !important;
+  width: 16px !important;
+  transform: translateX(-50%);
+  border-radius: var(--borderRadiusCircular) !important;
+}
+:root .fui-Tab .fui-Tab__content {
+  font-weight: var(--fontWeightRegular);
+}
+:root .fui-Tab[aria-selected="true"] .fui-Tab__content {
+  font-weight: var(--fontWeightSemibold);
+}
