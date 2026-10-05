@@ -20,7 +20,7 @@ What needs real input, or shows only outside the webview, is checked here with c
 - [ ] The window stays on top, and is absent from the taskbar and Alt+Tab, with no minimize or maximize button.
 - [ ] The window reopens at its last position and size after a hide and after a restart. A position that is off every monitor falls back onto the primary one, keeping the size.
 - [ ] Side by side, the two panes scroll in step from the keyboard (PageDown and Home in the focused pane, in either pane) and from a held pointer dragging either pane's scrollbar.
-- [ ] At the native minimum width, the compact toolbar's controls all fit without overlapping, in English and in Simplified Chinese.
+- [ ] At the native minimum size (264 × 172), the compact toolbar's controls all fit without overlapping, with the Display mode dropdown showing "Side-by-side" or 对照 whole beside its arrow, in English and in Simplified Chinese. In Source or Translation alone, an error with a one-line detail and Open settings shows whole below the toolbar. A size saved smaller than the minimum (from an earlier version) reopens at the minimum.
 - [ ] A refresh never takes focus.
 
 ## Hotkey and tray

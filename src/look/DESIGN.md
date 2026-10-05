@@ -124,6 +124,18 @@ A 4 px grid, using Fluent's spacing tokens.
 | Table cells | 8 vertical, 16 between columns, first column on the text edge |
 | Code block padding | 8 vertical, 12 left, 40 right (room for the copy button) |
 
+## Minimum size
+
+Each window's minimum follows from what it must show whole, measured in the built app (logical px) and rounded up to the 4 px grid. The minimum is set in Rust (`pin_window.rs`, `settings_window.rs`); a saved Pin window size below it grows to it on restore, since Windows applies a minimum only to a user's resize.
+
+| Window | Must show whole | Measured | Minimum |
+| --- | --- | --- | --- |
+| Pin, width | the compact toolbar: 8 + 8 padding, a 4 gap, six 24 px action buttons (140 with their gaps), the Display mode dropdown's frame, padding and arrow (35.3) and its longest label, English "Side-by-side" (66.4; Chinese labels are 24) | 261.8 | 264 |
+| Pin, height | the toolbar and its divider (32.8), then the tallest notice in one pane with the pane's 12 + 12 padding: an error with a one-line detail and Open settings (112.7; the overlong notice with Process anyway is 36) | 169.5 | 172 |
+| Settings | the title, a section heading and a field with its dropdown inside the 24 px padding: everything fits at 360 × 300, the dropdown ending 24 px from the right edge | — | 360 × 300 |
+
+Side by side at the minimum, each pane is half as wide, so a notice wraps further and its pane scrolls; a longer error detail scrolls too. The dropdown's ellipsis stays as the safety net for a label wider than measured, such as in another font.
+
 ## Icons
 
 Fluent System Icons (`@fluentui/react-icons`), the web counterpart of Segoe Fluent Icons. Regular style by default; 16 px in small buttons, 20 px in medium ones, as Fluent sizes them. A toggled-on state is shown by the button's fill, as WinUI's ToggleButton does, not by swapping to a filled icon.
