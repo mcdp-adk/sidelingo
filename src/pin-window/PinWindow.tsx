@@ -33,6 +33,7 @@ import {
   SettingsRegular,
 } from "@fluentui/react-icons";
 import { strings } from "../i18n";
+import { useLayerStyles } from "../look/layers";
 import { Markdown } from "../look/Markdown";
 import type { RoundError } from "../round/round";
 import { useSession, type Session } from "../session/session";
@@ -87,18 +88,7 @@ function configurationFailureMessage(failure: ConfigurationFailure): string {
 
 const useStyles = makeStyles({
   root: { position: "relative", height: "100vh", overflow: "hidden" },
-  paused: {
-    "::after": {
-      content: '""',
-      position: "absolute",
-      inset: 0,
-      border: `2px solid ${tokens.colorStatusWarningBorder2}`,
-      borderRadius: tokens.borderRadiusXLarge,
-      pointerEvents: "none",
-    },
-  },
-  // Overlays the content with no reserved space, as an opaque layer on the window's base colour with a divider below,
-  // shown only while the user reaches for it.
+  // Overlays the content with no reserved space, on the toolbar layer, shown only while the user reaches for it.
   toolbar: {
     position: "absolute",
     top: 0,
@@ -106,8 +96,6 @@ const useStyles = makeStyles({
     right: 0,
     justifyContent: "space-between",
     columnGap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
     opacity: 0,
     transitionProperty: "opacity",
     transitionDuration: tokens.durationNormal,
@@ -166,6 +154,7 @@ function interactiveTarget(target: EventTarget): boolean {
 
 export function PinWindow({ session }: { session: Session }) {
   const styles = useStyles();
+  const layers = useLayerStyles();
   const { round, hasInput, paused, overlong, configurationFailure } = useSession(session);
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
@@ -424,7 +413,7 @@ export function PinWindow({ session }: { session: Session }) {
   return (
     <div
       ref={root}
-      className={mergeClasses(styles.root, paused && styles.paused)}
+      className={mergeClasses(styles.root, paused && layers.pausedFrame)}
       // The top band: the toolbar's height plus a reach below it. Reading never shows the toolbar, wheel-scrolling
       // with the pointer mid-window included.
       onMouseMove={(e) => setPointerNearTop(e.clientY <= toolbar.current!.offsetHeight + TOOLBAR_REACH)}
@@ -444,7 +433,7 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, (pointerNearTop || modeListOpen) && styles.shown)}
+        className={mergeClasses(layers.toolbar, styles.toolbar, (pointerNearTop || modeListOpen) && styles.shown)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>

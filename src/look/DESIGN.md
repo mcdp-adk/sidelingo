@@ -18,12 +18,14 @@ Inside the module, in order of preference:
 | --- | --- | --- |
 | `<LookProvider accent>` | `main.tsx`, around both windows | system light/dark and accent; the WinUI → Fluent token map; the element baseline; the overlay rule; the component overrides; the context menu, browser shortcuts and spellcheck |
 | `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. No other component imports Streamdown |
+| `useLayerStyles()` | the Pin window, for its toolbar and its paused state | the toolbar layer's fill and divider; the caution frame around a paused window |
 | `webview_defaults(builder)` | both Rust window builders | WebView2's Fluent overlay scrollbar; autofill off. Both windows must agree, because WebView2 fixes the scrollbar style per environment |
 
 | File | Holds |
 | --- | --- |
 | `LookProvider.tsx` | the theme, the root variables, and the browser behaviours |
 | `winui.ts` | WinUI's values by resource name, the opaque surfaces, and the token map |
+| `layers.ts` | the looks no Fluent control draws: the toolbar layer and the paused frame |
 | `baseline.css` | the element baseline (§ 1), the overlay rule (§ 2) and the component overrides (§ 3) |
 | `Markdown.tsx` | Streamdown's configuration and the pieces that replace its web chrome: code block, table, task mark, link, image |
 | `markdown.css` | the style of every Markdown element |
@@ -38,6 +40,7 @@ Inside the module, in order of preference:
 | Toolbar | the Pin window's toolbar, over the results; its tab list subtle: a subtle fill on hover, the pill under the selected Display mode | opaque on the base: `#202020` dark, `#F3F3F3` light | a divider below, no blur |
 | Overlay | menus, dropdown lists, tooltips, dialogs | opaque, raised | flyout stroke, 8 px corners, Fluent's shadow |
 | Smoke | behind a dialog | SmokeFillColorDefault, `#4D000000` | — |
+| Paused frame | over the whole Pin window while clipboard monitoring is paused | none | 2 px in the caution colour, 8 px corners |
 
 Only the window layer is transparent. Fluent draws controls and popover surfaces from one family of background tokens (`colorNeutralBackground1` and its siblings), so a translucent control fill makes every overlay translucent too. The token map therefore sets every Fluent background a control or overlay draws on to an opaque value: what WinUI's translucent fill composites to over the window's base.
 
