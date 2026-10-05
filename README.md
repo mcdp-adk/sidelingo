@@ -123,4 +123,4 @@ It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into
 
 A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run.
 
-`pnpm check:tasks`, which CI runs, refuses a task test that finds an element by class, `#id`, another attribute or XPath, or that seeds or reads the settings document.
+`pnpm check:tasks`, which CI runs, refuses a task test or support helper that finds an element by class, `#id`, another attribute or XPath, and a task test that seeds or reads the settings document.
