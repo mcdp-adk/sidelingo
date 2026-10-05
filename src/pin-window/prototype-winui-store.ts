@@ -13,14 +13,17 @@ export const AXES = {
 export type Axis = keyof typeof AXES;
 export type Prototype = Record<Axis, number>;
 
+/** The owner's picks so far (2026-10-05): B top band, solid layer, winui content and theme. */
+const PICKED: Prototype = { reveal: 1, bar: 1, content: 1, theme: 1, links: 1, sample: 1 };
+
 const listeners = new Set<() => void>();
 let snapshot = read();
 
 function read(): Prototype {
   const params = new URLSearchParams(location.search);
   const entries = (Object.keys(AXES) as Axis[]).map((axis) => {
-    const value = Number(params.get(axis) ?? 0);
-    return [axis, Number.isInteger(value) && value >= 0 && value < AXES[axis].length ? value : 0];
+    const value = Number(params.get(axis) ?? PICKED[axis]);
+    return [axis, Number.isInteger(value) && value >= 0 && value < AXES[axis].length ? value : PICKED[axis]];
   });
   return Object.fromEntries(entries) as Prototype;
 }
