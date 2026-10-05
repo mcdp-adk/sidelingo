@@ -6,7 +6,13 @@ import { run, type RoundState } from "../../src/round/round";
 import { fixtures, type Fixture } from "./fixtures";
 
 // The eval has no pass or fail (ADR 0006): it writes each Round's result for the agent to read against the fixture's note.
-const outputFolder = join(import.meta.dirname, "output");
+// EVAL_LABEL names the run's folder, so an earlier run stays beside it for comparison; only that folder is replaced.
+const outputFolder = join(import.meta.dirname, "output", process.env.EVAL_LABEL || "latest");
+
+// EVAL_ONLY narrows the run to fixtures named, or in a group named, in a comma-separated list.
+const only = process.env.EVAL_ONLY?.split(",").map((entry) => entry.trim());
+const selected = only ? fixtures.filter(({ name, group }) => only.includes(name) || only.includes(group)) : fixtures;
+if (selected.length === 0) throw new Error(`EVAL_ONLY=${process.env.EVAL_ONLY} names no fixture or group.`);
 
 /** The two reference models, at reasoning effort low; keys are read from the environment and never printed or written. */
 const models: { name: string; provider: ProviderConfiguration }[] = [
@@ -65,6 +71,31 @@ function fenced(text: string): string {
 
 const milliseconds = (value: number | undefined) => (value === undefined ? "none" : `${Math.round(value)} ms`);
 
+const singleLine = (fixture: Fixture) => fixture.input.kind === "text" && !fixture.input.text.includes("\n");
+
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined;
+  const sorted = values.toSorted((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/** Median time to the first Translated token per group, and for every single line, which the PR states. */
+function medians(results: { fixture: Fixture; result: Result }[]): string[] {
+  const sets = new Map<string, number[]>();
+  for (const { fixture, result } of results) {
+    if (result.firstTranslatedToken === undefined) continue;
+    for (const set of [fixture.group, ...(singleLine(fixture) ? ["single line"] : [])]) {
+      sets.set(set, [...(sets.get(set) ?? []), result.firstTranslatedToken]);
+    }
+  }
+  return [
+    "| Set | Fixtures | Median first Translated token |",
+    "| --- | --- | --- |",
+    ...[...sets].map(([set, values]) => `| ${set} | ${values.length} | ${milliseconds(median(values))} |`),
+  ];
+}
+
 function report(fixture: Fixture, model: string, { state, firstTranslatedToken, total }: Result): string {
   const error = state.source.error ?? state.translation.error;
   return [
@@ -101,12 +132,15 @@ it.concurrent.each(models)("$name", async ({ name, provider }) => {
   const folder = join(outputFolder, name);
   mkdirSync(folder, { recursive: true });
   const summary = ["| Fixture | Group | Outcome | First Translated token | Round |", "| --- | --- | --- | --- | --- |"];
-  for (const fixture of fixtures) {
+  const results: { fixture: Fixture; result: Result }[] = [];
+  for (const fixture of selected) {
     const result = await runRound(fixture, provider);
+    results.push({ fixture, result });
     writeFileSync(join(folder, `${fixture.name}.md`), report(fixture, name, result));
     summary.push(
       `| ${fixture.name} | ${fixture.group} | ${result.state.outcome} | ${milliseconds(result.firstTranslatedToken)} | ${milliseconds(result.total)} |`,
     );
   }
-  writeFileSync(join(folder, "summary.md"), `# ${name}\n\n${summary.join("\n")}\n`);
+  const body = [...summary, "", ...medians(results)].join("\n");
+  writeFileSync(join(folder, "summary.md"), `# ${name}\n\n${body}\n`);
 });
