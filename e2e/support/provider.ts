@@ -166,24 +166,6 @@ async function stream(response: ServerResponse, steps: Step[]) {
   response.end("data: [DONE]\n\n");
 }
 
-/** A settings document whose active Preset is Custom, pointed at `provider`. */
-export function customSettings(
-  provider: FakeProvider,
-  {
-    baseUrl = provider.baseUrl,
-    model = "fake-model",
-    targetLanguage,
-  }: { baseUrl?: string; model?: string; targetLanguage?: string } = {},
-) {
-  return {
-    schemaVersion: 1,
-    automaticUpdates: false,
-    activePreset: "custom",
-    presets: { custom: { baseUrl, model } },
-    ...(targetLanguage && { targetLanguage }),
-  };
-}
-
 /** A promise the test settles when it chooses, to hold a stream at a step. */
 export function gate(): { wait: Promise<void>; open: () => void; reached: Promise<void>; signalReached: () => void } {
   let open!: () => void;

@@ -12,8 +12,6 @@ const identifierIn = (config: string): string => JSON.parse(readFileSync(config,
 
 /** The e2e build's own identifier, which names its AppData folders and single-instance lock. */
 export const identifier = identifierIn(e2eConfig);
-/** The identifier of the owner's own sidelingo. */
-export const ownerIdentifier = identifierIn(join(root, "src-tauri", "tauri.conf.json"));
 
 /** Built apart from `tauri dev` and release builds, so neither overwrites the other. */
 const targetDir = join(root, "src-tauri", "target", "e2e");
@@ -65,9 +63,7 @@ export interface Launch {
   args?: string[];
   /** The WebView's language, standing in for the Windows display language. */
   language?: string;
-  /** A settings document to seed before launch; without one the data folders start empty. */
-  settings?: unknown;
-  /** Raw settings file contents for startup recovery scenarios. */
+  /** Raw settings file contents to seed before launch, for a broken document; without them the data folders start empty. */
   settingsText?: string;
 }
 
@@ -83,16 +79,13 @@ export function capabilities({ language = "en-US", args = [] }: Launch = {}): We
 }
 
 /** Empties the e2e build's data folders, then seeds them. */
-export function resetDataFolders({ settings, settingsText }: Launch = {}): void {
+export function resetDataFolders({ settingsText }: Launch = {}): void {
   const { roaming, local } = dataFolders(identifier);
   // The WebView2 browser process can hold its folder for a moment after the app quits.
   for (const folder of [roaming, local]) rmSync(folder, { recursive: true, force: true, maxRetries: 20 });
   if (settingsText !== undefined) {
     mkdirSync(roaming, { recursive: true });
     writeFileSync(join(roaming, "settings.json"), settingsText);
-  } else if (settings !== undefined) {
-    mkdirSync(roaming, { recursive: true });
-    writeFileSync(join(roaming, "settings.json"), JSON.stringify(settings));
   }
 }
 
