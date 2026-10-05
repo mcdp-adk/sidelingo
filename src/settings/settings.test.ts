@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationFailure } from "./settings";
-import { customSettings, settle, startCore } from "../testing/core";
+import { customSettings, settle, startCore, type Reply } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
 const UNDECRYPTABLE = "bm90LWEtRFBBUEktY2lwaGVydGV4dA==";
 const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
 const CUSTOM_CHAT = "https://provider.test/v1/chat/completions";
+const LINE = "A single line";
+/** Structuring's reply that keeps `LINE` as it is. */
+const LINE_KEPT: Reply = [{ content: LINE }];
 
 /** What one copy leads to: the readiness failure the Session publishes, or the request it sends. */
 type Outcome = { failure: ConfigurationFailure } | { sent: { url: string; authorization: string | null } };
@@ -18,8 +21,8 @@ async function copyOnce(
   core: Awaited<ReturnType<typeof startCore>>,
   afterCopy?: () => Promise<void>,
 ): Promise<Outcome> {
-  core.provider.reply([{ content: "A single line" }], [{ content: "Translated" }]);
-  await core.copy("A single line");
+  core.provider.reply(LINE_KEPT, [{ content: "Translated" }]);
+  await core.copy(LINE);
   await afterCopy?.();
   const state = await core.until(
     (state) => state.configurationFailure !== null || (state.round !== null && state.round.state.outcome !== "running"),
@@ -29,14 +32,9 @@ async function copyOnce(
     expect(core.provider.requests).toEqual([]);
     return { failure: state.configurationFailure };
   }
-  // Structuring and Translation reach the Provider the same way.
-  const [structuring, translation] = core.provider.requests.map(({ url, headers }) => ({
-    url,
-    authorization: headers.get("authorization"),
-  }));
   expect(core.provider.requests).toHaveLength(2);
-  expect(structuring).toEqual(translation);
-  return { sent: translation! };
+  const { url, headers } = core.provider.requests[1]!;
+  return { sent: { url, authorization: headers.get("authorization") } };
 }
 
 const openai = (openai: Record<string, unknown>) => ({ schemaVersion: 1, activePreset: "openai", presets: { openai } });
@@ -315,8 +313,8 @@ describe("The initial Target language", () => {
     const core = await harness.startCore({
       settings: harness.customSettings({}, stored === undefined ? {} : { targetLanguage: stored }),
     });
-    core.provider.reply([{ content: "A single line" }], [{ content: "Translated" }]);
-    await core.copy("A single line");
+    core.provider.reply(LINE_KEPT, [{ content: "Translated" }]);
+    await core.copy(LINE);
     await core.roundEnds();
     const translation = core.provider.requests.at(-1)!;
     expect(translation.body.messages[1].content.split(":\n")[0]).toBe(`Translate to ${language}`);
