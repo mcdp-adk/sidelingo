@@ -96,7 +96,8 @@ const useStyles = makeStyles({
       pointerEvents: "none",
     },
   },
-  // Overlays the content with no reserved space, shown while the pointer is over the window.
+  // Overlays the content with no reserved space, as an opaque layer on the window's base colour with a divider below,
+  // shown while the pointer is over the window.
   toolbar: {
     position: "absolute",
     top: 0,
@@ -104,8 +105,8 @@ const useStyles = makeStyles({
     right: 0,
     justifyContent: "space-between",
     columnGap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-    backdropFilter: "blur(20px)",
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
     opacity: 0,
     transitionProperty: "opacity",
     transitionDuration: tokens.durationNormal,
@@ -448,6 +449,7 @@ export function PinWindow({ session }: { session: Session }) {
             className={mergeClasses(styles.tabs, compact && styles.measuringTabs)}
             aria-hidden={compact || undefined}
             inert={compact}
+            appearance="subtle"
             size="small"
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
