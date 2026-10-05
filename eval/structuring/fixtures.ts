@@ -106,6 +106,12 @@ We expect the next round - if funding holds - to start in March.`),
     note: "One fenced code block labelled powershell (or ps1/pwsh) holding the command exactly, backslashes and asterisk included. Not a paragraph. Translated text keeps the command unchanged.",
   },
   {
+    name: "one-line-shell-comment",
+    group: "code",
+    input: text(`# export PATH="$HOME/.local/bin:$PATH"`),
+    note: "One fenced code block labelled sh, bash or shell holding the line exactly, its leading # unescaped inside the fence. Not a heading, not an escaped paragraph. Translated text keeps the line unchanged.",
+  },
+  {
     name: "log-dump",
     group: "code",
     input: text(`2026-03-14 08:02:11 INFO  scheduler  Starting nightly export (job 4412)
