@@ -17,7 +17,7 @@ Inside the module, in order of preference:
 | Piece | Callers | What it hides |
 | --- | --- | --- |
 | `<LookProvider accent>` | `main.tsx`, around both windows | system light/dark and accent; the WinUI → Fluent token map; the element baseline; the overlay rule; the component overrides; the context menu, browser shortcuts and spellcheck |
-| `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. Not built yet: Source and Translated text still render through Streamdown directly |
+| `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. No other component imports Streamdown |
 | `webview_defaults(builder)` | both Rust window builders | WebView2's Fluent overlay scrollbar; autofill off. Both windows must agree, because WebView2 fixes the scrollbar style per environment |
 
 | File | Holds |
@@ -25,6 +25,8 @@ Inside the module, in order of preference:
 | `LookProvider.tsx` | the theme, the root variables, and the browser behaviours |
 | `winui.ts` | WinUI's values by resource name, the opaque surfaces, and the token map |
 | `baseline.css` | the element baseline (§ 1), the overlay rule (§ 2) and the component overrides (§ 3) |
+| `Markdown.tsx` | Streamdown's configuration and the pieces that replace its web chrome: code block, table, task mark, link, image |
+| `markdown.css` | the style of every Markdown element |
 
 ## Layers
 
@@ -61,6 +63,8 @@ Strokes, subtle hover fills and text stay translucent: they never cover content.
 | Control stroke | `#18FFFFFF` | `#29000000` | ControlStrokeColorSecondary | `colorNeutralStroke1` |
 | Field and checkbox edge | `#8BFFFFFF` | `#72000000` | ControlStrongStrokeColorDefault | `colorNeutralStrokeAccessible` |
 | Divider | `#15FFFFFF` | `#0F000000` | DividerStrokeColorDefault | `colorNeutralStroke2`, `3`, `Subtle` |
+| Card fill | `#0DFFFFFF` | `#B3FFFFFF` | CardBackgroundFillColorDefault | `--look-card` |
+| Card stroke | `#19000000` | `#0F000000` | CardStrokeColorDefault | `--look-card-stroke` |
 | Flyout stroke | `#33000000` | `#0F000000` | SurfaceStrokeColorFlyout | `--look-flyout-stroke` |
 | Subtle hover / pressed | `#0FFFFFFF` / `#0AFFFFFF` | `#09000000` / `#06000000` | SubtleFillColorSecondary / Tertiary | `colorSubtleBackgroundHover` / `Pressed` |
 | Focus outer / inner | `#FFFFFF` / `#B3000000` | `#E4000000` / `#B3FFFFFF` | FocusStrokeColorOuter / Inner | `colorStrokeFocus2` / `1` |
@@ -92,7 +96,7 @@ Fluent's type ramp already matches WinUI's sizes (TextBlock_themeresources.xaml)
 | Caption | 12 / 16 | regular | `Caption1` | footnotes |
 | Body | 14 / 20 | regular | `Body1` | everything by default |
 | BodyStrong | 14 / 20 | semibold | `Body1Strong` | Markdown h3–h6, table headers, the selected tab |
-| BodyLarge | 18 / 24 | semibold | `fontSizeBase500` | Markdown h2 |
+| BodyLarge | 18 / 24 | semibold | none: Fluent's ramp has no 18, so `markdown.css` names it | Markdown h2 |
 | Subtitle | 20 / 28 | semibold | `Subtitle1` | Markdown h1, Settings section headings |
 | Title | 28 / 36 | semibold | `Title2` | the Settings page title |
 
@@ -144,17 +148,17 @@ The whole list, in `baseline.css` § 3:
 | Paragraph, soft and hard breaks | Body 14/20, 12 between blocks |
 | Bold, italic, strikethrough | semibold; italic; strikethrough in the tertiary colour |
 | Inline code, `<kbd>` | mono 12 on a subtle 4 px chip; `kbd` adds a control stroke |
-| Link, autolink | Fluent Link in the link colour, underlined on hover, URL in a description tooltip; a click opens it in the default browser and does nothing else |
+| Link, autolink | Fluent Link in the link colour, underlined on hover, in the type of the text around it, URL in a description tooltip; a click or Enter opens it in the default browser and does nothing else. Only `http` and `https` links are links, and only those the Pin window may open (`src-tauri/capabilities/links.json`); an email address, a footnote reference or a link still streaming stays text. The element carries no `href`, so WebView2 shows no status bar URL and opens no window on Ctrl+click or middle-click |
 | Lists, nested lists | 20 indent, 4 between items, tertiary markers |
-| Task list | read-only checkbox icons, not inputs |
-| Quote, nested quote | a 3 px stroke on the left, secondary text |
+| Task list | Fluent's checkbox icons in the marker's place, in the secondary colour; exposed as read-only checkboxes, not inputs |
+| Quote, nested quote | a 3 px control stroke (ControlStrokeColorSecondary) on the left, 12 before the text, secondary text |
 | Code block | a card (CardBackgroundFillColorDefault, card stroke, 8 px corners), mono 12/20, scrolling inside itself sideways and beyond 400 px tall; one subtle Fluent copy button, whose copy goes through the app's own copy command and starts no Round; no line numbers, download button or language bar |
 | Table | plain table elements in a sideways scroller, no frame or fill; a semibold header in the secondary colour; dividers between rows; no copy, download or fullscreen controls |
 | Horizontal rule | a divider, 16 above and below |
-| Footnotes | Caption 12, secondary, after a divider |
+| Footnotes | Caption 12, secondary, after a divider with 16 above and below; the section's heading is for screen readers only, and back-references are dropped |
 | `<mark>`, `<sub>`, `<sup>`, `<details>` | the caution background; small; small; a BodyStrong summary |
 | Image | fits the pane, 4 px corners, no download control |
-| Mermaid | shown as a code block |
+| Mermaid | shown as a code block, as its source |
 | Muted Source text | the same layout in the tertiary colour |
 
 ## Browser behaviours removed
@@ -173,7 +177,9 @@ The whole list, in `baseline.css` § 3:
 | Browser focus ring | Fluent's ring, and the baseline's two-tone ring elsewhere |
 | Browser margins on headings, paragraphs, lists, quotes and `pre` | none, outside Markdown |
 | Browser text selection colour | the accent |
-| Streamdown's link-safety modal, code and table chrome | replaced by Fluent pieces in `<Markdown>` |
+| Streamdown's link-safety modal, code and table chrome | replaced by Fluent pieces in `<Markdown>`; its controls and line numbers are off |
+| Streamdown's utility classes | inert: sidelingo loads no Tailwind, so `markdown.css` is the only style a Markdown element has |
+| WebView2's status bar URL and new windows from links | links carry no `href` |
 
 ## Decided in review
 
