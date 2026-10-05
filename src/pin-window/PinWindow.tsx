@@ -16,7 +16,6 @@ import {
   MessageBarTitle,
   Dropdown,
   Option,
-  Select,
   Tab,
   TabList,
   Text,
@@ -33,32 +32,22 @@ import {
   PauseRegular,
   SettingsRegular,
 } from "@fluentui/react-icons";
-import { Streamdown } from "streamdown";
-import { cjk } from "@streamdown/cjk";
 import { strings } from "../i18n";
 import type { RoundError } from "../round/round";
 import { useSession, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
 import { patchSettings, useSettings } from "../settings/settings-store";
+import { Markdown } from "../look/Markdown";
 // PROTOTYPE (branch prototype/winui-look): throwaway, never merge into main.
-import {
-  PrototypeSwitcher,
-  SAMPLE_SOURCE,
-  SAMPLE_TRANSLATION,
-  usePrototype,
-  winuiComponents,
-  winuiControls,
-} from "./prototype-winui-look";
+import { PrototypeSwitcher, StatesGallery, usePrototype } from "./prototype-winui-look";
+import { KITCHEN_SINK_SOURCE, KITCHEN_SINK_TRANSLATION } from "./prototype-winui-samples";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
-/** How long the scrollbar stays after the last scroll or pointer movement, in milliseconds. */
-const SCROLLBAR_LINGER = 1000;
 /** Includes trailing scroll events after a wheel, key or pointer release. */
 const SCROLL_INTENT_LINGER = 400;
 
 const hide = () => invoke("hide_pin_window");
-const plugins = { cjk };
 const modeLabels: Record<DisplayMode, string> = {
   source: strings.sourceMode,
   translation: strings.translationMode,
@@ -115,8 +104,9 @@ const useStyles = makeStyles({
     right: 0,
     justifyContent: "space-between",
     columnGap: tokens.spacingHorizontalXS,
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-    backdropFilter: "blur(20px)",
+    // An overlay: the window's opaque base with a divider, so the content under it never shows through.
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     opacity: 0,
     transitionProperty: "opacity",
     transitionDuration: tokens.durationNormal,
@@ -129,7 +119,6 @@ const useStyles = makeStyles({
   tabs: { width: "max-content" },
   measuringTabs: { position: "absolute", visibility: "hidden", pointerEvents: "none" },
   dropdown: { width: "100%", minWidth: 0 },
-  dropdownInput: { minWidth: 0, textOverflow: "ellipsis" },
   actions: { display: "flex", flexShrink: 0 },
   panes: { display: "grid", height: "100%", gridTemplateColumns: "minmax(0, 1fr)" },
   columns: { gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)" },
@@ -146,9 +135,6 @@ const useStyles = makeStyles({
     // Long paths and URLs wrap; only code blocks scroll sideways, inside themselves.
     overflowWrap: "anywhere",
     cursor: "default",
-    // A thin, rounded Fluent scrollbar with no arrow buttons, shown only while in use.
-    "::-webkit-scrollbar": { width: "6px" },
-    "::-webkit-scrollbar-thumb": { borderRadius: tokens.borderRadiusCircular },
   },
   status: {
     overflow: "hidden",
@@ -157,13 +143,19 @@ const useStyles = makeStyles({
   },
   errorDetail: { whiteSpace: "pre-wrap" },
   source: { color: tokens.colorNeutralForeground3 },
-  scrollbarShown: { "::-webkit-scrollbar-thumb": { backgroundColor: tokens.colorNeutralForeground3 } },
 });
+
+/** WebView2's Fluent overlay scrollbar takes no layout width; this is how far its widest state reaches in. */
+const OVERLAY_SCROLLBAR_WIDTH = 16;
 
 /** A press on the content's own scrollbar, which drags the thumb rather than the window. */
 function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
   const content = e.currentTarget;
-  return e.target === content && e.clientX - content.getBoundingClientRect().left >= content.clientWidth;
+  return (
+    e.target === content &&
+    content.scrollHeight > content.clientHeight &&
+    content.getBoundingClientRect().right - e.clientX <= OVERLAY_SCROLLBAR_WIDTH
+  );
 }
 
 /** Inline controls keep their normal pointer behavior rather than moving or hiding the window. */
@@ -187,39 +179,14 @@ export function PinWindow({ session }: { session: Session }) {
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const [pointerOver, setPointerOver] = useState(false);
-  const [scrollbarShown, setScrollbarShown] = useState(false);
-  const scrollbarTimer = useRef<number>(undefined);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
   const proto = usePrototype();
   const [nearTop, setNearTop] = useState(false);
-  const [moving, setMoving] = useState(false);
-  const movingTimer = useRef<number>(undefined);
-  const md = (text: string) => (
-    <Streamdown
-      // Streamdown memoizes rendered blocks, so a new variant needs a fresh instance.
-      key={`${proto.content}-${proto.links}`}
-      plugins={plugins}
-      {...(proto.content === 1
-        ? { components: winuiComponents[proto.links], controls: winuiControls, lineNumbers: false }
-        : {})}
-    >
-      {text}
-    </Streamdown>
-  );
   const overToolbar = (target: EventTarget) => target instanceof Node && toolbar.current!.contains(target);
-  const onRootMouseMove = (e: MouseEvent<HTMLElement>) => {
+  // The toolbar shows only while the pointer is near the top, where it would be reached for.
+  const onRootMouseMove = (e: MouseEvent<HTMLElement>) =>
     setNearTop(e.clientY <= toolbar.current!.offsetHeight + 16 || overToolbar(e.target));
-    // Chromium sends zero-movement mousemoves after a scroll; they are not the user moving the pointer.
-    if (e.movementX === 0 && e.movementY === 0) return;
-    setMoving(true);
-    clearTimeout(movingTimer.current);
-    if (!overToolbar(e.target)) movingTimer.current = setTimeout(() => setMoving(false), 1500);
-  };
-  const stopMoving = () => {
-    clearTimeout(movingTimer.current);
-    setMoving(false);
-  };
-  const toolbarShown = pointerOver && (proto.reveal === 0 || (proto.reveal === 1 ? nearTop : moving));
+  const toolbarShown = pointerOver && nearTop;
 
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([entry]) => setTall(entry.contentRect.width < entry.contentRect.height));
@@ -299,7 +266,6 @@ export function PinWindow({ session }: { session: Session }) {
     window.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("blur", onPointerCancel);
     return () => {
-      clearTimeout(scrollbarTimer.current);
       void unlistenHidden.then((unlisten) => unlisten());
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousemove", onMouseMove);
@@ -315,14 +281,7 @@ export function PinWindow({ session }: { session: Session }) {
     contents.current.forEach((content) => content?.scrollTo({ top: 0 }));
   }, [round?.id]);
 
-  const showScrollbar = () => {
-    setScrollbarShown(true);
-    clearTimeout(scrollbarTimer.current);
-    scrollbarTimer.current = setTimeout(() => setScrollbarShown(false), SCROLLBAR_LINGER);
-  };
-
   const onScroll = (index: number) => {
-    showScrollbar();
     const driver = scrollDriver.current;
     if (mode !== "both" || driver?.index !== index || performance.now() >= driver.until) return;
     const content = contents.current[index]!;
@@ -376,11 +335,7 @@ export function PinWindow({ session }: { session: Session }) {
         role="region"
         aria-label={modeLabels[kind]}
         tabIndex={0}
-        className={mergeClasses(
-          styles.content,
-          scrollbarShown && styles.scrollbarShown,
-          proto.content === 1 && "proto-content-winui",
-        )}
+        className={styles.content}
         onWheel={() => markScrollIntent(index)}
         onKeyDown={(e) => {
           if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", " "].includes(e.key)) {
@@ -388,9 +343,7 @@ export function PinWindow({ session }: { session: Session }) {
           }
         }}
         onScroll={() => onScroll(index)}
-        onMouseMove={showScrollbar}
         onMouseDown={(e) => {
-          stopMoving();
           if (onScrollbar(e)) {
             // A native thumb drag owns scrolling until mouse-up, however long it is held.
             if (e.button === 0) scrollDriver.current = { index, until: Infinity };
@@ -400,7 +353,9 @@ export function PinWindow({ session }: { session: Session }) {
         onDoubleClick={onDoubleClick}
       >
         {proto.sample === 1 ? (
-          md(kind === "source" ? SAMPLE_SOURCE : SAMPLE_TRANSLATION)
+          <Markdown text={kind === "source" ? KITCHEN_SINK_SOURCE : KITCHEN_SINK_TRANSLATION} />
+        ) : proto.sample === 2 ? (
+          <StatesGallery kind={kind} />
         ) : (
           <>
             {configurationFailure && (
@@ -435,14 +390,14 @@ export function PinWindow({ session }: { session: Session }) {
                 </MessageBar>
               ) : (
                 <>
-                  {result.text && md(result.text)}
+                  {result.text && <Markdown text={result.text} />}
                   {!result.text && state.outcome === "running" && (
                     <Text as="p" block className={styles.status}>
                       {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
                     </Text>
                   )}
                   {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
-                    <div className={styles.source}>{md(state.source.text)}</div>
+                    <Markdown text={state.source.text} muted />
                   )}
                   {result.error && (
                     <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
@@ -484,12 +439,8 @@ export function PinWindow({ session }: { session: Session }) {
       ref={root}
       className={mergeClasses(styles.root, paused && styles.paused)}
       onMouseEnter={() => setPointerOver(true)}
-      onMouseLeave={() => {
-        setPointerOver(false);
-        stopMoving();
-      }}
+      onMouseLeave={() => setPointerOver(false)}
       onMouseMove={onRootMouseMove}
-      onWheel={stopMoving}
       onContextMenu={onContextMenu}
     >
       <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
@@ -505,12 +456,7 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(
-          styles.toolbar,
-          toolbarShown && styles.shown,
-          proto.bar === 1 && "proto-bar-solid",
-          proto.bar === 2 && "proto-bar-acrylic",
-        )}
+        className={mergeClasses(styles.toolbar, toolbarShown && styles.shown)}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -521,7 +467,7 @@ export function PinWindow({ session }: { session: Session }) {
             aria-hidden={compact || undefined}
             inert={compact}
             size="small"
-            appearance={proto.bar === 0 ? undefined : "subtle"}
+            appearance="subtle"
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
           >
@@ -531,7 +477,7 @@ export function PinWindow({ session }: { session: Session }) {
               </Tooltip>
             ))}
           </TabList>
-          {compact && proto.bar !== 0 && (
+          {compact && (
             <Dropdown
               aria-label={strings.displayMode}
               size="small"
@@ -546,22 +492,6 @@ export function PinWindow({ session }: { session: Session }) {
                 </Option>
               ))}
             </Dropdown>
-          )}
-          {compact && proto.bar === 0 && (
-            <Select
-              aria-label={strings.displayMode}
-              size="small"
-              className={styles.dropdown}
-              select={{ className: styles.dropdownInput }}
-              value={mode}
-              onChange={(_, data) => selectMode(data.value as DisplayMode)}
-            >
-              {DISPLAY_MODES.map((value) => (
-                <option key={value} value={value}>
-                  {modeLabels[value]}
-                </option>
-              ))}
-            </Select>
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>

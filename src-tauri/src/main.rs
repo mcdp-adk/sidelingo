@@ -9,6 +9,7 @@ mod autostart;
 mod clipboard;
 mod data_folder;
 mod hotkey;
+mod look;
 mod notifications;
 mod pin_window;
 mod secrets;

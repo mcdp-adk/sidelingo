@@ -60,7 +60,8 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 /// Creates the Pin window, hidden until its front end is ready. It lives as long
 /// as the process and only ever hides.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default());
+    let window =
+        crate::look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()));
 
     #[cfg(not(feature = "desktop-dev"))]
     let window = {

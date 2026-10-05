@@ -1,0 +1,223 @@
+/* PROTOTYPE (branch prototype/winui-look): the look module's Markdown styles, to be folded into main once reviewed.
+   Every element GFM and Streamdown can produce has a rule here, on WinUI's type ramp and 4 px grid.
+   Unlayered, so it wins over the Tailwind utilities Streamdown's own elements carry. */
+
+.look-markdown {
+  font-size: var(--fontSizeBase300); /* Body 14 */
+  line-height: var(--lineHeightBase300); /* 20 */
+  color: var(--colorNeutralForeground1);
+}
+.look-markdown-muted {
+  color: var(--colorNeutralForeground3);
+}
+
+/* Block rhythm: 12 between blocks, 20 above a heading, 8 below it. */
+.look-markdown :is(p, ul, ol, blockquote, .look-code-block, .look-table, hr, details, img, section) {
+  margin: 0 0 12px;
+}
+.look-markdown > div > :last-child {
+  margin-bottom: 0;
+}
+.look-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin: 20px 0 8px;
+  font-weight: var(--fontWeightSemibold);
+  letter-spacing: 0;
+  color: var(--colorNeutralForeground1);
+}
+.look-markdown > div > :first-child,
+.look-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+/* Subtitle 20/28, BodyLarge 18/24, BodyStrong 14/20. */
+.look-markdown h1 {
+  font-size: 20px;
+  line-height: 28px;
+}
+.look-markdown h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.look-markdown :is(h3, h4, h5, h6) {
+  font-size: 14px;
+  line-height: 20px;
+}
+.look-markdown :is(h5, h6) {
+  color: var(--colorNeutralForeground2);
+}
+
+.look-markdown :is(strong, b) {
+  font-weight: var(--fontWeightSemibold);
+}
+.look-markdown del {
+  color: var(--colorNeutralForeground3);
+}
+.look-markdown mark {
+  background: var(--look-mark);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+}
+.look-markdown :is(sub, sup) {
+  font-size: 10px;
+  line-height: 0;
+}
+
+/* Lists: 20 indent, 4 between items, secondary markers. */
+.look-markdown :is(ul, ol) {
+  padding-left: 20px;
+}
+.look-markdown ul {
+  list-style: disc;
+}
+.look-markdown ol {
+  list-style: decimal;
+}
+.look-markdown :is(ul, ol) :is(ul, ol) {
+  margin: 4px 0 0;
+}
+.look-markdown li {
+  margin: 0 0 4px;
+  padding: 0;
+}
+.look-markdown li > p {
+  margin: 0 0 4px;
+}
+.look-markdown li::marker {
+  color: var(--colorNeutralForeground3);
+}
+.look-markdown li:has(> .look-task) {
+  list-style: none;
+  margin-left: -20px;
+}
+.look-task {
+  font-size: 16px;
+  vertical-align: -3px;
+  margin-right: 8px;
+  color: var(--colorNeutralForeground2);
+}
+
+/* Quotes: a divider-coloured rule and secondary text. */
+.look-markdown blockquote {
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--colorNeutralStroke1);
+  color: var(--colorNeutralForeground2);
+  font-style: normal;
+}
+.look-markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.look-markdown hr {
+  border: 0;
+  border-top: 1px solid var(--look-divider);
+  margin: 16px 0;
+}
+
+/* Inline code and keys: mono 12, a subtle chip. */
+.look-markdown :is(code, kbd):not(.look-code-block code) {
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  padding: 1px 4px;
+  border-radius: var(--borderRadiusMedium);
+  background: var(--look-subtle-hover);
+  color: inherit;
+}
+.look-markdown kbd {
+  border: 1px solid var(--colorNeutralStroke1);
+  border-bottom-width: 2px;
+  background: var(--colorNeutralBackground1);
+}
+
+/* Code blocks: a card on the page, mono 12/20, scrolling inside itself. */
+.look-code-block {
+  position: relative;
+  border: 1px solid var(--look-card-stroke);
+  border-radius: var(--borderRadiusLarge);
+  background: var(--look-card);
+}
+.look-code-block pre {
+  padding: 8px 40px 8px 12px;
+  overflow: auto;
+  max-height: 400px;
+  font-size: var(--fontSizeBase200);
+  line-height: 20px;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.look-code-block code {
+  font-size: inherit;
+}
+.look-code-copy {
+  position: absolute !important;
+  top: 4px;
+  right: 4px;
+}
+
+/* Tables: a list with column headers, no frame, dividers between rows, first column on the text edge. */
+.look-table {
+  overflow-x: auto;
+}
+.look-table table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.look-table :is(th, td) {
+  padding: 8px 16px 8px 0;
+  vertical-align: top;
+  border: 0;
+  border-bottom: 1px solid var(--look-divider);
+  background: transparent;
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+.look-table th {
+  padding-top: 0;
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground2);
+}
+.look-table th:not([align]),
+.look-table td:not([align]) {
+  text-align: left;
+}
+.look-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Images keep inside the pane with control corners. */
+.look-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--borderRadiusMedium);
+}
+.look-markdown [data-streamdown="image-wrapper"] {
+  display: inline-block;
+}
+
+/* Footnotes: Caption 12, secondary, after a divider. */
+.look-markdown section[data-footnotes] {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--look-divider);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground2);
+}
+.look-markdown section[data-footnotes] h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Details: the summary reads like a BodyStrong label. */
+.look-markdown summary {
+  font-weight: var(--fontWeightSemibold);
+  cursor: default;
+}
+
+.look-dialog-url {
+  font-family: var(--fontFamilyMonospace);
+  font-size: var(--fontSizeBase200);
+  overflow-wrap: anywhere;
+}

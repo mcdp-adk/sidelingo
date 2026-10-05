@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  Dropdown,
   Field,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
-  Select,
+  Option,
+  Subtitle1,
+  Title2,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -26,6 +29,7 @@ const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
   error: { flexShrink: 0, margin: tokens.spacingHorizontalL },
   page: { flex: 1, minHeight: 0, overflowY: "auto", padding: tokens.spacingHorizontalXXL },
+  title: { display: "block", marginBottom: tokens.spacingVerticalXXL },
   section: {
     display: "flex",
     flexDirection: "column",
@@ -33,6 +37,10 @@ const useStyles = makeStyles({
     marginBottom: tokens.spacingVerticalXXXL,
   },
 });
+
+/** A Dropdown option needs a value; this one stands for "no effort set". */
+const DEFAULT_EFFORT = "default";
+const presetLabel = (id: Preset) => (id === "custom" ? strings.custom : PRESET_REGISTRY[id].label);
 
 export function SettingsWindow() {
   const styles = useStyles();
@@ -88,24 +96,25 @@ export function SettingsWindow() {
         </MessageBar>
       )}
       <main ref={page} className={styles.page}>
-        <h1>{strings.settings}</h1>
+        <Title2 as="h1" className={styles.title}>
+          {strings.settings}
+        </Title2>
         <section className={styles.section} aria-label={strings.provider}>
-          <h2>{strings.provider}</h2>
+          <Subtitle1 as="h2">{strings.provider}</Subtitle1>
           <Field label={strings.preset}>
-            <Select
+            <Dropdown
               aria-label={strings.preset}
-              value={preset ?? ""}
-              onChange={(_, data) => void commit({ activePreset: data.value as Preset })}
+              placeholder={strings.chooseProvider}
+              value={preset ? presetLabel(preset) : ""}
+              selectedOptions={preset ? [preset] : []}
+              onOptionSelect={(_, data) => void commit({ activePreset: data.optionValue as Preset })}
             >
-              <option value="" disabled hidden>
-                {strings.chooseProvider}
-              </option>
               {PRESETS.map((id) => (
-                <option key={id} value={id}>
-                  {id === "custom" ? strings.custom : PRESET_REGISTRY[id].label}
-                </option>
+                <Option key={id} value={id}>
+                  {presetLabel(id)}
+                </Option>
               ))}
-            </Select>
+            </Dropdown>
           </Field>
           {preset === "custom" && (
             <TextSetting
@@ -129,32 +138,38 @@ export function SettingsWindow() {
                 commit={(model) => commit({ presets: { [preset]: { model } } })}
               />
               <Field label={strings.reasoningEffort}>
-                <Select
+                <Dropdown
                   aria-label={strings.reasoningEffort}
-                  value={settings.presets[preset].reasoningEffort ?? ""}
-                  onChange={(_, data) =>
+                  value={settings.presets[preset].reasoningEffort ?? strings.defaultEffort}
+                  selectedOptions={[settings.presets[preset].reasoningEffort ?? DEFAULT_EFFORT]}
+                  onOptionSelect={(_, data) =>
                     void commit({
-                      presets: { [preset]: { reasoningEffort: data.value ? (data.value as ReasoningEffort) : null } },
+                      presets: {
+                        [preset]: {
+                          reasoningEffort:
+                            data.optionValue === DEFAULT_EFFORT ? null : (data.optionValue as ReasoningEffort),
+                        },
+                      },
                     })
                   }
                 >
-                  <option value="">{strings.defaultEffort}</option>
+                  <Option value={DEFAULT_EFFORT}>{strings.defaultEffort}</Option>
                   {PRESET_REGISTRY[preset].efforts.map((effort) => (
-                    <option key={effort} value={effort}>
+                    <Option key={effort} value={effort}>
                       {effort}
-                    </option>
+                    </Option>
                   ))}
-                </Select>
+                </Dropdown>
               </Field>
             </>
           )}
         </section>
         <section className={styles.section} aria-label={strings.network}>
-          <h2>{strings.network}</h2>
+          <Subtitle1 as="h2">{strings.network}</Subtitle1>
           <NetworkSettings settings={settings} commit={commit} />
         </section>
         <section ref={general} className={styles.section} aria-label={strings.general}>
-          <h2>{strings.general}</h2>
+          <Subtitle1 as="h2">{strings.general}</Subtitle1>
           <TargetLanguageSetting
             value={settings.targetLanguage}
             commit={(targetLanguage) => commit({ targetLanguage })}
@@ -170,7 +185,7 @@ export function SettingsWindow() {
           <AutostartSetting />
         </section>
         <section className={styles.section} aria-label={strings.about}>
-          <h2>{strings.about}</h2>
+          <Subtitle1 as="h2">{strings.about}</Subtitle1>
           <AboutSection
             automaticUpdates={settings.automaticUpdates}
             commit={(automaticUpdates) => commit({ automaticUpdates })}
