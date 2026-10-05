@@ -1,0 +1,28 @@
+name: Closing criteria
+
+# A PR closes its issues on merge, so every acceptance criterion in them is ticked first (AGENTS.md).
+# Ticking a box doesn't trigger this workflow: re-run the job after ticking.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  issues: read
+  pull-requests: read
+
+jobs:
+  criteria:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/check-closing-criteria.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

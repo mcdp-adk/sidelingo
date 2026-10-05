@@ -79,7 +79,7 @@ Tests come in five layers, and each behaviour has one owning test at the layer t
 | Real Provider | `pnpm test:real` | Locally, before a release and when a change touches the Provider client or a prompt |
 | Desktop checklist | [`docs/desktop-checklist.md`](docs/desktop-checklist.md), with computer-use | Before each release, plus the items a PR touches |
 
-CI also runs type-checking, `pnpm format:check`, `pnpm check:tasks`, `cargo fmt --check` and Clippy. It can't run the user tasks: GitHub-hosted Windows runners are elevated, and WebView2 ignores its `WEBVIEW2_*` environment variables under an elevated host, so the WebDriver debugging port never arrives ([tauri-apps/wry#1782](https://github.com/tauri-apps/wry/issues/1782)). Revisit once wry passes that setting through its own API.
+CI also runs type-checking, `pnpm format:check`, `pnpm check:tasks`, `cargo fmt --check` and Clippy. On a ready PR, the Closing criteria check refuses to close an issue that still has an unticked acceptance criterion; re-run it after ticking. It can't run the user tasks: GitHub-hosted Windows runners are elevated, and WebView2 ignores its `WEBVIEW2_*` environment variables under an elevated host, so the WebDriver debugging port never arrives ([tauri-apps/wry#1782](https://github.com/tauri-apps/wry/issues/1782)). Revisit once wry passes that setting through its own API.
 
 #### Webview core
 
