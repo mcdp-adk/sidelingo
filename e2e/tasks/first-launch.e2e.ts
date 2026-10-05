@@ -82,7 +82,6 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       const line = `A line copied after setup ${stamp}`;
       writeClipboardText(line);
       await expect($("p")).toHaveText(first);
-      await $("[role=toolbar]").moveTo();
       const copyTranslation = $(`aria/${ui.copyTranslation}`);
       await expect(copyTranslation).toBeDisabled();
       held.open();

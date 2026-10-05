@@ -3,7 +3,6 @@ import { chooseOption } from "./dropdown";
 /** Opens Settings through its focused Pin shortcut, waiting for the user-visible toolbar first. */
 export async function openSettings(): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
-  await $("[role=toolbar]").moveTo();
   await expect($("aria/Settings (Ctrl+,)")).toBeDisplayed();
   await browser.keys(["Control", ","]);
   const settings = await switchToSettingsWindow(pin);
@@ -39,7 +38,6 @@ export async function setUpCustomProvider(
   { key }: { key?: string } = {},
 ): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
-  await $("[role=toolbar]").moveTo();
   await $("aria/Settings (Ctrl+,)").click();
   const settings = await switchToSettingsWindow(pin);
   await chooseOption("Preset", "Custom");

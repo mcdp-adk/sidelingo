@@ -65,7 +65,6 @@ describe("Task 2: multi-line text", () => {
     writeClipboardText(`A copied line ${stamp}\nAnother copied line`);
     await expect($("p=Structuring…")).toBeDisplayed();
     await expect($("h1")).toHaveText("标题");
-    await $("[role=toolbar]").moveTo();
     const copySource = $("aria/Copy source");
     const copyTranslation = $("aria/Copy translation");
     await expect(copySource).toBeDisabled();
@@ -169,18 +168,14 @@ describe("Task 2: multi-line text", () => {
     // 4. At its narrowest the window shows the Display modes in a dropdown.
     const [minimum] = minimumTrackingSizes(appExe, "sidelingo");
     setWindowBounds(appExe, "sidelingo", { ...wide, width: minimum.width });
-    await $("[role=toolbar]").moveTo();
     await expect(dropdown("Display mode")).toBeDisplayed();
     await expect($("[role=tablist]")).not.toBeDisplayed();
     await expectChosen("Display mode", "Side-by-side");
     await chooseOption("Display mode", "Source");
     await showsSource();
-    // The user reaches for the toolbar again, since choosing left the pointer below the top band.
-    await $("[role=toolbar]").moveTo();
     await chooseOption("Display mode", "Side-by-side");
     await showsBoth();
     setWindowBounds(appExe, "sidelingo", wide);
-    await $("[role=toolbar]").moveTo();
     await expect(dropdown("Display mode")).not.toExist();
     await expect($("[role=tablist]")).toBeDisplayed();
     expect(provider.requests).toHaveLength(2);
