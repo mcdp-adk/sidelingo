@@ -23,11 +23,23 @@ const editable = (target: EventTarget | null) =>
   target instanceof Element &&
   target.closest("input, textarea, [contenteditable]:not([contenteditable=false])") !== null;
 
+/** Keys that act on the browser alone: find next, reload, caret browsing, and the keyboard's browser keys. */
+const BROWSER_KEYS = [
+  "F3",
+  "F5",
+  "F7",
+  "BrowserBack",
+  "BrowserForward",
+  "BrowserRefresh",
+  "BrowserSearch",
+  "BrowserHome",
+  "BrowserFavorites",
+  "BrowserStop",
+];
+
 /** Browser shortcuts a native window doesn't have: reload, find, print, save, view source, history, navigation. */
 function browserShortcut(e: KeyboardEvent): boolean {
-  if (["F3", "F5", "F7", "BrowserBack", "BrowserForward", "BrowserRefresh", "BrowserSearch"].includes(e.key)) {
-    return true;
-  }
+  if (BROWSER_KEYS.includes(e.key)) return true;
   if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return true;
   if (!e.ctrlKey || e.altKey) return false;
   const key = e.key.toLowerCase();
