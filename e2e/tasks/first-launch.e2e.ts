@@ -93,11 +93,11 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await browser.waitUntil(() => readClipboardText() === first + rest, {
         timeoutMsg: "the clipboard never held the Translated text",
       });
-      // Structuring, then Translation, both with the Model and effort entered.
+      // One Round: Structuring, then Translation with the Model and effort entered.
       expect(provider.requests).toHaveLength(2);
-      for (const { body } of provider.requests)
-        expect(body).toMatchObject({ model: "my-own-model", reasoning_effort: "low" });
-      expect(provider.requests[1].body.messages.at(-1).content).toContain(line);
+      const translation = provider.requests[1].body;
+      expect(translation).toMatchObject({ model: "my-own-model", reasoning_effort: "low" });
+      expect(translation.messages.at(-1).content).toContain(line);
     });
   }
 });

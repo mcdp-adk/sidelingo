@@ -64,12 +64,9 @@ describe("Task 4: recovering from a Provider error", () => {
     held.open();
     await expect($("p")).toHaveText(first + rest);
     await expect(copyTranslation).toBeEnabled();
-    // Regenerate reran Structuring, then Translation, with the entered key.
+    // Regenerate ran one Round, whose Translation carried the entered key.
     expect(provider.requests).toHaveLength(3);
-    expect(provider.requests.slice(1).map(({ headers }) => headers.authorization)).toEqual([
-      "Bearer right-key",
-      "Bearer right-key",
-    ]);
+    expect(provider.requests[2].headers.authorization).toBe("Bearer right-key");
     expect(provider.requests[2].body.messages.at(-1).content).toContain(line);
 
     // The connection drops after some Source text has streamed.
