@@ -41,10 +41,10 @@ import { patchSettings, useSettings } from "../settings/settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
-/** How long the scrollbar stays after the last scroll or pointer movement, in milliseconds. */
-const SCROLLBAR_LINGER = 1000;
 /** Includes trailing scroll events after a wheel, key or pointer release. */
 const SCROLL_INTENT_LINGER = 400;
+/** How far from a pane's right edge a press reaches its overlay scrollbar, which takes no layout width. */
+const SCROLLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
 const plugins = { cjk };
@@ -135,9 +135,6 @@ const useStyles = makeStyles({
     // Long paths and URLs wrap; only code blocks scroll sideways, inside themselves.
     overflowWrap: "anywhere",
     cursor: "default",
-    // A thin, rounded Fluent scrollbar with no arrow buttons, shown only while in use.
-    "::-webkit-scrollbar": { width: "6px" },
-    "::-webkit-scrollbar-thumb": { borderRadius: tokens.borderRadiusCircular },
   },
   status: {
     overflow: "hidden",
@@ -146,13 +143,16 @@ const useStyles = makeStyles({
   },
   errorDetail: { whiteSpace: "pre-wrap" },
   source: { color: tokens.colorNeutralForeground3 },
-  scrollbarShown: { "::-webkit-scrollbar-thumb": { backgroundColor: tokens.colorNeutralForeground3 } },
 });
 
 /** A press on the content's own scrollbar, which drags the thumb rather than the window. */
 function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
   const content = e.currentTarget;
-  return e.target === content && e.clientX - content.getBoundingClientRect().left >= content.clientWidth;
+  return (
+    e.target === content &&
+    content.scrollHeight > content.clientHeight &&
+    content.getBoundingClientRect().right - e.clientX <= SCROLLBAR_REACH
+  );
 }
 
 /** Inline controls keep their normal pointer behavior rather than moving or hiding the window. */
@@ -176,8 +176,6 @@ export function PinWindow({ session }: { session: Session }) {
   const [tall, setTall] = useState(false);
   const pressedAt = useRef<{ x: number; y: number } | null>(null);
   const [pointerOver, setPointerOver] = useState(false);
-  const [scrollbarShown, setScrollbarShown] = useState(false);
-  const scrollbarTimer = useRef<number>(undefined);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
 
   useLayoutEffect(() => {
@@ -257,7 +255,6 @@ export function PinWindow({ session }: { session: Session }) {
     window.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("blur", onPointerCancel);
     return () => {
-      clearTimeout(scrollbarTimer.current);
       void unlistenHidden.then((unlisten) => unlisten());
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousemove", onMouseMove);
@@ -273,14 +270,7 @@ export function PinWindow({ session }: { session: Session }) {
     contents.current.forEach((content) => content?.scrollTo({ top: 0 }));
   }, [round?.id]);
 
-  const showScrollbar = () => {
-    setScrollbarShown(true);
-    clearTimeout(scrollbarTimer.current);
-    scrollbarTimer.current = setTimeout(() => setScrollbarShown(false), SCROLLBAR_LINGER);
-  };
-
   const onScroll = (index: number) => {
-    showScrollbar();
     const driver = scrollDriver.current;
     if (mode !== "both" || driver?.index !== index || performance.now() >= driver.until) return;
     const content = contents.current[index]!;
@@ -334,7 +324,7 @@ export function PinWindow({ session }: { session: Session }) {
         role="region"
         aria-label={modeLabels[kind]}
         tabIndex={0}
-        className={mergeClasses(styles.content, scrollbarShown && styles.scrollbarShown)}
+        className={styles.content}
         onWheel={() => markScrollIntent(index)}
         onKeyDown={(e) => {
           if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", " "].includes(e.key)) {
@@ -342,7 +332,6 @@ export function PinWindow({ session }: { session: Session }) {
           }
         }}
         onScroll={() => onScroll(index)}
-        onMouseMove={showScrollbar}
         onMouseDown={(e) => {
           if (onScrollbar(e)) {
             // A native thumb drag owns scrolling until mouse-up, however long it is held.
