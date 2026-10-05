@@ -2,12 +2,15 @@
 // Allowed selectors: an accessible name (`aria/…`), a role (`[role=…]`, or a tag that is one, such as `button` or
 // `p`), and visible text (`button=Copy`, `*=part`). Class, `#id`, any other attribute and XPath are refused, as is
 // seeding or reading the settings document, which only a task about that document may do (Tasks 10 and 11, named below).
+// The support helpers the tasks call find elements under the same rules; they manage the data folders, settings
+// document included, on the tasks' behalf.
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const tasks = join(root, "e2e", "tasks");
+const support = join(root, "e2e", "support");
 
 /** A tag, a role attribute, or both, such as `[role=toolbar]` or `div[role="group"]`. */
 const roleCompound = /^(?:[a-z][a-z0-9]*)?(?:\[role=(?:"[^"]*"|'[^']*'|[\w-]+)\])?$/i;
@@ -37,10 +40,12 @@ const settingsDocument = /settings\.json|\bcustomSettings\b|\brelaunch\([^)]*\bs
 const aboutSettingsDocument = new Set(["keys.e2e.ts", "broken-settings-file.e2e.ts"]);
 
 const problems = [];
-const files = (await readdir(tasks, { recursive: true })).filter((name) => name.endsWith(".ts"));
-if (files.length === 0) problems.push(`no task tests found in ${relative(root, tasks)}`);
-for (const name of files) {
-  const file = join(tasks, name);
+const typeScriptIn = async (folder) =>
+  (await readdir(folder, { recursive: true })).filter((name) => name.endsWith(".ts")).map((name) => join(folder, name));
+const taskFiles = await typeScriptIn(tasks);
+if (taskFiles.length === 0) problems.push(`no task tests found in ${relative(root, tasks)}`);
+for (const file of [...taskFiles, ...(await typeScriptIn(support))]) {
+  const name = relative(tasks, file);
   const source = await readFile(file, "utf8");
   const report = (index, problem) => {
     const line = source.slice(0, index).split("\n").length;
@@ -56,7 +61,8 @@ for (const name of files) {
   for (const match of source.matchAll(/\b(?:react|custom)\$\$?\(/g)) {
     report(match.index, `finds an element by component structure (\`${match[0]}\`)`);
   }
-  const settingsUses = aboutSettingsDocument.has(name) ? [] : source.matchAll(settingsDocument);
+  const settingsUses =
+    !taskFiles.includes(file) || aboutSettingsDocument.has(name) ? [] : source.matchAll(settingsDocument);
   for (const match of settingsUses) {
     const use = match[0].replace(/^relaunch\(.*?(settings(?:Text)?)$/s, "relaunch({ $1 })");
     report(match.index, `uses the settings document (\`${use}\`); configure sidelingo through its UI`);
@@ -67,4 +73,4 @@ if (problems.length > 0) {
   console.error(problems.join("\n"));
   process.exit(1);
 }
-console.log(`${files.length} task test file(s) find elements as a user does.`);
+console.log(`${taskFiles.length} task test file(s) and their support helpers find elements as a user does.`);
