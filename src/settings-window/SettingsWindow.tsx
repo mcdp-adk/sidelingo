@@ -7,6 +7,8 @@ import {
   MessageBarBody,
   MessageBarTitle,
   Select,
+  Subtitle1,
+  Title2,
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
@@ -26,11 +28,12 @@ const useStyles = makeStyles({
   root: { height: "100vh", display: "flex", flexDirection: "column" },
   error: { flexShrink: 0, margin: tokens.spacingHorizontalL },
   page: { flex: 1, minHeight: 0, overflowY: "auto", padding: tokens.spacingHorizontalXXL },
+  title: { marginBottom: tokens.spacingVerticalXXL },
   section: {
     display: "flex",
     flexDirection: "column",
     rowGap: tokens.spacingVerticalL,
-    marginBottom: tokens.spacingVerticalXXXL,
+    ":not(:last-child)": { marginBottom: tokens.spacingVerticalXXXL },
   },
 });
 
@@ -88,9 +91,11 @@ export function SettingsWindow() {
         </MessageBar>
       )}
       <main ref={page} className={styles.page}>
-        <h1>{strings.settings}</h1>
+        <Title2 as="h1" block className={styles.title}>
+          {strings.settings}
+        </Title2>
         <section className={styles.section} aria-label={strings.provider}>
-          <h2>{strings.provider}</h2>
+          <Subtitle1 as="h2">{strings.provider}</Subtitle1>
           <Field label={strings.preset}>
             <Select
               aria-label={strings.preset}
@@ -150,11 +155,11 @@ export function SettingsWindow() {
           )}
         </section>
         <section className={styles.section} aria-label={strings.network}>
-          <h2>{strings.network}</h2>
+          <Subtitle1 as="h2">{strings.network}</Subtitle1>
           <NetworkSettings settings={settings} commit={commit} />
         </section>
         <section ref={general} className={styles.section} aria-label={strings.general}>
-          <h2>{strings.general}</h2>
+          <Subtitle1 as="h2">{strings.general}</Subtitle1>
           <TargetLanguageSetting
             value={settings.targetLanguage}
             commit={(targetLanguage) => commit({ targetLanguage })}
@@ -170,7 +175,7 @@ export function SettingsWindow() {
           <AutostartSetting />
         </section>
         <section className={styles.section} aria-label={strings.about}>
-          <h2>{strings.about}</h2>
+          <Subtitle1 as="h2">{strings.about}</Subtitle1>
           <AboutSection
             automaticUpdates={settings.automaticUpdates}
             commit={(automaticUpdates) => commit({ automaticUpdates })}
