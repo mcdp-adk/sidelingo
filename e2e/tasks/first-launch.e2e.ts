@@ -69,10 +69,11 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await expectShownOption(preset, ui.chooseProvider);
 
       await preset.selectByVisibleText(ui.custom);
+      // Leaving the Base URL field with Tab commits it, as Enter does.
       await replaceTextField("Base URL", provider.baseUrl);
-      await browser.keys("Enter");
+      await browser.keys("Tab");
       await $(`aria/${ui.reasoningEffort}`).selectByVisibleText("low");
-      // The Provider's models are offered once the Base URL is in; the user types a Model of their own,
+      // The Provider's models are offered once the Base URL is committed; the user types a Model of their own,
       // commits it with Enter and copies straight away.
       await $(`aria/${ui.model}`).click();
       await expect($("aria/catalog-alpha")).toBeDisplayed();
