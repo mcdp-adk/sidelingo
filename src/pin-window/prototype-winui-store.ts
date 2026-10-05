@@ -6,6 +6,7 @@ export const AXES = {
   bar: ["current", "solid layer", "acrylic layer"],
   content: ["current", "winui"],
   theme: ["current", "winui"],
+  links: ["streamdown modal", "open directly", "fluent dialog"],
   sample: ["off", "on"],
 } as const;
 

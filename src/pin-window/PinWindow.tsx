@@ -14,6 +14,8 @@ import {
   MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
+  Dropdown,
+  Option,
   Select,
   Tab,
   TabList,
@@ -195,7 +197,9 @@ export function PinWindow({ session }: { session: Session }) {
   const md = (text: string) => (
     <Streamdown
       plugins={plugins}
-      {...(proto.content === 1 ? { components: winuiComponents, controls: winuiControls, lineNumbers: false } : {})}
+      {...(proto.content === 1
+        ? { components: winuiComponents[proto.links], controls: winuiControls, lineNumbers: false }
+        : {})}
     >
       {text}
     </Streamdown>
@@ -259,7 +263,8 @@ export function PinWindow({ session }: { session: Session }) {
         void invoke("open_settings");
       }
       // Esc in the right-click menu closes only the menu.
-      if (e.key === "Escape" && !(e.target as Element).closest("[role=menu]")) void hide();
+      if (e.key === "Escape" && !(e.target as Element).closest("[role=menu], [role=dialog], [role=listbox]"))
+        void hide();
     };
     // The window drag starts only past the threshold, so a click never loses its mouse-up to it
     // (tauri-apps/tauri#10767).
@@ -524,7 +529,23 @@ export function PinWindow({ session }: { session: Session }) {
               </Tooltip>
             ))}
           </TabList>
-          {compact && (
+          {compact && proto.bar !== 0 && (
+            <Dropdown
+              aria-label={strings.displayMode}
+              size="small"
+              className={styles.dropdown}
+              value={modeLabels[mode]}
+              selectedOptions={[mode]}
+              onOptionSelect={(_, data) => selectMode(data.optionValue as DisplayMode)}
+            >
+              {DISPLAY_MODES.map((value) => (
+                <Option key={value} value={value}>
+                  {modeLabels[value]}
+                </Option>
+              ))}
+            </Dropdown>
+          )}
+          {compact && proto.bar === 0 && (
             <Select
               aria-label={strings.displayMode}
               size="small"

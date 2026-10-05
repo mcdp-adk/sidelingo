@@ -211,3 +211,49 @@
 .proto-content-winui tr:last-child td {
   border-bottom: 0;
 }
+
+/* Code text: <code> carries the UA's own monospace (SimSun on Chinese Windows), so set it there too. */
+.proto-code-block :is(pre, code) {
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+/* Every nested scroller (code blocks, tables) gets the same thin, auto-hiding bar as the pane, no arrows. */
+.proto-content-winui * {
+  scrollbar-width: auto;
+}
+.proto-content-winui *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+.proto-content-winui *::-webkit-scrollbar-button {
+  display: none;
+}
+.proto-content-winui *::-webkit-scrollbar-track {
+  background: transparent;
+}
+.proto-content-winui *::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+.proto-content-winui *:hover::-webkit-scrollbar-thumb {
+  background: var(--colorNeutralForeground3);
+}
+
+/* Task list marks. */
+.proto-content-winui li:has(> .proto-task) {
+  list-style: none;
+  margin-left: -20px;
+}
+.proto-task {
+  font-size: 16px;
+  vertical-align: -3px;
+  margin-right: 6px;
+  color: var(--colorNeutralForeground2);
+}
+
+.proto-dialog-url {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
