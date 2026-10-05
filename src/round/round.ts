@@ -129,8 +129,8 @@ async function* withoutReasoning(deltas: AsyncGenerator<string>): AsyncGenerator
 }
 
 /**
- * Runs Structuring for images and text with a line break, then streams one Translation of the whole
- * Source text through `client`. A single line goes straight to Translation. Aborting `signal` cancels every call.
+ * Runs Structuring on every Input, then streams one Translation of the whole Source text through `client`.
+ * Aborting `signal` cancels every call.
  */
 export async function* run(
   client: ProviderClient,
@@ -138,46 +138,44 @@ export async function* run(
   configuration: RoundConfiguration,
   signal: AbortSignal,
 ): AsyncGenerator<RoundState> {
-  const text = input.kind === "text" ? input.text.trim() : "";
-  let sourceText = text;
-  const needsStructuring = input.kind === "image" || /[\r\n]/.test(text);
-  if (needsStructuring) {
-    sourceText = "";
-    let source: RoundPane = { text: sourceText, status: "streaming" };
-    const translation: RoundPane = { text: "", status: "waiting" };
-    yield { stage: "structuring", outcome: "running", source, translation };
-    try {
-      for await (const cleaned of withoutReasoning(
-        client.streamChat(configuration.provider, structuringMessages(input), signal),
-      )) {
-        sourceText = cleaned;
-        // An image's answer that may still become NO_TEXT stays hidden, so NO_TEXT never shows as text.
-        const mayBeNoText = input.kind === "image" && NO_TEXT.startsWith(sourceText.trim());
-        source = { text: mayBeNoText ? "" : sourceText, status: "streaming" };
-        yield { stage: "structuring", outcome: "running", source, translation };
-      }
-      if (!sourceText.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
-    } catch (reason) {
-      if (signal.aborted) return;
-      const error = roundError(reason, "structuring", input, configuration);
-      yield {
-        stage: "structuring",
-        outcome: "failed",
-        source: { text: sourceText, status: "failed", error },
-        translation: { text: "", status: "skipped", error },
-      };
-      return;
+  let sourceText = "";
+  const waiting: RoundPane = { text: "", status: "waiting" };
+  yield {
+    stage: "structuring",
+    outcome: "running",
+    source: { text: sourceText, status: "streaming" },
+    translation: waiting,
+  };
+  try {
+    for await (const cleaned of withoutReasoning(
+      client.streamChat(configuration.provider, structuringMessages(input), signal),
+    )) {
+      sourceText = cleaned;
+      // An image's answer that may still become NO_TEXT stays hidden, so NO_TEXT never shows as text.
+      const mayBeNoText = input.kind === "image" && NO_TEXT.startsWith(sourceText.trim());
+      const source: RoundPane = { text: mayBeNoText ? "" : sourceText, status: "streaming" };
+      yield { stage: "structuring", outcome: "running", source, translation: waiting };
     }
-    source = { text: sourceText, status: "done" };
-    if (input.kind === "image" && sourceText.trim() === NO_TEXT) {
-      yield {
-        stage: "no-text",
-        outcome: "no-text",
-        source: { text: "", status: "done" },
-        translation: { text: "", status: "skipped" },
-      };
-      return;
-    }
+    if (!sourceText.trim()) throw new ProviderError("empty-response", "The Provider returned an empty response.");
+  } catch (reason) {
+    if (signal.aborted) return;
+    const error = roundError(reason, "structuring", input, configuration);
+    yield {
+      stage: "structuring",
+      outcome: "failed",
+      source: { text: sourceText, status: "failed", error },
+      translation: { text: "", status: "skipped", error },
+    };
+    return;
+  }
+  if (input.kind === "image" && sourceText.trim() === NO_TEXT) {
+    yield {
+      stage: "no-text",
+      outcome: "no-text",
+      source: { text: "", status: "done" },
+      translation: { text: "", status: "skipped" },
+    };
+    return;
   }
   const source: RoundPane = { text: sourceText, status: "done" };
   let translated = "";

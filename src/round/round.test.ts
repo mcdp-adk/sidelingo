@@ -5,6 +5,8 @@ import { customSettings, startCore, type Core, type Reply, type SentRequest } fr
 const IMAGE: Input = { kind: "image", dataUrl: "data:image/png;base64,iVBORw0KGgo=" };
 const LINES = "A wrapped line\ncontinues here";
 const EMPTY = "The Provider returned an empty response.";
+/** Structuring's reply for "A single line" that keeps it as it is. */
+const LINE_STRUCTURED: Reply = [{ content: "A single line" }];
 const DROPPED = "The connection dropped.";
 
 interface Row {
@@ -79,12 +81,6 @@ const rows: Row[] = [
     replies: [[{ content: "## Source" }], { status: 429, message: "Slow down" }],
     source: "## Source",
   })(http(429, "Slow down")),
-  translationFails({
-    name: "an HTTP error for a single line, which goes straight to Translation",
-    input: "A single line",
-    replies: [{ status: 500, message: "Internal error" }],
-    source: "A single line",
-  })(http(500, "Internal error")),
   structuringFails({ name: "a 400 for an image Input", input: IMAGE, reply: { status: 400, message: "No images" } })(
     http(400, "No images", { hints: ["image-model-support"] }),
   ),
@@ -98,7 +94,7 @@ const rows: Row[] = [
     name: "a 400 for a request with a reasoning effort",
     input: "A single line",
     reasoningEffort: "low",
-    replies: [{ status: 400, message: "Unsupported effort" }],
+    replies: [LINE_STRUCTURED, { status: 400, message: "Unsupported effort" }],
     source: "A single line",
   })(http(400, "Unsupported effort", { hints: ["reasoning-effort"] })),
   structuringFails({
@@ -110,7 +106,7 @@ const rows: Row[] = [
   translationFails({
     name: "a 400 for a text Input at Default effort",
     input: "A single line",
-    replies: [{ status: 400, message: "Rejected" }],
+    replies: [LINE_STRUCTURED, { status: 400, message: "Rejected" }],
     source: "A single line",
   })(http(400, "Rejected")),
   structuringFails({
@@ -123,7 +119,7 @@ const rows: Row[] = [
     translationFails({
       name: `an HTTP ${status}, which settings can fix`,
       input: "A single line",
-      replies: [{ status, message: `Refused ${status}` }],
+      replies: [LINE_STRUCTURED, { status, message: `Refused ${status}` }],
       source: "A single line",
     })(http(status, `Refused ${status}`, { offersSettings: true })),
   ),
@@ -164,7 +160,7 @@ const rows: Row[] = [
   translationFails({
     name: "a Translation stream that drops after partial text",
     input: "A single line",
-    replies: [[{ content: "Partial translation" }, { drop: true }]],
+    replies: [LINE_STRUCTURED, [{ content: "Partial translation" }, { drop: true }]],
     source: "A single line",
   })(network(DROPPED), "Partial translation"),
   structuringFails({
@@ -214,12 +210,6 @@ const done = (source: string, translation: string): RoundState => ({
 const structuredThenTranslated = (source: string, translation: string) => [
   structuring(""),
   structuring(source),
-  translating(source, ""),
-  translating(source, translation),
-  done(source, translation),
-];
-/** A single line translated in one chunk. */
-const translatedAtOnce = (source: string, translation: string) => [
   translating(source, ""),
   translating(source, translation),
   done(source, translation),
@@ -325,23 +315,11 @@ interface PipelineRow {
 
 const pipeline: PipelineRow[] = [
   {
-    name: "a single line skips Structuring, so its Source text is done at once",
-    input: "  Une seule ligne  ",
-    replies: [[{ content: "A single" }, { content: " line" }]],
-    shown: [
-      translating("Une seule ligne", ""),
-      translating("Une seule ligne", "A single"),
-      translating("Une seule ligne", "A single line"),
-      done("Une seule ligne", "A single line"),
-    ],
-    sent: [translationRequest("Une seule ligne")],
-  },
-  {
-    name: "a line ending in a line break is a single line",
-    input: "Une ligne\r\n",
-    replies: [[{ content: "A line" }]],
-    shown: translatedAtOnce("Une ligne", "A line"),
-    sent: [translationRequest("Une ligne")],
+    name: "a single line sends a Structuring request, then a Translation request of its Structuring result",
+    input: "  `npm run build`  ",
+    replies: [[{ content: "```sh\nnpm run build\n```" }], [{ content: "Translated" }]],
+    shown: structuredThenTranslated("```sh\nnpm run build\n```", "Translated"),
+    sent: [structuringRequest(textPart("`npm run build`")), translationRequest("```sh\nnpm run build\n```")],
   },
   {
     name: "multi-line text streams Structuring, then one Translation of the complete Source text",
@@ -436,6 +414,7 @@ const pipeline: PipelineRow[] = [
     name: "reasoning fields and keep-alive comments in the stream are not shown",
     input: "A single line",
     replies: [
+      LINE_STRUCTURED,
       [
         { comment: "keep-alive" },
         { data: '{"choices":[{"delta":{"reasoning_content":"leaked"}}]}' },
@@ -444,8 +423,8 @@ const pipeline: PipelineRow[] = [
         { content: "Translated" },
       ],
     ],
-    shown: translatedAtOnce("A single line", "Translated"),
-    sent: [translationRequest("A single line")],
+    shown: structuredThenTranslated("A single line", "Translated"),
+    sent: [structuringRequest(textPart("A single line")), translationRequest("A single line")],
   },
   {
     name: "at Default effort, both streamed requests carry only the Model and the prompts, Translation's in the Target language",
@@ -461,9 +440,9 @@ const pipeline: PipelineRow[] = [
   {
     name: "Source text already in the Target language is still translated, into English while none is stored",
     input: "The quick brown fox",
-    replies: [[{ content: "The quick brown fox" }]],
-    shown: translatedAtOnce("The quick brown fox", "The quick brown fox"),
-    sent: [translationRequest("The quick brown fox")],
+    replies: [[{ content: "The quick brown fox" }], [{ content: "The quick brown fox" }]],
+    shown: structuredThenTranslated("The quick brown fox", "The quick brown fox"),
+    sent: [structuringRequest(textPart("The quick brown fox")), translationRequest("The quick brown fox")],
   },
   ...["low", "none"].map((reasoningEffort): PipelineRow => ({
     name: `Custom's ${reasoningEffort} effort is sent as reasoning_effort in both stages`,
@@ -485,9 +464,15 @@ const pipeline: PipelineRow[] = [
     },
     keyEnvironment: { OPENROUTER_API_KEY: "router-key" },
     input: "A single line",
-    replies: [[{ content: "Translated" }]],
-    shown: translatedAtOnce("A single line", "Translated"),
+    replies: [LINE_STRUCTURED, [{ content: "Translated" }]],
+    shown: structuredThenTranslated("A single line", "Translated"),
     sent: [
+      structuringRequest(textPart("A single line"), {
+        fields: { reasoning: { effort: "high" } },
+        model: "router-model",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        authorization: "Bearer router-key",
+      }),
       translationRequest("A single line", {
         fields: { reasoning: { effort: "high" } },
         model: "router-model",
@@ -522,9 +507,9 @@ const pipeline: PipelineRow[] = [
     name: `the Base URL ${baseUrl} is used as entered without trailing slashes`,
     settings: customSettings({ baseUrl }),
     input: "A single line",
-    replies: [[{ content: "Translated" }]],
-    shown: translatedAtOnce("A single line", "Translated"),
-    sent: [translationRequest("A single line", { url })],
+    replies: [LINE_STRUCTURED, [{ content: "Translated" }]],
+    shown: structuredThenTranslated("A single line", "Translated"),
+    sent: [structuringRequest(textPart("A single line"), { url }), translationRequest("A single line", { url })],
   })),
 ];
 

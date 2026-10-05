@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customSettings, settle, startCore, type Core, type SentRequest } from "../testing/core";
+import { customSettings, settle, startCore, type Core, type Reply, type SentRequest } from "../testing/core";
 
 const OVERLONG = "x".repeat(10_001);
 const LONGEST = "a".repeat(10_000);
@@ -28,11 +28,17 @@ const failed = async (core: Core) => {
 
 const streaming = (core: Core, text: string) => core.until((state) => state.round?.state.translation.text === text);
 
-/** Each request as "<Target language>: <Input>"; every Input here is one line, so a Round sends one request. */
+/** Structuring's reply that keeps a one-line Input as it is, so its Translation request carries the Input. */
+const kept = (input: string): Reply => [{ content: input }];
+
+/** Each request as "Structuring: <Input>" or "<Target language>: <Source text>"; every Source text here is one line. */
 const asked = ({ body }: SentRequest) => {
-  const [, language, input] = /^Translate to (\w+):\n[\s\S]*\n(.*)$/.exec(body.messages[1].content)!;
-  return `${language}: ${input}`;
+  const user = body.messages[1].content;
+  if (Array.isArray(user)) return `Structuring: ${user[0].text}`;
+  const [, language, source] = /^Translate to (\w+):\n[\s\S]*\n(.*)$/.exec(user)!;
+  return `${language}: ${source}`;
 };
+const round = (input: string, language = "English") => [`Structuring: ${input}`, `${language}: ${input}`];
 
 interface Row {
   name: string;
@@ -40,7 +46,7 @@ interface Row {
   act(core: Core): Promise<void>;
   /** The requests sent, in order. */
   asked: string[];
-  /** Indexes of the requests the Session cancelled mid-stream. (A finished request's signal may abort too, so other rows don't look.) */
+  /** Indexes of the requests whose signal the Session aborted: a Round's requests share one signal, so its finished Structuring request is listed too. (Other rows don't look.) */
   cancelled?: number[];
   /** The Translated text shown at the end, or null when no Round is shown. */
   shown: string | null;
@@ -52,139 +58,141 @@ const rows: Row[] = [
   {
     name: "copying the same Input twice sends nothing",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Same"), [{ content: "Done" }]);
       await core.copy("Same");
       await shows(core, "Done");
       await core.copy("Same");
     },
-    asked: ["English: Same"],
+    asked: round("Same"),
     shown: "Done",
   },
   {
     name: "a new copy cancels the Round in flight, and its later text never shows",
     async act(core) {
       const first = held("Partial", " obsolete");
-      core.provider.reply(first.reply, [{ content: "Second done" }]);
+      core.provider.reply(kept("First"), first.reply, kept("Second"), [{ content: "Second done" }]);
       await core.copy("First");
       await streaming(core, "Partial");
       await core.copy("Second");
       await shows(core, "Second done");
       first.release();
     },
-    asked: ["English: First", "English: Second"],
-    cancelled: [0],
+    asked: [...round("First"), ...round("Second")],
+    cancelled: [0, 1],
     shown: "Second done",
   },
   {
     name: "showing the window with the last successful Input reuses it",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Reused"), [{ content: "Done" }]);
       await core.copy("Reused");
       await shows(core, "Done");
       await core.hide();
       await core.show("Reused");
     },
-    asked: ["English: Reused"],
+    asked: round("Reused"),
     shown: "Done",
   },
   {
     name: "showing the window reuses the last successful Input after a Display mode change",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Reused"), [{ content: "Done" }]);
       await core.copy("Reused");
       await shows(core, "Done");
       await core.changeSettings(customSettings({}, { displayMode: "both" }));
       await core.hide();
       await core.show("Reused");
     },
-    asked: ["English: Reused"],
+    asked: round("Reused"),
     shown: "Done",
   },
   {
     name: "showing the window with nothing usable keeps the shown result",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Kept"), [{ content: "Done" }]);
       await core.copy("Kept");
       await shows(core, "Done");
       await core.hide();
       await core.show(null);
     },
-    asked: ["English: Kept"],
+    asked: round("Kept"),
     shown: "Done",
   },
   {
     name: "a Round still running when the window shows keeps running",
     async act(core) {
-      const round = held("Partial", " and the rest");
-      core.provider.reply(round.reply);
+      const pending = held("Partial", " and the rest");
+      core.provider.reply(kept("Running"), pending.reply);
       await core.copy("Running");
       await streaming(core, "Partial");
       await core.hide();
       await core.show("Running");
-      round.release();
+      pending.release();
       await shows(core, "Partial and the rest");
     },
-    asked: ["English: Running"],
+    asked: round("Running"),
     shown: "Partial and the rest",
   },
   {
     name: "a Round that finishes while the window is hidden is reused",
     async act(core) {
-      const round = held("Partial", " and the rest");
-      core.provider.reply(round.reply);
+      const pending = held("Partial", " and the rest");
+      core.provider.reply(kept("Hidden"), pending.reply);
       await core.copy("Hidden");
       await streaming(core, "Partial");
       await core.hide();
-      round.release();
+      pending.release();
       await shows(core, "Partial and the rest");
       await core.show("Hidden");
     },
-    asked: ["English: Hidden"],
+    asked: round("Hidden"),
     shown: "Partial and the rest",
   },
   {
     name: "a failed Round is not reused",
     async act(core) {
-      core.provider.reply(UNAVAILABLE, [{ content: "Retried" }]);
+      core.provider.reply(UNAVAILABLE, kept("Failing"), [{ content: "Retried" }]);
       await core.copy("Failing");
       await failed(core);
       await core.hide();
       await core.show("Failing");
       await shows(core, "Retried");
     },
-    asked: ["English: Failing", "English: Failing"],
+    asked: ["Structuring: Failing", ...round("Failing")],
     shown: "Retried",
   },
   {
     name: "a partial Round is not reused",
     async act(core) {
-      core.provider.reply([{ content: "Partial" }, { drop: true }], [{ content: "Retried" }]);
+      core.provider.reply(kept("Dropping"), [{ content: "Partial" }, { drop: true }], kept("Dropping"), [
+        { content: "Retried" },
+      ]);
       await core.copy("Dropping");
       await failed(core);
       await core.hide();
       await core.show("Dropping");
       await shows(core, "Retried");
     },
-    asked: ["English: Dropping", "English: Dropping"],
+    asked: [...round("Dropping"), ...round("Dropping")],
     shown: "Retried",
   },
   {
     name: "a pause ignores copies",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Before"), [{ content: "Done" }]);
       await core.copy("Before");
       await shows(core, "Done");
       core.session.toggleClipboardPause();
       await core.copy("Ignored");
     },
-    asked: ["English: Before"],
+    asked: round("Before"),
     shown: "Done",
     paused: true,
   },
   {
     name: "hiding the window resets a pause",
     async act(core) {
-      core.provider.reply([{ content: "Done" }], [{ content: "Followed" }]);
+      core.provider.reply(kept("Before"), [{ content: "Done" }], kept("After"), [{ content: "Followed" }]);
       await core.copy("Before");
       await shows(core, "Done");
       core.session.toggleClipboardPause();
@@ -192,58 +200,58 @@ const rows: Row[] = [
       await core.copy("After");
       await shows(core, "Followed");
     },
-    asked: ["English: Before", "English: After"],
+    asked: [...round("Before"), ...round("After")],
     shown: "Followed",
   },
   {
     name: "an Input of exactly 10,000 characters starts at once",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept(LONGEST), [{ content: "Done" }]);
       await core.copy(LONGEST);
       await shows(core, "Done");
     },
-    asked: [`English: ${LONGEST}`],
+    asked: round(LONGEST),
     shown: "Done",
   },
   {
     name: "an Input over 10,000 characters waits for Process anyway, clearing the shown result",
     async act(core) {
-      core.provider.reply([{ content: "Done" }]);
+      core.provider.reply(kept("Short"), [{ content: "Done" }]);
       await core.copy("Short");
       await shows(core, "Done");
       await core.copy(OVERLONG);
     },
-    asked: ["English: Short"],
+    asked: round("Short"),
     shown: null,
     overlong: true,
   },
   {
     name: "Process anyway runs an Input over 10,000 characters",
     async act(core) {
-      core.provider.reply([{ content: "Processed" }]);
+      core.provider.reply(kept(OVERLONG), [{ content: "Processed" }]);
       await core.copy(OVERLONG);
       // The Pin window's Process anyway is Regenerate on the waiting Input.
       core.session.regenerate();
       await shows(core, "Processed");
     },
-    asked: [`English: ${OVERLONG}`],
+    asked: round(OVERLONG),
     shown: "Processed",
   },
   {
     name: "a new copy replaces an Input waiting for Process anyway",
     async act(core) {
-      core.provider.reply([{ content: "Followed" }]);
+      core.provider.reply(kept("Next"), [{ content: "Followed" }]);
       await core.copy(OVERLONG);
       await core.copy("Next");
       await shows(core, "Followed");
     },
-    asked: ["English: Next"],
+    asked: round("Next"),
     shown: "Followed",
   },
   {
     name: "Regenerate reruns a reused Round",
     async act(core) {
-      core.provider.reply([{ content: "Original" }], [{ content: "Regenerated" }]);
+      core.provider.reply(kept("Again"), [{ content: "Original" }], kept("Again"), [{ content: "Regenerated" }]);
       await core.copy("Again");
       await shows(core, "Original");
       await core.hide();
@@ -251,40 +259,40 @@ const rows: Row[] = [
       core.session.regenerate();
       await shows(core, "Regenerated");
     },
-    asked: ["English: Again", "English: Again"],
+    asked: [...round("Again"), ...round("Again")],
     shown: "Regenerated",
   },
   {
     name: "Regenerate cancels the Round in flight and reruns its Input",
     async act(core) {
       const first = held("Partial", " obsolete");
-      core.provider.reply(first.reply, [{ content: "Regenerated" }]);
+      core.provider.reply(kept("Again"), first.reply, kept("Again"), [{ content: "Regenerated" }]);
       await core.copy("Again");
       await streaming(core, "Partial");
       core.session.regenerate();
       await shows(core, "Regenerated");
       first.release();
     },
-    asked: ["English: Again", "English: Again"],
-    cancelled: [0],
+    asked: [...round("Again"), ...round("Again")],
+    cancelled: [0, 1],
     shown: "Regenerated",
   },
   {
     name: "Regenerate retries after a failure",
     async act(core) {
-      core.provider.reply(UNAVAILABLE, [{ content: "Retried" }]);
+      core.provider.reply(UNAVAILABLE, kept("Failing"), [{ content: "Retried" }]);
       await core.copy("Failing");
       await failed(core);
       core.session.regenerate();
       await shows(core, "Retried");
     },
-    asked: ["English: Failing", "English: Failing"],
+    asked: ["Structuring: Failing", ...round("Failing")],
     shown: "Retried",
   },
   {
     name: "a failed Regenerate leaves the earlier success not reusable",
     async act(core) {
-      core.provider.reply([{ content: "Original" }], UNAVAILABLE, [{ content: "Rerun" }]);
+      core.provider.reply(kept("Again"), [{ content: "Original" }], UNAVAILABLE, kept("Again"), [{ content: "Rerun" }]);
       await core.copy("Again");
       await shows(core, "Original");
       core.session.regenerate();
@@ -293,43 +301,43 @@ const rows: Row[] = [
       await core.show("Again");
       await shows(core, "Rerun");
     },
-    asked: ["English: Again", "English: Again", "English: Again"],
+    asked: [...round("Again"), "Structuring: Again", ...round("Again")],
     shown: "Rerun",
   },
   {
     name: "a configuration change during a Round lets it finish but makes it not reusable",
     async act(core) {
-      const round = held("Partial", " and the rest");
-      core.provider.reply(round.reply, [{ content: "Japanese" }]);
+      const pending = held("Partial", " and the rest");
+      core.provider.reply(kept("Configured"), pending.reply, kept("Configured"), [{ content: "Japanese" }]);
       await core.copy("Configured");
       await streaming(core, "Partial");
       await core.changeSettings(customSettings({}, { targetLanguage: "ja" }));
       await settle();
-      expect(core.provider.requests).toHaveLength(1);
-      round.release();
+      expect(core.provider.requests).toHaveLength(2);
+      pending.release();
       await shows(core, "Partial and the rest");
       await core.hide();
       await core.show("Configured");
       await shows(core, "Japanese");
     },
-    asked: ["English: Configured", "Japanese: Configured"],
+    asked: [...round("Configured"), ...round("Configured", "Japanese")],
     shown: "Japanese",
   },
   {
     name: "a configuration change keeps the shown result but makes it not reusable",
     async act(core) {
-      core.provider.reply([{ content: "Done" }], [{ content: "Japanese" }]);
+      core.provider.reply(kept("Configured"), [{ content: "Done" }], kept("Configured"), [{ content: "Japanese" }]);
       await core.copy("Configured");
       await shows(core, "Done");
       await core.changeSettings(customSettings({}, { targetLanguage: "ja" }));
       await settle();
       expect(core.session.state().round?.state.translation.text).toBe("Done");
-      expect(core.provider.requests).toHaveLength(1);
+      expect(core.provider.requests).toHaveLength(2);
       await core.hide();
       await core.show("Configured");
       await shows(core, "Japanese");
     },
-    asked: ["English: Configured", "Japanese: Configured"],
+    asked: [...round("Configured"), ...round("Configured", "Japanese")],
     shown: "Japanese",
   },
 ];

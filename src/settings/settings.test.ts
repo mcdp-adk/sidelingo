@@ -11,14 +11,14 @@ const CUSTOM_CHAT = "https://provider.test/v1/chat/completions";
 type Outcome = { failure: ConfigurationFailure } | { sent: { url: string; authorization: string | null } };
 
 /**
- * Copies a line and waits until the Session either publishes a readiness failure or ends the Round.
+ * Copies a line, which Structuring keeps as it is, and waits until the Session either publishes a readiness failure or ends the Round.
  * `afterCopy` runs once the copy has been delivered.
  */
 async function copyOnce(
   core: Awaited<ReturnType<typeof startCore>>,
   afterCopy?: () => Promise<void>,
 ): Promise<Outcome> {
-  core.provider.reply([{ content: "Translated" }]);
+  core.provider.reply([{ content: "A single line" }], [{ content: "Translated" }]);
   await core.copy("A single line");
   await afterCopy?.();
   const state = await core.until(
@@ -29,9 +29,14 @@ async function copyOnce(
     expect(core.provider.requests).toEqual([]);
     return { failure: state.configurationFailure };
   }
-  expect(core.provider.requests).toHaveLength(1);
-  const [{ url, headers }] = core.provider.requests;
-  return { sent: { url, authorization: headers.get("authorization") } };
+  // Structuring and Translation reach the Provider the same way.
+  const [structuring, translation] = core.provider.requests.map(({ url, headers }) => ({
+    url,
+    authorization: headers.get("authorization"),
+  }));
+  expect(core.provider.requests).toHaveLength(2);
+  expect(structuring).toEqual(translation);
+  return { sent: translation! };
 }
 
 const openai = (openai: Record<string, unknown>) => ({ schemaVersion: 1, activePreset: "openai", presets: { openai } });
@@ -310,11 +315,10 @@ describe("The initial Target language", () => {
     const core = await harness.startCore({
       settings: harness.customSettings({}, stored === undefined ? {} : { targetLanguage: stored }),
     });
-    core.provider.reply([{ content: "Translated" }]);
+    core.provider.reply([{ content: "A single line" }], [{ content: "Translated" }]);
     await core.copy("A single line");
     await core.roundEnds();
-    expect(core.provider.requests.map(({ body }) => body.messages[1].content.split(":\n")[0])).toEqual([
-      `Translate to ${language}`,
-    ]);
+    const translation = core.provider.requests.at(-1)!;
+    expect(translation.body.messages[1].content.split(":\n")[0]).toBe(`Translate to ${language}`);
   });
 });
