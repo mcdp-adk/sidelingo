@@ -31,9 +31,8 @@ import {
   PauseRegular,
   SettingsRegular,
 } from "@fluentui/react-icons";
-import { Streamdown } from "streamdown";
-import { cjk } from "@streamdown/cjk";
 import { strings } from "../i18n";
+import { Markdown } from "../look/Markdown";
 import type { RoundError } from "../round/round";
 import { useSession, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
@@ -47,7 +46,6 @@ const SCROLL_INTENT_LINGER = 400;
 const SCROLLBAR_REACH = 16;
 
 const hide = () => invoke("hide_pin_window");
-const plugins = { cjk };
 const modeLabels: Record<DisplayMode, string> = {
   source: strings.sourceMode,
   translation: strings.translationMode,
@@ -142,7 +140,6 @@ const useStyles = makeStyles({
     textOverflow: "ellipsis",
   },
   errorDetail: { whiteSpace: "pre-wrap" },
-  source: { color: tokens.colorNeutralForeground3 },
 });
 
 /** A press on the content's own scrollbar, which drags the thumb rather than the window. */
@@ -158,7 +155,8 @@ function onScrollbar(e: MouseEvent<HTMLElement>): boolean {
 /** Inline controls keep their normal pointer behavior rather than moving or hiding the window. */
 function interactiveTarget(target: EventTarget): boolean {
   return (
-    target instanceof Element && target.closest("button, a[href], input, select, textarea, [role=button]") !== null
+    target instanceof Element &&
+    target.closest("button, a[href], input, select, textarea, [role=button], [role=link]") !== null
   );
 }
 
@@ -373,16 +371,14 @@ export function PinWindow({ session }: { session: Session }) {
             </MessageBar>
           ) : (
             <>
-              {result.text && <Streamdown plugins={plugins}>{result.text}</Streamdown>}
+              {result.text && <Markdown text={result.text} />}
               {!result.text && state.outcome === "running" && (
                 <Text as="p" block className={styles.status}>
                   {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
                 </Text>
               )}
               {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
-                <div className={styles.source}>
-                  <Streamdown plugins={plugins}>{state.source.text}</Streamdown>
-                </div>
+                <Markdown text={state.source.text} muted />
               )}
               {result.error && (
                 <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>

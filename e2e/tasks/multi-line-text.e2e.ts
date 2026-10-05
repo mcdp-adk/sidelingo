@@ -99,7 +99,7 @@ describe("Task 2: multi-line text", () => {
     const sourcePane = regions()[0];
     await expect(sourcePane.$$("li")).toBeElementsArrayOfSize(2);
     await expect(sourcePane.$$("td")).toBeElementsArrayOfSize(2);
-    await expect(sourcePane.$("button=链接")).toBeDisplayed();
+    await expect(sourcePane.$("[role=link]")).toHaveText("链接");
     // The bold before CJK punctuation renders, so no asterisk is left.
     await expect(sourcePane).toHaveText("强调，以及链接。", { containing: true });
     await expect(sourcePane).not.toHaveText("*", { containing: true });

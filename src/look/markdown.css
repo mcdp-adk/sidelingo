@@ -1,0 +1,205 @@
+/* The look module's Markdown: every element GFM and Streamdown produce, on WinUI's type ramp and 4 px grid.
+   Streamdown's own utility classes carry no styles (sidelingo loads no Tailwind), so these rules are the only ones. */
+
+.look-markdown {
+  /* Body 14/20. */
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+  color: var(--colorNeutralForeground1);
+}
+
+/* Block rhythm: 12 between blocks, 20 above a heading and 8 below it, 16 around a rule. */
+/* No browser margins: the baseline clears most; these are the rest. */
+:where(.look-markdown) :where(hr, details, table, section) {
+  margin: 0;
+}
+.look-markdown > * + *,
+.look-markdown :is(blockquote, details, section) > * + * {
+  margin-top: 12px;
+}
+.look-markdown > :is(h1, h2, h3, h4, h5, h6) + * {
+  margin-top: 8px;
+}
+.look-markdown > * + :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 20px;
+}
+.look-markdown > * + hr,
+.look-markdown > hr + * {
+  margin-top: 16px;
+}
+
+/* Headings: Subtitle 20/28, BodyLarge 18/24, BodyStrong 14/20; h5 and h6 in the secondary colour. */
+.look-markdown :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: var(--fontWeightSemibold);
+}
+.look-markdown h1 {
+  font-size: var(--fontSizeBase500);
+  line-height: var(--lineHeightBase500);
+}
+.look-markdown h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.look-markdown :is(h3, h4, h5, h6) {
+  font-size: var(--fontSizeBase300);
+  line-height: var(--lineHeightBase300);
+}
+.look-markdown :is(h5, h6) {
+  color: var(--colorNeutralForeground2);
+}
+
+/* Inline text. */
+.look-markdown :is(strong, b) {
+  font-weight: var(--fontWeightSemibold);
+}
+.look-markdown del {
+  color: var(--colorNeutralForeground3);
+}
+.look-markdown mark {
+  /* SystemFillColorCautionBackground. */
+  background-color: var(--colorStatusWarningBackground1);
+  color: inherit;
+}
+.look-markdown :is(sub, sup) {
+  font-size: var(--fontSizeBase100);
+  line-height: 0;
+}
+
+/* Lists: 20 indent, 4 between items, tertiary markers. */
+.look-markdown :is(ul, ol) {
+  padding-left: 20px;
+}
+.look-markdown ul {
+  list-style-type: disc;
+}
+.look-markdown ol {
+  list-style-type: decimal;
+}
+.look-markdown li + li,
+.look-markdown li > * + * {
+  margin-top: 4px;
+}
+.look-markdown li::marker {
+  color: var(--colorNeutralForeground3);
+}
+/* A task's checkbox mark stands in the marker's place. */
+.look-markdown li.task-list-item {
+  list-style-type: none;
+}
+.look-task {
+  display: inline-block;
+  width: 16px;
+  margin-left: -20px;
+  margin-right: 4px;
+  font-size: 16px;
+  line-height: 0;
+  vertical-align: -3px;
+  color: var(--colorNeutralForeground2);
+}
+
+/* Quotes: a 3 px control stroke on the left, secondary text. */
+.look-markdown blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--colorNeutralStroke1);
+  color: var(--colorNeutralForeground2);
+}
+
+/* A rule is a divider. */
+.look-markdown hr {
+  height: 0;
+  border: 0;
+  border-top: 1px solid var(--colorNeutralStroke2);
+}
+
+/* Inline code and keys: mono 12 chips on a subtle fill (SubtleFillColorSecondary); a key adds a control stroke. */
+.look-markdown :not(pre) > code,
+.look-markdown kbd {
+  padding: 1px 4px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--colorSubtleBackgroundHover);
+  font-size: var(--fontSizeBase200);
+}
+.look-markdown kbd {
+  border: 1px solid var(--colorNeutralStroke1);
+}
+
+/* Code blocks: a card, mono 12/20, scrolling inside itself; the copy button sits in the padding on the right. */
+.look-code-block {
+  position: relative;
+  border: 1px solid var(--look-card-stroke);
+  border-radius: var(--borderRadiusLarge);
+  background-color: var(--look-card);
+}
+.look-code-block pre {
+  max-height: 400px;
+  overflow: auto;
+  padding: 8px 40px 8px 12px;
+  font-size: var(--fontSizeBase200);
+  line-height: 20px;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+/* Tables: a list with column headers, no frame or fill, scrolling sideways inside itself. */
+.look-table {
+  overflow-x: auto;
+}
+.look-table table {
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.look-table :is(th, td) {
+  padding: 8px 16px 8px 0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: normal;
+}
+.look-table th {
+  font-weight: var(--fontWeightSemibold);
+  color: var(--colorNeutralForeground2);
+  white-space: nowrap;
+}
+.look-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Images fit the pane, with control corners. */
+.look-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--borderRadiusMedium);
+}
+
+/* Footnotes: Caption 12, secondary, after a divider. */
+.look-markdown > section:where([data-footnotes]) {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--colorNeutralStroke2);
+  font-size: var(--fontSizeBase200);
+  line-height: var(--lineHeightBase200);
+  color: var(--colorNeutralForeground2);
+}
+/* The section's "Footnotes" heading is for screen readers only. */
+.look-markdown section[data-footnotes] > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.look-markdown section[data-footnotes] > h2 + * {
+  margin-top: 0;
+}
+
+/* Details: a BodyStrong summary. */
+.look-markdown summary {
+  font-weight: var(--fontWeightSemibold);
+}
+
+/* Muted: the same layout, all in the tertiary colour. */
+.look-markdown.look-muted,
+.look-markdown.look-muted * {
+  color: var(--colorNeutralForeground3);
+}

@@ -21,6 +21,8 @@ const WINUI = {
     ControlStrokeColorSecondary: "rgba(255, 255, 255, 0.094)", // #18FFFFFF
     ControlStrongStrokeColorDefault: "rgba(255, 255, 255, 0.545)", // #8BFFFFFF
     DividerStrokeColorDefault: "rgba(255, 255, 255, 0.082)", // #15FFFFFF
+    CardStrokeColorDefault: "rgba(0, 0, 0, 0.098)", // #19000000
+    CardBackgroundFillColorDefault: "rgba(255, 255, 255, 0.051)", // #0DFFFFFF
     SurfaceStrokeColorFlyout: "rgba(0, 0, 0, 0.2)", // #33000000
     SubtleFillColorSecondary: "rgba(255, 255, 255, 0.059)", // #0FFFFFFF
     SubtleFillColorTertiary: "rgba(255, 255, 255, 0.039)", // #0AFFFFFF
@@ -43,6 +45,8 @@ const WINUI = {
     ControlStrokeColorSecondary: "rgba(0, 0, 0, 0.161)", // #29000000
     ControlStrongStrokeColorDefault: "rgba(0, 0, 0, 0.447)", // #72000000
     DividerStrokeColorDefault: "rgba(0, 0, 0, 0.059)", // #0F000000
+    CardStrokeColorDefault: "rgba(0, 0, 0, 0.059)", // #0F000000
+    CardBackgroundFillColorDefault: "rgba(255, 255, 255, 0.702)", // #B3FFFFFF
     SurfaceStrokeColorFlyout: "rgba(0, 0, 0, 0.059)", // #0F000000
     SubtleFillColorSecondary: "rgba(0, 0, 0, 0.035)", // #09000000
     SubtleFillColorTertiary: "rgba(0, 0, 0, 0.024)", // #06000000
@@ -92,6 +96,8 @@ export function lookVariables(scheme: Scheme): Record<string, string> {
     "--look-raised": SURFACES[scheme].raised,
     "--look-flyout-stroke": winui.SurfaceStrokeColorFlyout,
     "--look-smoke": winui.SmokeFillColorDefault,
+    "--look-card": winui.CardBackgroundFillColorDefault,
+    "--look-card-stroke": winui.CardStrokeColorDefault,
   };
 }
 
