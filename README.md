@@ -119,7 +119,7 @@ cargo install --git https://github.com/chippers/msedgedriver-tool --rev 8c4b34f5
 pnpm test:e2e
 ```
 
-It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into `src-tauri/target/e2e`, so it never touches your own sidelingo's data or a running copy. That build checks for updates at a local endpoint the tests serve on port 47561, not on GitHub. It also writes the Windows clipboard.
+It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into `src-tauri/target/e2e`, so it never touches your own sidelingo's data or a running copy. `pnpm build:e2e` makes that build alone. That build checks for updates at a local endpoint the tests serve on port 47561, not on GitHub. It also writes the Windows clipboard.
 
 A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run.
 

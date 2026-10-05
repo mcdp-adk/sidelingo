@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -20,4 +21,19 @@ if (typeof identifier !== "string" || identifier === "" || identifier === appIde
   throw new Error(
     `${e2eConfigPath} must give the e2e build an identifier other than sidelingo's own (${appIdentifier}), so its runs never touch your own sidelingo's data.`,
   );
+}
+
+/** Built apart from `tauri dev` and release builds, so neither overwrites the other. */
+const targetDir = join(root, "src-tauri", "target", "e2e");
+export const appExe = join(targetDir, "debug", "sidelingo.exe");
+
+/** Builds the e2e app; `pnpm test:e2e` runs this first, and `pnpm build:e2e` runs it alone. */
+export function buildApp(): void {
+  execFileSync("pnpm", ["tauri", "build", "--debug", "--no-bundle", "--config", e2eConfigPath], {
+    cwd: root,
+    // Absolute: Cargo resolves a relative target dir from src-tauri.
+    env: { ...process.env, CARGO_TARGET_DIR: targetDir },
+    stdio: "inherit",
+    shell: true,
+  });
 }
