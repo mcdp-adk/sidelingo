@@ -17,7 +17,8 @@
     "build:e2e": "node -e \"import('./e2e/support/config.ts').then((m) => m.buildApp())\"",
     "test:e2e": "wdio run e2e/wdio.conf.ts",
     "check:tasks": "node scripts/check-tasks.mjs",
-    "test:real": "vitest run --config vitest.real.config.ts"
+    "test:real": "vitest run --config vitest.real.config.ts",
+    "eval:structuring": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {
     "@fluentui/react-components": "^9.74.9",

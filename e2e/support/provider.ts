@@ -44,8 +44,24 @@ export interface ModelReply {
   wait?: Promise<unknown>;
 }
 
-/** Streams back the last line of the last message, so a copied line comes back as its own translation. */
-const echo: Script = ({ body }) => [{ delta: { content: body.messages.at(-1).content.split("\n").at(-1) } }];
+/** Whether `request` asks for Structuring: its user message is a list of parts, where Translation's is a string. */
+export const isStructuring = (request: RecordedRequest): boolean => Array.isArray(request.body.messages.at(-1).content);
+
+/** Answers the Structuring of a copied text by keeping the text as it is, and every other request with `script`. */
+export function keepingText(script: Script): (request: RecordedRequest) => Step[] | HttpReply {
+  return (request) => {
+    const text = isStructuring(request)
+      ? request.body.messages.at(-1).content.find((part: { type: string }) => part.type === "text")?.text
+      : undefined;
+    if (text !== undefined) return [{ delta: { content: text } }];
+    return typeof script === "function" ? script(request) : script;
+  };
+}
+
+/** Keeps a copied text as its Source text, then streams back its last line, so a copied line comes back as its own translation. */
+const echo: Script = keepingText(({ body }) => [
+  { delta: { content: body.messages.at(-1).content.split("\n").at(-1) } },
+]);
 
 /** A local Provider speaking Chat Completions, scripted per test, recording every request. */
 export class FakeProvider {

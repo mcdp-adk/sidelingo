@@ -1,9 +1,7 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, inspectPng, writeClipboardBitmap } from "../support/clipboard";
-import { FakeProvider, gate, type RecordedRequest } from "../support/provider";
+import { FakeProvider, gate, isStructuring, keepingText, type RecordedRequest } from "../support/provider";
 import { setUpCustomProvider } from "../support/settings";
-
-const structuring = (request: RecordedRequest) => Array.isArray(request.body.messages[1].content);
 
 /** The image a Structuring request carries, decoded independently of the app. */
 function sentImage(request: RecordedRequest) {
@@ -38,7 +36,7 @@ describe("Task 3: images", () => {
     const translated = `The screenshot translated ${stamp}`;
     const reading = gate();
     provider.reset((request) =>
-      structuring(request) ? [reading, { delta: { content: source } }] : [{ delta: { content: translated } }],
+      isStructuring(request) ? [reading, { delta: { content: source } }] : [{ delta: { content: translated } }],
     );
     writeClipboardBitmap(3000, 1500);
     await expect($("p=Structuring…")).toBeDisplayed();
@@ -59,11 +57,12 @@ describe("Task 3: images", () => {
     // A copy holding both text and a bitmap is the text.
     const copied = `A line copied with a picture ${stamp}`;
     const lineTranslated = `The line translated ${stamp}`;
-    provider.reset([{ delta: { content: lineTranslated } }]);
+    provider.reset(keepingText([{ delta: { content: lineTranslated } }]));
     writeClipboardBitmap(80, 40, { text: copied });
     await expect($("[role=region]")).toHaveText(lineTranslated);
-    expect(provider.requests).toHaveLength(1);
-    expect(provider.requests[0].body.messages[1].content).toContain(copied);
+    expect(provider.requests).toHaveLength(2);
+    // Structuring kept the copied text, so Translation carries it.
+    expect(provider.requests[1].body.messages[1].content).toContain(copied);
 
     // A picture without text: the model answers NO_TEXT, which the user never reads as text.
     const finishing = gate();

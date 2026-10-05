@@ -1,6 +1,6 @@
 import { relaunch } from "../support/app";
 import { clearClipboard, readClipboardText, writeClipboardText } from "../support/clipboard";
-import { FakeProvider, gate } from "../support/provider";
+import { FakeProvider, gate, keepingText } from "../support/provider";
 import { expectShownOption, replaceTextField, switchToSettingsWindow } from "../support/settings";
 
 // The WebView's language stands in for Windows' display language, which picks the UI language.
@@ -48,7 +48,7 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       const first = `Bonjour ${stamp}`;
       const rest = ` and welcome ${stamp}`;
       const held = gate();
-      provider.reset([{ delta: { content: first } }, held, { delta: { content: rest } }]);
+      provider.reset(keepingText([{ delta: { content: first } }, held, { delta: { content: rest } }]));
       provider.models({ ids: ["catalog-alpha", "catalog-beta"] });
 
       clearClipboard();
@@ -93,9 +93,11 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       await browser.waitUntil(() => readClipboardText() === first + rest, {
         timeoutMsg: "the clipboard never held the Translated text",
       });
-      expect(provider.requests).toHaveLength(1);
-      expect(provider.requests[0].body).toMatchObject({ model: "my-own-model", reasoning_effort: "low" });
-      expect(provider.requests[0].body.messages.at(-1).content).toContain(line);
+      // One Round: Structuring, then Translation with the Model and effort entered.
+      expect(provider.requests).toHaveLength(2);
+      const translation = provider.requests[1].body;
+      expect(translation).toMatchObject({ model: "my-own-model", reasoning_effort: "low" });
+      expect(translation.messages.at(-1).content).toContain(line);
     });
   }
 });

@@ -50,3 +50,6 @@ vite.config.ts.timestamp-*
 
 # What a failing end-to-end test left on screen
 /e2e/failures/
+
+# What the Structuring eval wrote; outputs stay local
+/eval/structuring/output/

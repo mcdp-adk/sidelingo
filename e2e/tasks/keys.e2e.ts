@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { capabilities, dataFolders, identifier, quit, relaunch } from "../support/app";
 import { clearClipboard, writeClipboardText } from "../support/clipboard";
 import { runPowerShell } from "../support/powershell";
-import { FakeProvider } from "../support/provider";
+import { FakeProvider, keepingText } from "../support/provider";
 import { expectShownOption, followOpenSettings, replaceTextField } from "../support/settings";
 
 const launchKey = "synthetic-openai-launch-key";
@@ -47,7 +47,7 @@ describe("Task 10: the user's Provider keys", () => {
       DEEPSEEK_API_KEY: null,
       OLLAMA_API_KEY: null,
     };
-    provider.reset([{ delta: { content: "Translated with the entered key" } }]);
+    provider.reset(keepingText([{ delta: { content: "Translated with the entered key" } }]));
     clearClipboard();
     await relaunch({ environment });
     let pin = await browser.getWindowHandle();
@@ -92,7 +92,7 @@ describe("Task 10: the user's Provider keys", () => {
     expect(decryptForThisUser(JSON.parse(saved).presets.custom.keyCiphertext)).toBe(enteredKey);
 
     // After a restart, the line still on the clipboard is translated with the decrypted saved key.
-    provider.reset([{ delta: { content: "Translated after a restart" } }]);
+    provider.reset(keepingText([{ delta: { content: "Translated after a restart" } }]));
     await browser.reloadSession(capabilities());
     await expect($("p")).toHaveText("Translated after a restart");
     expect(provider.requests.at(-1)?.headers.authorization).toBe(`Bearer ${enteredKey}`);
@@ -104,7 +104,7 @@ describe("Task 10: the user's Provider keys", () => {
     document.presets.custom.keyCiphertext = foreign;
     document.presets.openai = { ...document.presets.openai, keyCiphertext: foreign };
     writeFileSync(settingsFile, JSON.stringify(document));
-    provider.reset([{ delta: { content: "Translated with the replacement key" } }]);
+    provider.reset(keepingText([{ delta: { content: "Translated with the replacement key" } }]));
     await browser.reloadSession(capabilities());
     pin = await browser.getWindowHandle();
     await expect($("[role=group]")).toHaveText(undecryptable, { containing: true });

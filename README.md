@@ -124,3 +124,11 @@ It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into
 A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run.
 
 `pnpm check:tasks`, which CI runs, refuses a task test or support helper that finds an element by class, `#id`, another attribute or XPath, and a task test that seeds or reads the settings document.
+
+### Structuring eval
+
+```bash
+pnpm eval:structuring
+```
+
+It runs every synthetic fixture in `eval/structuring/fixtures.ts` through a whole Round against OpenRouter (`~openai/gpt-luna-latest`) and Ollama Cloud (`deepseek-v4.1-flash`), both at reasoning effort `low`. It reads the keys from `OPENROUTER_API_KEY` and `OLLAMA_API_KEY`. For each fixture and model it writes the Source text, the Translated text, the outcome and the time to the first Translated token into `eval/structuring/output/`, which git ignores and each run replaces. It has no pass or fail: read each output against its fixture's note. Neither `pnpm test` nor CI runs it.

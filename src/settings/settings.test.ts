@@ -1,25 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationFailure } from "./settings";
-import { customSettings, settle, startCore } from "../testing/core";
+import { customSettings, settle, startCore, type Reply } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
 const UNDECRYPTABLE = "bm90LWEtRFBBUEktY2lwaGVydGV4dA==";
 const OPENAI_CHAT = "https://api.openai.com/v1/chat/completions";
 const CUSTOM_CHAT = "https://provider.test/v1/chat/completions";
+const LINE = "A single line";
+/** Structuring's reply that keeps `LINE` as it is. */
+const LINE_KEPT: Reply = [{ content: LINE }];
 
 /** What one copy leads to: the readiness failure the Session publishes, or the request it sends. */
 type Outcome = { failure: ConfigurationFailure } | { sent: { url: string; authorization: string | null } };
 
 /**
- * Copies a line and waits until the Session either publishes a readiness failure or ends the Round.
+ * Copies a line, which Structuring keeps as it is, and waits until the Session either publishes a readiness failure or ends the Round.
  * `afterCopy` runs once the copy has been delivered.
  */
 async function copyOnce(
   core: Awaited<ReturnType<typeof startCore>>,
   afterCopy?: () => Promise<void>,
 ): Promise<Outcome> {
-  core.provider.reply([{ content: "Translated" }]);
-  await core.copy("A single line");
+  core.provider.reply(LINE_KEPT, [{ content: "Translated" }]);
+  await core.copy(LINE);
   await afterCopy?.();
   const state = await core.until(
     (state) => state.configurationFailure !== null || (state.round !== null && state.round.state.outcome !== "running"),
@@ -29,8 +32,8 @@ async function copyOnce(
     expect(core.provider.requests).toEqual([]);
     return { failure: state.configurationFailure };
   }
-  expect(core.provider.requests).toHaveLength(1);
-  const [{ url, headers }] = core.provider.requests;
+  expect(core.provider.requests).toHaveLength(2);
+  const { url, headers } = core.provider.requests[1]!;
   return { sent: { url, authorization: headers.get("authorization") } };
 }
 
@@ -310,11 +313,10 @@ describe("The initial Target language", () => {
     const core = await harness.startCore({
       settings: harness.customSettings({}, stored === undefined ? {} : { targetLanguage: stored }),
     });
-    core.provider.reply([{ content: "Translated" }]);
-    await core.copy("A single line");
+    core.provider.reply(LINE_KEPT, [{ content: "Translated" }]);
+    await core.copy(LINE);
     await core.roundEnds();
-    expect(core.provider.requests.map(({ body }) => body.messages[1].content.split(":\n")[0])).toEqual([
-      `Translate to ${language}`,
-    ]);
+    const translation = core.provider.requests.at(-1)!;
+    expect(translation.body.messages[1].content.split(":\n")[0]).toBe(`Translate to ${language}`);
   });
 });
