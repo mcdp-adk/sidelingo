@@ -131,4 +131,7 @@ A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, clear
 pnpm eval:structuring
 ```
 
-It runs every synthetic fixture in `eval/structuring/fixtures.ts` through a whole Round against OpenRouter (`~openai/gpt-luna-latest`) and Ollama Cloud (`deepseek-v4.1-flash`), both at reasoning effort `low`. It reads the keys from `OPENROUTER_API_KEY` and `OLLAMA_API_KEY`. For each fixture and model it writes the Source text, the Translated text, the outcome and the time to the first Translated token into `eval/structuring/output/`, which git ignores and each run replaces. It has no pass or fail: read each output against its fixture's note. Neither `pnpm test` nor CI runs it.
+It runs every synthetic fixture in `eval/structuring/fixtures.ts` through a whole Round against OpenRouter (`~openai/gpt-luna-latest`) and Ollama Cloud (`deepseek-v4.1-flash`), both at reasoning effort `low`. It reads the keys from `OPENROUTER_API_KEY` and `OLLAMA_API_KEY`. For each fixture and model it writes the Source text, the Translated text, the outcome and the time to the first Translated token into `eval/structuring/output/<label>/`, which git ignores. Each model's `summary.md` adds the median time to the first Translated token per group and for every single line. It has no pass or fail: read each output against its fixture's note. Neither `pnpm test` nor CI runs it.
+
+- `EVAL_LABEL` names the run's folder (default `latest`). A run replaces only its own folder, so a `before` run stays beside an `after` run.
+- `EVAL_ONLY` runs only the fixtures named, or in a group named, in a comma-separated list, such as `EVAL_ONLY=one-line,lone-url`. Run the whole set once before stating conclusions in a PR.
