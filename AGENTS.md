@@ -20,5 +20,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 - Every ticked acceptance criterion has evidence, and an issue closes only with every criterion ticked.
 - Only the owner rewords an acceptance criterion; an agent proposes the new wording in conversation.
 - Evidence cites commits reachable from the PR or `main`, and states its results on GitHub. Captures and logs stay local, unnamed by path.
+- Evidence separates what was observed from its suspected cause, and marks a cause not reproduced as a hypothesis.
 - A PR for an issue starts with `Closes #N` when it finishes the issue, or `Refs #N` when it doesn't.
+- While working, test a change at the layer that owns it (ADR 0006); the task layer runs in full once, before merge.
 - A PR that changes code merges only after the task layer (`pnpm test:e2e`) passes locally, with the run shown in the PR. CI runs the rest.

@@ -1,17 +1,13 @@
 import { readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { e2eConfigPath, identifier, root } from "./config";
+import { appExe, identifier } from "./config";
 import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
 import { psString, runPowerShell } from "./powershell";
 import { inspectWindows } from "./window";
 
-export { identifier } from "./config";
-
-/** Built apart from `tauri dev` and release builds, so neither overwrites the other. */
-const targetDir = join(root, "src-tauri", "target", "e2e");
-export const appExe = join(targetDir, "debug", "sidelingo.exe");
+export { appExe, buildApp, identifier } from "./config";
 
 /** Folders named by an identifier, per ADR 0004: settings in Roaming, WebView2 data in Local. */
 export function dataFolders(id: string) {
@@ -41,15 +37,6 @@ export function dataFolderLeaks(values: Record<string, string | Buffer>): string
         .map(([name]) => `${name} in ${path}`);
     }),
   );
-}
-
-export function buildApp(): void {
-  execFileSync("pnpm", ["tauri", "build", "--debug", "--no-bundle", "--config", e2eConfigPath], {
-    cwd: root,
-    env: { ...process.env, CARGO_TARGET_DIR: targetDir },
-    stdio: "inherit",
-    shell: true,
-  });
 }
 
 export interface Launch {
@@ -85,7 +72,10 @@ export function resetDataFolders({ settingsText }: Launch = {}): void {
   }
 }
 
-/** Quits the app and launches it again from fresh data folders, returning once the Pin window shows. */
+/**
+ * Quits the app and launches it again from fresh data folders, returning once the Pin window shows. An element found
+ * before a relaunch belongs to the ended session; find elements after it, or through a function that finds them afresh.
+ */
 export async function relaunch(launch: Launch = {}): Promise<void> {
   await browser.deleteSession();
   await useLaunchEnvironment(launch.environment);

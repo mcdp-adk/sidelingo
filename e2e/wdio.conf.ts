@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { appExe, buildApp, capabilities, resetDataFolders } from "./support/app";
 import { SevereServiceError } from "webdriverio";
@@ -9,6 +10,45 @@ import { psString, runPowerShell } from "./support/powershell";
 
 /** A failing test leaves its screenshot and page source here. */
 const failuresDir = resolve(import.meta.dirname, "failures");
+
+/**
+ * One run per machine, across every checkout: each run drives the real clipboard, the default hotkey and the e2e
+ * build's data folders. The file holds the owning run's process id.
+ */
+const runLock = join(tmpdir(), "sidelingo-e2e.lock");
+
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function takeRunLock(): void {
+  try {
+    writeFileSync(runLock, String(process.pid), { flag: "wx" });
+    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  }
+  const owner = Number(readFileSync(runLock, "utf8"));
+  // An empty file is a run that has just taken the lock.
+  if (!owner || isRunning(owner)) {
+    throw new Error(`another e2e run (process ${owner || "starting"}) is using this machine; wait for it to finish`);
+  }
+  // The owner exited without releasing it.
+  writeFileSync(runLock, String(process.pid));
+}
+
+function releaseRunLock(): void {
+  try {
+    if (Number(readFileSync(runLock, "utf8")) === process.pid) rmSync(runLock);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+}
 
 /** A leftover e2e app, or another owner of the default hotkey, would taint every launch. */
 async function expectNothingHeldOver(): Promise<void> {
@@ -42,15 +82,21 @@ export const config: WebdriverIO.Config = {
 
   async onPrepare() {
     try {
+      takeRunLock();
       await expectNothingHeldOver();
       rmSync(failuresDir, { recursive: true, force: true });
       buildApp();
       mkdirSync(driverDir, { recursive: true });
       execFileSync("msedgedriver-tool", { cwd: driverDir, stdio: "inherit" });
     } catch (error) {
+      releaseRunLock();
       const message = error instanceof Error ? error.message : String(error);
       throw new SevereServiceError(`E2E preparation failed: ${message}`);
     }
+  },
+
+  onComplete() {
+    releaseRunLock();
   },
 
   // Every spec file starts the app from empty data folders.

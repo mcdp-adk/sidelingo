@@ -31,6 +31,7 @@ describe("Task 7: the Target language", () => {
     await picker.click();
     await browser.keys(["Control", "a"]);
     await browser.keys("日本語");
+    // A bare [role=option] also finds a native select's options, such as "Choose a Provider".
     const option = $("[role=listbox] [role=option]");
     await expect(option).toHaveText(/Japanese[\s\S]*日本語/);
     await option.click();

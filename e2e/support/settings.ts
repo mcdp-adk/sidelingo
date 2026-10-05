@@ -61,7 +61,10 @@ export async function setUpCustomProvider(
   return { pin, settings };
 }
 
-/** Follows the Open settings button of the Pin window's notice or error, returning once Settings shows. */
+/**
+ * Follows the Open settings button of the Pin window's notice or error, returning once Settings shows. The
+ * choose-a-Provider notice appears only once something is copied; with nothing copied, open Settings from the toolbar.
+ */
 export async function followOpenSettings(): Promise<{ pin: string; settings: string }> {
   const pin = await browser.getWindowHandle();
   // The user waits to see the notice or error before pressing its button.
