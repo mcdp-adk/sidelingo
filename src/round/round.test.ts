@@ -247,7 +247,7 @@ const structuringRequest = (
     stream: true,
     ...fields,
     messages: [
-      { role: "system", content: expect.stringMatching(/^You turn an Input into faithful, readable Source text\./) },
+      { role: "system", content: expect.stringMatching(/^You lay out an Input as Source text /) },
       { role: "user", content: [part] },
     ],
   },
