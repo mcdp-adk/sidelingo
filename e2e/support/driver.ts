@@ -1,8 +1,9 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { connect, createServer, type AddressInfo } from "node:net";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
+import { root } from "./config";
 
 const providerKeyNames = ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OLLAMA_API_KEY"] as const;
 
@@ -11,7 +12,7 @@ export type LaunchEnvironment = Partial<
   Record<(typeof providerKeyNames)[number] | "HTTP_PROXY" | "HTTPS_PROXY" | "ALL_PROXY" | "NO_PROXY", string | null>
 >;
 
-export const driverDir = resolve(import.meta.dirname, "..", "..", "node_modules", ".cache", "msedgedriver");
+export const driverDir = join(root, "node_modules", ".cache", "msedgedriver");
 
 interface DriverState {
   process?: ChildProcess;

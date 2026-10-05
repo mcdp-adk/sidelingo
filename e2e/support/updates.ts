@@ -1,13 +1,9 @@
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { e2eConfig } from "./config";
 
 /** The update endpoint the e2e build checks, from its own config, in place of the latest GitHub Release. */
-const endpoint = new URL(
-  JSON.parse(readFileSync(join(resolve(import.meta.dirname, "..", ".."), "src-tauri", "tauri.e2e.conf.json"), "utf8"))
-    .plugins.updater.endpoints[0],
-);
+const endpoint = new URL(e2eConfig.plugins.updater.endpoints[0]);
 
 /** A local update endpoint that finds no newer release, recording every check. */
 export class FakeUpdateEndpoint {

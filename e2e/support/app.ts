@@ -1,17 +1,14 @@
 import { existsSync, readdirSync, readFileSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
+import { e2eConfig, e2eConfigPath, root } from "./config";
 import { useLaunchEnvironment, type LaunchEnvironment } from "./driver";
 import { psString, runPowerShell } from "./powershell";
 import { inspectWindows } from "./window";
 
-const root = resolve(import.meta.dirname, "..", "..");
-const e2eConfig = join(root, "src-tauri", "tauri.e2e.conf.json");
-const identifierIn = (config: string): string => JSON.parse(readFileSync(config, "utf8")).identifier;
-
 /** The e2e build's own identifier, which names its AppData folders and single-instance lock. */
-export const identifier = identifierIn(e2eConfig);
+export const identifier: string = e2eConfig.identifier;
 
 /** Built apart from `tauri dev` and release builds, so neither overwrites the other. */
 const targetDir = join(root, "src-tauri", "target", "e2e");
@@ -48,7 +45,7 @@ export function dataFolderLeaks(values: Record<string, string | Buffer>): string
 }
 
 export function buildApp(): void {
-  execFileSync("pnpm", ["tauri", "build", "--debug", "--no-bundle", "--config", e2eConfig], {
+  execFileSync("pnpm", ["tauri", "build", "--debug", "--no-bundle", "--config", e2eConfigPath], {
     cwd: root,
     env: { ...process.env, CARGO_TARGET_DIR: targetDir },
     stdio: "inherit",
