@@ -15,7 +15,7 @@ One pass of processing, from an Input through Structuring to a finished Translat
 _Avoid_: Request, job (a Round may involve several model requests)
 
 **Structuring** (整理):
-Turning an Input into well-organized, readable Source text; always applied, whether the Input is plain text or an image.
+Turning an Input into Source text laid out the way its content is meant to be read, without changing its words; always applied, whether the Input is plain text or an image.
 _Avoid_: Formatting, Markdown conversion, OCR
 
 **Source text** (原文):
