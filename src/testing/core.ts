@@ -21,7 +21,8 @@ export function customSettings(custom: Record<string, unknown> = {}, document: R
   };
 }
 
-type Command = (args: any) => unknown;
+/** A Rust command as the core invokes it: named arguments in, the command's result out. */
+type Command = (args: Record<string, unknown>) => unknown;
 
 export interface CoreOptions {
   /** The stored settings document `read_settings` returns, `null` included; a Custom Preset when left out. */
@@ -78,7 +79,7 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
       status: "document",
       document: "settings" in options ? options.settings : customSettings(),
     }),
-    unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext] ?? null,
+    unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext as string] ?? null,
     pin_window_ready: () => null,
     // The updater finds no update unless a test plays otherwise.
     "plugin:updater|check": () => null,
@@ -91,7 +92,8 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
       invoked.push({ command, args });
       const played = commands[command];
       if (!played) throw new Error(`The core invoked \`${command}\`, which this test does not play.`);
-      return played(args);
+      // The core passes named arguments or none; it never sends raw bytes.
+      return played((args ?? {}) as Record<string, unknown>);
     },
     { shouldMockEvents: true },
   );
