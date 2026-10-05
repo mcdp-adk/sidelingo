@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { FluentProvider } from "@fluentui/react-components";
 import { lookVariables, winuiTheme, type Scheme } from "./winui";
 import "./baseline.css";
@@ -17,6 +18,16 @@ function useScheme(): Scheme {
     return () => darkQuery.removeEventListener("change", onChange);
   }, []);
   return dark ? "dark" : "light";
+}
+
+/** The system accent, starting from the one read at startup, as it changes; the native half sends each change. */
+function useAccent(initial: string | null): string | null {
+  const [accent, setAccent] = useState(initial);
+  useEffect(() => {
+    const unlisten = listen<string>("accent-changed", ({ payload }) => setAccent(payload));
+    return () => void unlisten.then((stop) => stop());
+  }, []);
+  return accent;
 }
 
 const editable = (target: EventTarget | null) =>
@@ -53,8 +64,9 @@ function browserShortcut(e: KeyboardEvent): boolean {
  * baseline every element starts from, the overlay rule, the component overrides, and the browser behaviours a
  * native window doesn't have. Everything inside renders on Mica.
  */
-export function LookProvider({ accent, children }: { accent: string | null; children: ReactNode }) {
+export function LookProvider({ initialAccent, children }: { initialAccent: string | null; children: ReactNode }) {
   const scheme = useScheme();
+  const accent = useAccent(initialAccent);
   const theme = useMemo(() => winuiTheme(accent ?? DEFAULT_ACCENT, scheme), [accent, scheme]);
 
   // On the root rather than the provider, so Fluent's portalled overlays see them too.

@@ -15,7 +15,9 @@ import { startUpdateChecks, startUpdateStatus } from "./updates/updates";
 document.documentElement.lang = uiLanguage;
 
 function App({ accent, session }: { accent: string | null; session: Session | null }) {
-  return <LookProvider accent={accent}>{session ? <PinWindow session={session} /> : <SettingsWindow />}</LookProvider>;
+  return (
+    <LookProvider initialAccent={accent}>{session ? <PinWindow session={session} /> : <SettingsWindow />}</LookProvider>
+  );
 }
 
 const accent = await invoke<string | null>("accent_color");
