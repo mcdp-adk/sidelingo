@@ -32,9 +32,12 @@ export async function expectShownOption(dropdown: ReturnType<typeof $>, text: st
   });
 }
 
+/** The Model `setUpCustomProvider` enters. */
+export const TASK_MODEL = "task-model";
+
 /**
  * Sets up the Custom Preset as a user does on a fresh install, from the Pin window: the toolbar's Settings button,
- * Custom, then the Base URL, a Model and an optional Key, each committed with Enter. Returns to the Pin window and
+ * Custom, then the Base URL, the Model `TASK_MODEL` and an optional Key, each committed with Enter. Returns to the Pin window and
  * leaves the settings window open.
  */
 export async function setUpCustomProvider(
@@ -48,7 +51,7 @@ export async function setUpCustomProvider(
   await $("aria/Preset").selectByVisibleText("Custom");
   await replaceTextField("Base URL", baseUrl);
   await browser.keys("Enter");
-  await replaceTextField("Model", "task-model");
+  await replaceTextField("Model", TASK_MODEL);
   await browser.keys("Enter");
   if (key !== undefined) {
     await replaceTextField("Key", key);
