@@ -26,14 +26,6 @@ export async function replaceTextField(label: string, value: string): Promise<vo
   await browser.keys(value);
 }
 
-/** Waits until a closed dropdown, found by its accessible name, shows `text`, as a user reads it. */
-export async function expectShownOption(dropdown: ReturnType<typeof $>, text: string): Promise<void> {
-  // Ask afresh each time; a controlled dropdown changes its choice after a save.
-  await browser.waitUntil(() => dropdown.$(`option=${text}`).isSelected(), {
-    timeoutMsg: `the dropdown never showed "${text}"`,
-  });
-}
-
 /** The Model `setUpCustomProvider` enters. */
 export const TASK_MODEL = "task-model";
 
