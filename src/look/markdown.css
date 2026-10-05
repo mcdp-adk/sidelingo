@@ -215,9 +215,3 @@
   font-weight: var(--fontWeightSemibold);
   cursor: default;
 }
-
-.look-dialog-url {
-  font-family: var(--fontFamilyMonospace);
-  font-size: var(--fontSizeBase200);
-  overflow-wrap: anywhere;
-}

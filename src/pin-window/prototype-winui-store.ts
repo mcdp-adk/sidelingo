@@ -3,14 +3,13 @@ import { useSyncExternalStore } from "react";
 
 /** Only what the look module hasn't settled; the choice lives in the URL's search params, so a reload keeps it. */
 export const AXES = {
-  links: ["open directly", "fluent dialog"],
   sample: ["off", "markdown", "states"],
 } as const;
 
 export type Axis = keyof typeof AXES;
 export type Prototype = Record<Axis, number>;
 
-const START: Prototype = { links: 0, sample: 1 };
+const START: Prototype = { sample: 1 };
 
 const listeners = new Set<() => void>();
 let snapshot = read();

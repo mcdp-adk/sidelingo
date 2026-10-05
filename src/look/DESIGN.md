@@ -135,6 +135,6 @@ Hover, pressed, selected and disabled come from the token map. Focus uses WinUI'
 | Browser text selection colour | accent |
 | Streamdown's link-safety modal, code and table chrome | replaced by Fluent pieces in `<Markdown>` |
 
-## Open
+## Decided in review
 
-- Clicking a link: open directly (recommended; WinUI's Hyperlink does) or confirm in a Fluent dialog. The prototype's `links` switch shows both.
+- Clicking a link opens it in the default browser at once, as WinUI's Hyperlink does; the URL shows on hover. A confirming Fluent dialog was tried and dropped (2026-10-05).
