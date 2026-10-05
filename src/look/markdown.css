@@ -139,6 +139,16 @@
   white-space: pre;
   overflow-wrap: normal;
 }
+/* The copy button sits on an opaque raised backing, so code scrolled sideways passes behind it rather than through
+   its icon. Over the card on Mica, the raised fill reads as the card itself; the subtle button's hover and press
+   fills draw over it. */
+.look-code-copy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border-radius: var(--borderRadiusMedium);
+  background-color: var(--look-raised);
+}
 
 /* Tables: a list with column headers, no frame or fill, scrolling sideways inside itself. */
 .look-table {

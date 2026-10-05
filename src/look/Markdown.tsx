@@ -27,7 +27,6 @@ const useStyles = makeStyles({
     ":hover": { color: tokens.colorNeutralForeground3 },
     ":active": { color: tokens.colorNeutralForeground3 },
   },
-  copy: { position: "absolute", top: tokens.spacingVerticalXS, right: tokens.spacingHorizontalXS },
 });
 
 /** The text of a hast element, as written. */
@@ -49,25 +48,25 @@ function webUrl(href: string | undefined): string | null {
 
 /** A code block: a card with one copy button. Mermaid fences show their source the same way. */
 function CodeBlock({ node }: ExtraProps) {
-  const styles = useStyles();
   const code = node ? textOf(node).replace(/\n$/, "") : "";
   return (
     <div className="look-code-block">
       <pre>
         <code>{code}</code>
       </pre>
-      <Tooltip content={strings.copyCode} relationship="label">
-        <Button
-          className={styles.copy}
-          size="small"
-          appearance="subtle"
-          icon={<CopyRegular />}
-          // The app's own copy, which the clipboard follower knows as sidelingo's and so starts no Round.
-          onClick={() =>
-            void invoke("copy_text", { text: code }).catch((reason) => console.error("Code was not copied:", reason))
-          }
-        />
-      </Tooltip>
+      <div className="look-code-copy">
+        <Tooltip content={strings.copyCode} relationship="label">
+          <Button
+            size="small"
+            appearance="subtle"
+            icon={<CopyRegular />}
+            // The app's own copy, which the clipboard follower knows as sidelingo's and so starts no Round.
+            onClick={() =>
+              void invoke("copy_text", { text: code }).catch((reason) => console.error("Code was not copied:", reason))
+            }
+          />
+        </Tooltip>
+      </div>
     </div>
   );
 }
