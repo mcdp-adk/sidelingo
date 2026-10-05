@@ -234,6 +234,40 @@ describe("A changed settings document", () => {
   });
 });
 
+describe("The UI language", () => {
+  afterEach(() => {
+    vi.stubGlobal("navigator", { language: "en-US" });
+    vi.resetModules();
+  });
+
+  // Any Chinese display language gives Simplified Chinese, anything else English (#29 → Languages).
+  // The recovery notification is the core's own text that reaches the Rust side.
+  it.each([
+    { displayLanguage: "zh-CN", title: "设置已恢复" },
+    { displayLanguage: "zh-TW", title: "设置已恢复" },
+    { displayLanguage: "zh-HK", title: "设置已恢复" },
+    { displayLanguage: "en-US", title: "Settings recovered" },
+    { displayLanguage: "ja-JP", title: "Settings recovered" },
+    { displayLanguage: "fr-CA", title: "Settings recovered" },
+  ])(
+    "under $displayLanguage, the settings recovery notification is titled $title",
+    async ({ displayLanguage, title }) => {
+      vi.stubGlobal("navigator", { language: displayLanguage });
+      vi.resetModules();
+      const harness = await import("../testing/core");
+      const core = await harness.startCore({
+        commands: {
+          read_settings: () => ({ status: "invalidJson" }),
+          set_aside_broken_settings: () => true,
+          show_native_notification: () => null,
+        },
+      });
+      const notifications = core.invoked.filter(({ command }) => command === "show_native_notification");
+      expect(notifications.map(({ args }) => (args as { title: string }).title)).toEqual([title]);
+    },
+  );
+});
+
 describe("The initial Target language", () => {
   afterEach(() => {
     vi.stubGlobal("navigator", { language: "en-US" });
