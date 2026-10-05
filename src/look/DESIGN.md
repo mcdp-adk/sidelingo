@@ -18,6 +18,7 @@ Inside the module, in order of preference:
 | --- | --- | --- |
 | `<LookProvider accent>` | `main.tsx`, around both windows | system light/dark and accent; the WinUI → Fluent token map; the element baseline; the overlay rule; the component overrides; the context menu, browser shortcuts and spellcheck |
 | `<Markdown text muted>` | the Pin window, for Source and Translated text | Streamdown and its configuration; one style for every Markdown element; code blocks, tables, task marks and links drawn with Fluent. No other component imports Streamdown |
+| `<ChoiceDropdown choices value labelOf onChoose>` | the Pin window's Display mode; Settings' Preset, Reasoning effort and Proxy mode | the Fluent Dropdown and its options for one of a fixed set of typed choices: the closed label, the selected option, and only a listed choice reaching `onChoose` |
 | `useLayerStyles()` | the Pin window, for its toolbar and its paused state | the toolbar layer's fill and divider; the caution frame around a paused window |
 | `webview_defaults(builder)` | both Rust window builders | WebView2's Fluent overlay scrollbar; autofill off. Both windows must agree, because WebView2 fixes the scrollbar style per environment |
 
@@ -25,6 +26,7 @@ Inside the module, in order of preference:
 | --- | --- |
 | `LookProvider.tsx` | the theme, the root variables, and the browser behaviours |
 | `winui.ts` | WinUI's values by resource name, the opaque surfaces, and the token map |
+| `ChoiceDropdown.tsx` | the dropdown for a fixed set of typed choices |
 | `layers.ts` | the looks no Fluent control draws: the toolbar layer and the paused frame |
 | `baseline.css` | the element baseline (§ 1), the overlay rule (§ 2) and the component overrides (§ 3) |
 | `Markdown.tsx` | Streamdown's configuration and the pieces that replace its web chrome: code block, table, task mark, link, image |

@@ -6,7 +6,6 @@ import {
   makeStyles,
   mergeClasses,
   Button,
-  Dropdown,
   Menu,
   MenuItem,
   MenuList,
@@ -15,7 +14,6 @@ import {
   MessageBarActions,
   MessageBarBody,
   MessageBarTitle,
-  Option,
   Tab,
   TabList,
   Text,
@@ -33,6 +31,7 @@ import {
   SettingsRegular,
 } from "@fluentui/react-icons";
 import { strings } from "../i18n";
+import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import { useLayerStyles } from "../look/layers";
 import { Markdown } from "../look/Markdown";
 import type { RoundError } from "../round/round";
@@ -455,23 +454,18 @@ export function PinWindow({ session }: { session: Session }) {
             ))}
           </TabList>
           {compact && (
-            <Dropdown
+            <ChoiceDropdown
               aria-label={strings.displayMode}
               size="small"
               className={styles.dropdown}
               button={{ className: styles.dropdownButton }}
-              value={modeLabels[mode]}
-              selectedOptions={[mode]}
-              onOptionSelect={(_, data) => data.optionValue && selectMode(data.optionValue as DisplayMode)}
+              choices={DISPLAY_MODES}
+              value={mode}
+              labelOf={(value) => modeLabels[value]}
+              onChoose={selectMode}
               // Its list hangs below the top band, so the toolbar stays while the list is open.
               onOpenChange={(_, data) => setModeListOpen(data.open)}
-            >
-              {DISPLAY_MODES.map((value) => (
-                <Option key={value} value={value}>
-                  {modeLabels[value]}
-                </Option>
-              ))}
-            </Dropdown>
+            />
           )}
         </div>
         <div ref={actions} className={styles.actions} onMouseDown={onEmptyToolbarMouseDown}>
