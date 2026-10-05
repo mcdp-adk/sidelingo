@@ -1,0 +1,213 @@
+/* PROTOTYPE (branch prototype/winui-look): throwaway, never merge into main.
+   WinUI values recalled from microsoft-ui-xaml's theme resources; verify before folding in.
+   Unlayered, so it wins over Tailwind's layered utilities that Streamdown uses. */
+
+:root {
+  --proto-text-primary: rgba(0, 0, 0, 0.896);
+  --proto-text-secondary: rgba(0, 0, 0, 0.62);
+  --proto-solid-base: #f3f3f3;
+  --proto-acrylic: rgba(243, 243, 243, 0.82);
+  --proto-card: rgba(255, 255, 255, 0.7);
+  --proto-card-stroke: rgba(0, 0, 0, 0.0578);
+  --proto-divider: rgba(0, 0, 0, 0.0803);
+  --proto-subtle-secondary: rgba(0, 0, 0, 0.0373);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --proto-text-primary: #ffffff;
+    --proto-text-secondary: rgba(255, 255, 255, 0.786);
+    --proto-solid-base: #202020;
+    --proto-acrylic: rgba(32, 32, 32, 0.82);
+    --proto-card: rgba(255, 255, 255, 0.051);
+    --proto-card-stroke: rgba(0, 0, 0, 0.1);
+    --proto-divider: rgba(255, 255, 255, 0.084);
+    --proto-subtle-secondary: rgba(255, 255, 255, 0.061);
+  }
+}
+
+/* The switcher: deliberately not WinUI, so it never reads as part of the design. */
+.proto-switcher {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 4px;
+  border-radius: 999px;
+  background: #ff00aa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.proto-switcher button {
+  border: 0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font:
+    11px/16px Consolas,
+    monospace;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Toolbar layers. */
+.proto-bar-solid {
+  background: var(--proto-solid-base) !important;
+  backdrop-filter: none !important;
+  border-bottom: 1px solid var(--proto-divider);
+}
+.proto-bar-acrylic {
+  background: var(--proto-acrylic) !important;
+  backdrop-filter: blur(30px) saturate(1.25) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14);
+}
+/* SelectorBar-like pill instead of a full-width underline. */
+.proto-bar-solid .fui-Tab::after,
+.proto-bar-acrylic .fui-Tab::after {
+  left: 50% !important;
+  right: auto !important;
+  width: 16px !important;
+  transform: translateX(-50%);
+  border-radius: 999px !important;
+  height: 3px !important;
+}
+.proto-bar-solid .fui-Tab,
+.proto-bar-acrylic .fui-Tab {
+  font-weight: 400 !important;
+}
+.proto-bar-solid .fui-Tab[aria-selected="true"],
+.proto-bar-acrylic .fui-Tab[aria-selected="true"] {
+  font-weight: 600 !important;
+}
+
+/* Theme: WinUI buttons are regular weight with no minimum width. */
+:root[data-proto-theme="winui"] .fui-Button {
+  font-weight: 400;
+  min-width: 0;
+}
+
+/* Content on the Windows type ramp. */
+.proto-content-winui {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--proto-text-primary);
+}
+.proto-content-winui :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  margin: 20px 0 8px;
+  letter-spacing: 0;
+}
+.proto-content-winui :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+.proto-content-winui h1 {
+  font-size: 20px;
+  line-height: 28px;
+}
+.proto-content-winui h2 {
+  font-size: 18px;
+  line-height: 24px;
+}
+.proto-content-winui :is(h3, h4, h5, h6) {
+  font-size: 14px;
+  line-height: 20px;
+}
+.proto-content-winui p {
+  margin: 0 0 12px;
+}
+.proto-content-winui :is(ul, ol) {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.proto-content-winui :is(ul, ol) :is(ul, ol) {
+  margin: 4px 0 0;
+}
+.proto-content-winui li {
+  margin: 0 0 4px;
+  padding: 0;
+}
+.proto-content-winui li::marker {
+  color: var(--proto-text-secondary);
+}
+.proto-content-winui blockquote {
+  margin: 0 0 12px;
+  padding: 0 0 0 12px;
+  border-left: 3px solid var(--proto-divider);
+  color: var(--proto-text-secondary);
+  font-style: normal;
+}
+.proto-content-winui a {
+  color: var(--colorBrandForegroundLink);
+  font-weight: 400;
+  text-decoration: none;
+}
+.proto-content-winui a:hover {
+  text-decoration: underline;
+}
+.proto-content-winui hr {
+  border: 0;
+  border-top: 1px solid var(--proto-divider);
+  margin: 16px 0;
+}
+.proto-content-winui [data-streamdown="inline-code"] {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--proto-subtle-secondary);
+}
+.proto-code-block {
+  position: relative;
+  margin: 0 0 12px;
+  border: 1px solid var(--proto-card-stroke);
+  border-radius: 4px;
+  background: var(--proto-card);
+}
+.proto-code-block pre {
+  margin: 0;
+  padding: 8px 40px 8px 12px;
+  overflow-x: auto;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.proto-code-copy {
+  position: absolute !important;
+  top: 4px;
+  right: 4px;
+}
+.proto-content-winui [data-streamdown="table-wrapper"] {
+  margin: 0 0 12px;
+  border: 1px solid var(--proto-card-stroke);
+  border-radius: 4px;
+  background: var(--proto-card);
+  overflow-x: auto;
+}
+.proto-content-winui table {
+  border-collapse: collapse;
+  width: 100%;
+  border: 0;
+}
+.proto-content-winui :is(th, td) {
+  padding: 6px 12px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--proto-divider);
+  font-size: 14px;
+  line-height: 20px;
+  background: transparent;
+}
+.proto-content-winui th {
+  font-weight: 600;
+}
+.proto-content-winui tr:last-child td {
+  border-bottom: 0;
+}

@@ -38,6 +38,15 @@ import type { RoundError } from "../round/round";
 import { useSession, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
 import { patchSettings, useSettings } from "../settings/settings-store";
+// PROTOTYPE (branch prototype/winui-look): throwaway, never merge into main.
+import {
+  PrototypeSwitcher,
+  SAMPLE_SOURCE,
+  SAMPLE_TRANSLATION,
+  usePrototype,
+  winuiComponents,
+  winuiControls,
+} from "./prototype-winui-look";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
@@ -179,6 +188,32 @@ export function PinWindow({ session }: { session: Session }) {
   const [scrollbarShown, setScrollbarShown] = useState(false);
   const scrollbarTimer = useRef<number>(undefined);
   const [menu, setMenu] = useState<{ target: PositioningVirtualElement; selection: string } | null>(null);
+  const proto = usePrototype();
+  const [nearTop, setNearTop] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const movingTimer = useRef<number>(undefined);
+  const md = (text: string) => (
+    <Streamdown
+      plugins={plugins}
+      {...(proto.content === 1 ? { components: winuiComponents, controls: winuiControls, lineNumbers: false } : {})}
+    >
+      {text}
+    </Streamdown>
+  );
+  const overToolbar = (target: EventTarget) => target instanceof Node && toolbar.current!.contains(target);
+  const onRootMouseMove = (e: MouseEvent<HTMLElement>) => {
+    setNearTop(e.clientY <= toolbar.current!.offsetHeight + 16 || overToolbar(e.target));
+    // Chromium sends zero-movement mousemoves after a scroll; they are not the user moving the pointer.
+    if (e.movementX === 0 && e.movementY === 0) return;
+    setMoving(true);
+    clearTimeout(movingTimer.current);
+    if (!overToolbar(e.target)) movingTimer.current = setTimeout(() => setMoving(false), 1500);
+  };
+  const stopMoving = () => {
+    clearTimeout(movingTimer.current);
+    setMoving(false);
+  };
+  const toolbarShown = pointerOver && (proto.reveal === 0 || (proto.reveal === 1 ? nearTop : moving));
 
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([entry]) => setTall(entry.contentRect.width < entry.contentRect.height));
@@ -334,7 +369,11 @@ export function PinWindow({ session }: { session: Session }) {
         role="region"
         aria-label={modeLabels[kind]}
         tabIndex={0}
-        className={mergeClasses(styles.content, scrollbarShown && styles.scrollbarShown)}
+        className={mergeClasses(
+          styles.content,
+          scrollbarShown && styles.scrollbarShown,
+          proto.content === 1 && "proto-content-winui",
+        )}
         onWheel={() => markScrollIntent(index)}
         onKeyDown={(e) => {
           if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown", " "].includes(e.key)) {
@@ -344,6 +383,7 @@ export function PinWindow({ session }: { session: Session }) {
         onScroll={() => onScroll(index)}
         onMouseMove={showScrollbar}
         onMouseDown={(e) => {
+          stopMoving();
           if (onScrollbar(e)) {
             // A native thumb drag owns scrolling until mouse-up, however long it is held.
             if (e.button === 0) scrollDriver.current = { index, until: Infinity };
@@ -352,78 +392,82 @@ export function PinWindow({ session }: { session: Session }) {
         onClick={onClick}
         onDoubleClick={onDoubleClick}
       >
-        {configurationFailure && (
-          <MessageBar intent={configurationFailure.kind === "missing-key" ? "error" : "info"} layout="multiline">
-            <MessageBarBody>
-              <MessageBarTitle>{configurationFailureMessage(configurationFailure)}</MessageBarTitle>
-            </MessageBarBody>
-            <MessageBarActions>
-              <Button size="small" onClick={() => void invoke("open_settings")}>
-                {strings.openSettings}
-              </Button>
-            </MessageBarActions>
-          </MessageBar>
-        )}
-        {overlong ? (
-          <MessageBar intent="info">
-            <MessageBarBody>
-              <MessageBarTitle>{strings.overlongText}</MessageBarTitle>
-            </MessageBarBody>
-            <MessageBarActions>
-              <Button size="small" onClick={session.regenerate}>
-                {strings.processAnyway}
-              </Button>
-            </MessageBarActions>
-          </MessageBar>
-        ) : round && state && result ? (
-          state.outcome === "no-text" ? (
-            <MessageBar intent="info">
-              <MessageBarBody>
-                <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
-              </MessageBarBody>
-            </MessageBar>
-          ) : (
-            <>
-              {result.text && <Streamdown plugins={plugins}>{result.text}</Streamdown>}
-              {!result.text && state.outcome === "running" && (
-                <Text as="p" block className={styles.status}>
-                  {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
-                </Text>
-              )}
-              {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
-                <div className={styles.source}>
-                  <Streamdown plugins={plugins}>{state.source.text}</Streamdown>
-                </div>
-              )}
-              {result.error && (
-                <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
+        {proto.sample === 1 ? (
+          md(kind === "source" ? SAMPLE_SOURCE : SAMPLE_TRANSLATION)
+        ) : (
+          <>
+            {configurationFailure && (
+              <MessageBar intent={configurationFailure.kind === "missing-key" ? "error" : "info"} layout="multiline">
+                <MessageBarBody>
+                  <MessageBarTitle>{configurationFailureMessage(configurationFailure)}</MessageBarTitle>
+                </MessageBarBody>
+                <MessageBarActions>
+                  <Button size="small" onClick={() => void invoke("open_settings")}>
+                    {strings.openSettings}
+                  </Button>
+                </MessageBarActions>
+              </MessageBar>
+            )}
+            {overlong ? (
+              <MessageBar intent="info">
+                <MessageBarBody>
+                  <MessageBarTitle>{strings.overlongText}</MessageBarTitle>
+                </MessageBarBody>
+                <MessageBarActions>
+                  <Button size="small" onClick={session.regenerate}>
+                    {strings.processAnyway}
+                  </Button>
+                </MessageBarActions>
+              </MessageBar>
+            ) : round && state && result ? (
+              state.outcome === "no-text" ? (
+                <MessageBar intent="info">
                   <MessageBarBody>
-                    <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
-                    <Text as="p" block className={styles.errorDetail}>
-                      {result.error.detail}
-                    </Text>
-                    {result.error.hints?.map((hint) => (
-                      <Text key={hint} as="p" block>
-                        {hint === "image-model-support" ? strings.imageModelHint : strings.reasoningEffortHint}
-                      </Text>
-                    ))}
+                    <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
                   </MessageBarBody>
-                  {result.error.offersSettings && (
-                    <MessageBarActions>
-                      <Button size="small" onClick={() => void invoke("open_settings")}>
-                        {strings.openSettings}
-                      </Button>
-                    </MessageBarActions>
-                  )}
                 </MessageBar>
-              )}
-            </>
-          )
-        ) : !configurationFailure ? (
-          <Text as="p" block>
-            {strings.pinEmptyHint}
-          </Text>
-        ) : null}
+              ) : (
+                <>
+                  {result.text && md(result.text)}
+                  {!result.text && state.outcome === "running" && (
+                    <Text as="p" block className={styles.status}>
+                      {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
+                    </Text>
+                  )}
+                  {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
+                    <div className={styles.source}>{md(state.source.text)}</div>
+                  )}
+                  {result.error && (
+                    <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
+                      <MessageBarBody>
+                        <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
+                        <Text as="p" block className={styles.errorDetail}>
+                          {result.error.detail}
+                        </Text>
+                        {result.error.hints?.map((hint) => (
+                          <Text key={hint} as="p" block>
+                            {hint === "image-model-support" ? strings.imageModelHint : strings.reasoningEffortHint}
+                          </Text>
+                        ))}
+                      </MessageBarBody>
+                      {result.error.offersSettings && (
+                        <MessageBarActions>
+                          <Button size="small" onClick={() => void invoke("open_settings")}>
+                            {strings.openSettings}
+                          </Button>
+                        </MessageBarActions>
+                      )}
+                    </MessageBar>
+                  )}
+                </>
+              )
+            ) : !configurationFailure ? (
+              <Text as="p" block>
+                {strings.pinEmptyHint}
+              </Text>
+            ) : null}
+          </>
+        )}
       </div>
     );
   };
@@ -433,7 +477,12 @@ export function PinWindow({ session }: { session: Session }) {
       ref={root}
       className={mergeClasses(styles.root, paused && styles.paused)}
       onMouseEnter={() => setPointerOver(true)}
-      onMouseLeave={() => setPointerOver(false)}
+      onMouseLeave={() => {
+        setPointerOver(false);
+        stopMoving();
+      }}
+      onMouseMove={onRootMouseMove}
+      onWheel={stopMoving}
       onContextMenu={onContextMenu}
     >
       <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
@@ -449,7 +498,12 @@ export function PinWindow({ session }: { session: Session }) {
       </div>
       <Toolbar
         ref={toolbar}
-        className={mergeClasses(styles.toolbar, pointerOver && styles.shown)}
+        className={mergeClasses(
+          styles.toolbar,
+          toolbarShown && styles.shown,
+          proto.bar === 1 && "proto-bar-solid",
+          proto.bar === 2 && "proto-bar-acrylic",
+        )}
         onMouseDown={onEmptyToolbarMouseDown}
       >
         <div className={styles.modeControls} onMouseDown={onEmptyToolbarMouseDown}>
@@ -460,6 +514,7 @@ export function PinWindow({ session }: { session: Session }) {
             aria-hidden={compact || undefined}
             inert={compact}
             size="small"
+            appearance={proto.bar === 0 ? undefined : "subtle"}
             selectedValue={mode}
             onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
           >
@@ -550,6 +605,7 @@ export function PinWindow({ session }: { session: Session }) {
           </MenuList>
         </MenuPopover>
       </Menu>
+      <PrototypeSwitcher />
     </div>
   );
 }

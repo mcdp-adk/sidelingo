@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+// PROTOTYPE (branch prototype/winui-look): throwaway, never merge into main.
+import { usePrototype, winuiTokens } from "./pin-window/prototype-winui-store";
 import { createDarkTheme, createLightTheme, type BrandVariants, type Theme } from "@fluentui/react-components";
 
 const SEGOE_UI_VARIABLE = "'Segoe UI Variable Text', ";
@@ -36,5 +38,9 @@ export function useSystemTheme(accent: string): Theme {
     darkQuery.addEventListener("change", onChange);
     return () => darkQuery.removeEventListener("change", onChange);
   }, []);
-  return useMemo(() => themeOf(accent, dark), [accent, dark]);
+  const proto = usePrototype();
+  return useMemo(
+    () => ({ ...themeOf(accent, dark), ...(proto.theme === 1 ? winuiTokens(dark) : {}) }),
+    [accent, dark, proto.theme],
+  );
 }
