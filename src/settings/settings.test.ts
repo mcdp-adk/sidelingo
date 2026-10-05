@@ -10,10 +10,17 @@ const CUSTOM_CHAT = "https://provider.test/v1/chat/completions";
 /** What one copy leads to: the readiness failure the Session publishes, or the request it sends. */
 type Outcome = { failure: ConfigurationFailure } | { sent: { url: string; authorization: string | null } };
 
-/** Copies a line and waits until the Session either publishes a readiness failure or ends the Round. */
-async function copyOnce(core: Awaited<ReturnType<typeof startCore>>): Promise<Outcome> {
+/**
+ * Copies a line and waits until the Session either publishes a readiness failure or ends the Round.
+ * `afterCopy` runs once the copy has been delivered.
+ */
+async function copyOnce(
+  core: Awaited<ReturnType<typeof startCore>>,
+  afterCopy?: () => Promise<void>,
+): Promise<Outcome> {
   core.provider.reply([{ content: "Translated" }]);
   await core.copy("A single line");
+  await afterCopy?.();
   const state = await core.until(
     (state) => state.configurationFailure !== null || (state.round !== null && state.round.state.outcome !== "running"),
   );
@@ -34,6 +41,11 @@ interface ReadinessRow {
   settings: unknown;
   keyEnvironment?: Record<string, string>;
   secrets?: Record<string, string>;
+  /**
+   * A document Rust writes just before the copy. Its saved key `ciphertext` is still decrypting when
+   * the Input arrives, and decrypts to `key` only after it.
+   */
+  changedTo?: { settings: unknown; ciphertext: string; key: string };
   outcome: Outcome;
 }
 
@@ -101,12 +113,37 @@ const readiness: ReadinessRow[] = [
     settings: customSettings(),
     outcome: { sent: { url: CUSTOM_CHAT, authorization: null } },
   },
+  {
+    name: "a changed document applies to an Input that arrives at once after it, before the store has published it",
+    settings: customSettings(),
+    changedTo: {
+      settings: customSettings({ baseUrl: "https://next.test/v1", keyCiphertext: "next-ciphertext" }),
+      ciphertext: "next-ciphertext",
+      key: "next-key",
+    },
+    outcome: { sent: { url: "https://next.test/v1/chat/completions", authorization: "Bearer next-key" } },
+  },
 ];
 
 describe("Configuration readiness", () => {
-  it.each(readiness)("$name", async ({ settings, keyEnvironment, secrets, outcome }) => {
-    const core = await startCore({ settings, keyEnvironment, secrets });
-    expect(await copyOnce(core)).toEqual(outcome);
+  it.each(readiness)("$name", async ({ settings, keyEnvironment, secrets, changedTo, outcome }) => {
+    let decrypt = () => {};
+    const decrypting = new Promise<string | undefined>((resolve) => (decrypt = () => resolve(changedTo?.key)));
+    const core = await startCore({
+      settings,
+      keyEnvironment,
+      secrets,
+      commands: changedTo && {
+        unprotect_secret: ({ ciphertext }) =>
+          ciphertext === changedTo.ciphertext ? decrypting : (secrets?.[ciphertext as string] ?? null),
+      },
+    });
+    if (changedTo) await core.changeSettings(changedTo.settings);
+    const releaseKey = async () => {
+      await settle();
+      decrypt();
+    };
+    expect(await copyOnce(core, changedTo && releaseKey)).toEqual(outcome);
   });
 });
 
@@ -207,27 +244,6 @@ describe("Loading the settings document", () => {
       .map(({ command, args }) => (command === "show_native_notification" ? { command } : { command, args }));
     expect(recoveryCommands).toEqual(recovery);
     expect(await copyOnce(core)).toEqual(outcome);
-  });
-});
-
-describe("A changed settings document", () => {
-  it("applies to an Input that arrives at once after it, before the store has published it", async () => {
-    // The new document's saved key is still being decrypted when the Input arrives.
-    let decrypt!: (key: string) => void;
-    const decrypting = new Promise<string>((resolve) => (decrypt = resolve));
-    const core = await startCore({
-      settings: customSettings({ model: "previous-model" }),
-      commands: { unprotect_secret: ({ ciphertext }) => (ciphertext === "next-ciphertext" ? decrypting : null) },
-    });
-    core.provider.reply([{ content: "Translated" }]);
-    await core.changeSettings(customSettings({ model: "next-model", keyCiphertext: "next-ciphertext" }));
-    await core.copy("A single line");
-    await settle();
-    decrypt("next-key");
-    await core.roundEnds();
-    expect(core.provider.requests.map(({ body, headers }) => [body.model, headers.get("authorization")])).toEqual([
-      ["next-model", "Bearer next-key"],
-    ]);
   });
 });
 
