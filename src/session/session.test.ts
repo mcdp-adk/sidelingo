@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Input } from "../round/round";
-import { customSettings, settle, startCore, type Core, type Reply, type SentRequest } from "../testing/core";
+import type { PinContent, PinView } from "./session";
+import {
+  customSettings,
+  ended,
+  settle,
+  showsError,
+  startCore,
+  type Core,
+  type Reply,
+  type SentRequest,
+} from "../testing/core";
 
 const OVERLONG = "x".repeat(10_001);
 const IMAGE: Input = { kind: "image", dataUrl: "data:image/png;base64,iVBORw0KGgo=" };
@@ -14,21 +24,24 @@ function held(partial: string, rest: string) {
   return { reply: [{ content: partial }, { wait }, { content: rest }], release };
 }
 
+/** The Translated text shown, or null when no Round's panes show. */
+const translated = ({ content }: PinView) => (content?.kind === "round" ? content.translation.text : null);
+
 /**
- * Resolves once the shown Round has stopped running with this Translated text, and the Session has
- * finished with it: a Round's last state is published before the Session decides whether it is reusable.
+ * Resolves once the shown Round has ended with this Translated text, and the Session has finished with it:
+ * a Round's last state is published before the Session decides whether it is reusable.
  */
 const shows = async (core: Core, text: string) => {
-  await core.until((state) => state.round?.state.outcome !== "running" && state.round?.state.translation.text === text);
+  await core.until((view) => ended(view) && translated(view) === text);
   await settle();
 };
 
 const failed = async (core: Core) => {
-  await core.until((state) => state.round?.state.outcome === "failed");
+  await core.until(showsError);
   await settle();
 };
 
-const streaming = (core: Core, text: string) => core.until((state) => state.round?.state.translation.text === text);
+const streaming = (core: Core, text: string) => core.until((view) => translated(view) === text);
 
 /** Structuring's reply that keeps a one-line Input as it is, so its Translation request carries the Input. */
 const kept = (input: string): Reply => [{ content: input }];
@@ -53,12 +66,11 @@ interface Row {
   asked: string[];
   /** Indexes of the requests whose signal the Session aborted: a Round's requests share one signal, so its finished Structuring request is listed too. (Other rows don't look.) */
   cancelled?: number[];
-  /** The Translated text shown at the end, or null when no Round is shown. */
+  /** The Translated text shown at the end, or null when no Round's panes show. */
   shown: string | null;
-  /** How the shown Round ended; `done` when one is shown. */
-  outcome?: "done" | "no-text";
+  /** What the panes show at the end; a fully successful Round's when absent. */
+  content?: PinContent["kind"];
   paused?: boolean;
-  overlong?: boolean;
 }
 
 const rows: Row[] = [
@@ -160,13 +172,13 @@ const rows: Row[] = [
     async act(core) {
       core.provider.reply([{ content: "NO_TEXT" }]);
       await core.copy(IMAGE);
-      await shows(core, "");
+      await core.roundEnds();
       await core.hide();
       await core.show(IMAGE);
     },
     asked: ["Structuring: an image"],
-    shown: "",
-    outcome: "no-text",
+    shown: null,
+    content: "no-text",
   },
   {
     name: "a failed Round is not reused",
@@ -243,7 +255,7 @@ const rows: Row[] = [
     },
     asked: requestsFor("Short"),
     shown: null,
-    overlong: true,
+    content: "overlong",
   },
   {
     name: "Process anyway runs an Input over 10,000 characters",
@@ -351,7 +363,7 @@ const rows: Row[] = [
       await shows(core, "Done");
       await core.changeSettings(customSettings({}, { targetLanguage: "ja" }));
       await settle();
-      expect(core.session.state().round?.state.translation.text).toBe("Done");
+      expect(translated(core.session.view())).toBe("Done");
       expect(core.provider.requests).toHaveLength(2);
       await core.hide();
       await core.show("Configured");
@@ -363,27 +375,116 @@ const rows: Row[] = [
 ];
 
 describe("The Session's Input rules", () => {
-  it.each(rows)(
-    "$name",
-    async ({ act, asked: expected, cancelled, shown, outcome = "done", paused = false, overlong = false }) => {
-      const core = await startCore({ settings: customSettings({}, { targetLanguage: "en" }) });
+  it.each(rows)("$name", async ({ act, asked: expected, cancelled, shown, content = "round", paused = false }) => {
+    const core = await startCore({ settings: customSettings({}, { targetLanguage: "en" }) });
 
-      await act(core);
-      await settle();
+    await act(core);
+    await settle();
 
-      expect(core.provider.requests.map(asked)).toEqual(expected);
-      if (cancelled) {
-        expect(core.provider.requests.flatMap(({ signal }, index) => (signal.aborted ? [index] : []))).toEqual(
-          cancelled,
-        );
-      }
-      const state = core.session.state();
-      expect({
-        shown: state.round?.state.translation.text ?? null,
-        outcome: state.round?.state.outcome ?? null,
-        paused: state.paused,
-        overlong: state.overlong,
-      }).toEqual({ shown, outcome: shown === null ? null : outcome, paused, overlong });
+    expect(core.provider.requests.map(asked)).toEqual(expected);
+    if (cancelled) {
+      expect(core.provider.requests.flatMap(({ signal }, index) => (signal.aborted ? [index] : []))).toEqual(cancelled);
+    }
+    const view = core.session.view();
+    // A shown Round finished in full: its Translation can be copied.
+    expect({
+      shown: translated(view),
+      content: view.content?.kind,
+      copyable: view.canCopyTranslation,
+      paused: view.paused,
+    }).toEqual({ shown, content, copyable: content === "round", paused });
+  });
+});
+
+interface ViewRow {
+  name: string;
+  /** The stored settings document; a Custom Preset when absent. */
+  settings?: unknown;
+  /** Plays Rust's events and the Provider's replies. */
+  act(core: Core): Promise<void>;
+  /** The Pin view at the end. */
+  view: PinView;
+}
+
+const viewRows: ViewRow[] = [
+  {
+    name: "before any Input, the window shows the empty hint and offers neither Regenerate nor a copy",
+    async act() {},
+    view: {
+      roundId: null,
+      configurationFailure: null,
+      content: { kind: "hint" },
+      paused: false,
+      canRegenerate: false,
+      canCopySource: false,
+      canCopyTranslation: false,
     },
-  );
+  },
+  {
+    name: "an Input over 10,000 characters shows the overlong notice and offers Regenerate, not a copy",
+    async act(core) {
+      await core.copy(OVERLONG);
+    },
+    view: {
+      roundId: null,
+      configurationFailure: null,
+      content: { kind: "overlong" },
+      paused: false,
+      canRegenerate: true,
+      canCopySource: false,
+      canCopyTranslation: false,
+    },
+  },
+  {
+    name: "a configuration failure with no Round shows only its notice, not the empty hint",
+    settings: { schemaVersion: 1 },
+    async act(core) {
+      await core.copy("Unconfigured");
+      await core.until((view) => view.configurationFailure !== null);
+    },
+    view: {
+      roundId: null,
+      configurationFailure: { kind: "no-provider" },
+      content: null,
+      paused: false,
+      canRegenerate: true,
+      canCopySource: false,
+      canCopyTranslation: false,
+    },
+  },
+  {
+    name: "a configuration failure after a Round keeps that Round under its notice, still copyable",
+    async act(core) {
+      core.provider.reply(kept("Earlier"), [{ content: "Done" }]);
+      await core.copy("Earlier");
+      await shows(core, "Done");
+      await core.changeSettings({ schemaVersion: 1 });
+      await core.copy("Unconfigured");
+      await core.until((view) => view.configurationFailure !== null);
+    },
+    view: {
+      roundId: expect.any(Number),
+      configurationFailure: { kind: "no-provider" },
+      content: {
+        kind: "round",
+        source: { text: "Earlier", progress: null, error: null },
+        translation: { text: "Done", progress: null, error: null, mutedSource: null },
+      },
+      paused: false,
+      canRegenerate: true,
+      canCopySource: true,
+      canCopyTranslation: true,
+    },
+  },
+];
+
+describe("What the Pin window shows", () => {
+  it.each(viewRows)("$name", async ({ settings, act, view }) => {
+    const core = await startCore(settings === undefined ? {} : { settings });
+
+    await act(core);
+    await settle();
+
+    expect(core.session.view()).toEqual(view);
+  });
 });

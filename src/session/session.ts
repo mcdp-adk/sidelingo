@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { providerClient, type Transport } from "../provider/provider";
-import { run, type Input, type RoundState } from "../round/round";
+import { run, type Input, type RoundError, type RoundPane, type RoundStage, type RoundState } from "../round/round";
 import {
   DEFAULT_SETTINGS,
   parseSettings,
@@ -16,18 +16,84 @@ import { currentKeySources, currentProxyPassword, currentSettings, waitForSettin
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
 
 /** The Round the Pin window shows; `id` changes with each new Round. */
-export interface ShownRound {
+interface ShownRound {
   id: number;
   state: RoundState;
 }
 
-/** One coherent view of the session for results and user controls. */
-export interface SessionState {
+/** The Session's own state, from which it derives the Pin view. */
+interface Snapshot {
   round: ShownRound | null;
   hasInput: boolean;
   paused: boolean;
   overlong: boolean;
   configurationFailure: ConfigurationFailure | null;
+}
+
+/** One pane of a shown Round. */
+export interface PinPane {
+  text: string;
+  /** The status line, while the Round runs and the pane has no text yet. */
+  progress: RoundStage | null;
+  error: RoundError | null;
+}
+
+/** What the panes show, below any configuration notice. */
+export type PinContent =
+  | { kind: "hint" }
+  | { kind: "overlong" }
+  | { kind: "no-text" }
+  | {
+      kind: "round";
+      source: PinPane;
+      /** `mutedSource` is the Source text a Translation pane shown alone shows muted until Translated text arrives. */
+      translation: PinPane & { mutedSource: string | null };
+    };
+
+/** What the Pin window shows: results and user controls, from one coherent snapshot. */
+export interface PinView {
+  /** Changes with each new Round, so the panes scroll back to the top. */
+  roundId: number | null;
+  /** Shown above the content until the next Input or Regenerate. */
+  configurationFailure: ConfigurationFailure | null;
+  /** `null` under a configuration notice with no Round to show. */
+  content: PinContent | null;
+  paused: boolean;
+  canRegenerate: boolean;
+  canCopySource: boolean;
+  canCopyTranslation: boolean;
+}
+
+function pinView({ round, hasInput, paused, overlong, configurationFailure }: Snapshot): PinView {
+  const state = round?.state;
+  const paneOf = (shown: RoundState, roundPane: RoundPane): PinPane => ({
+    text: roundPane.text,
+    progress: !roundPane.text && shown.outcome === "running" ? shown.stage : null,
+    error: roundPane.error ?? null,
+  });
+  const copyable = (pane: RoundPane | undefined) => !!pane?.text && pane.status === "done";
+  let content: PinContent | null;
+  if (overlong) content = { kind: "overlong" };
+  else if (state?.outcome === "no-text") content = { kind: "no-text" };
+  else if (state) {
+    content = {
+      kind: "round",
+      source: paneOf(state, state.source),
+      translation: {
+        ...paneOf(state, state.translation),
+        mutedSource: !state.translation.text && state.source.text ? state.source.text : null,
+      },
+    };
+  } else content = configurationFailure ? null : { kind: "hint" };
+  return {
+    roundId: round?.id ?? null,
+    configurationFailure,
+    content,
+    paused,
+    canRegenerate: hasInput,
+    canCopySource: copyable(state?.source),
+    canCopyTranslation: copyable(state?.translation),
+  };
 }
 
 /** Follows the Inputs Rust sends and runs their Rounds; the Pin webview creates one at startup. */
@@ -37,8 +103,8 @@ export interface Session {
    * first `show` Input isn't lost.
    */
   start(): Promise<void>;
-  /** The current state; a new object whenever it changes. */
-  state(): SessionState;
+  /** What the Pin window shows now; a new object whenever it changes. */
+  view(): PinView;
   /** Calls `notify` after each change, until the returned function unsubscribes. */
   subscribe(notify: () => void): () => void;
   /** Pause ignores only copies; hiding resets it without stopping the Round. */
@@ -50,13 +116,14 @@ export interface Session {
 /** A Session whose Rounds reach the Provider through `transport`: `tauri-plugin-http`'s `fetch` in the app. */
 export function createSession(transport: Transport): Session {
   const client = providerClient(transport);
-  let snapshot: SessionState = {
+  let snapshot: Snapshot = {
     round: null,
     hasInput: false,
     paused: false,
     overlong: false,
     configurationFailure: null,
   };
+  let view = pinView(snapshot);
   let currentInput: Input | null = null;
   /** Only the last fully successful Round is reusable; nothing is written to disk. */
   let lastSuccessful: { input: Input; round: ShownRound } | null = null;
@@ -69,9 +136,10 @@ export function createSession(transport: Transport): Session {
 
   function publish(
     round: ShownRound | null,
-    controls: Partial<Pick<SessionState, "paused" | "overlong" | "configurationFailure">> = {},
+    controls: Partial<Pick<Snapshot, "paused" | "overlong" | "configurationFailure">> = {},
   ) {
     snapshot = { ...snapshot, ...controls, round, hasInput: currentInput !== null };
+    view = pinView(snapshot);
     for (const notify of subscribers) notify();
   }
 
@@ -160,7 +228,7 @@ export function createSession(transport: Transport): Session {
       });
       await invoke("pin_window_ready");
     },
-    state: () => snapshot,
+    view: () => view,
     subscribe(notify) {
       subscribers.add(notify);
       return () => subscribers.delete(notify);
@@ -185,7 +253,7 @@ function sameInput(left: Input | undefined | null, right: Input): boolean {
   return left?.kind === "image" && right.kind === "image" && left.dataUrl === right.dataUrl;
 }
 
-/** Results and action availability come from the same session snapshot. */
-export function useSession(session: Session): SessionState {
-  return useSyncExternalStore(session.subscribe, session.state);
+/** Results and action availability come from the same Pin view. */
+export function usePinView(session: Session): PinView {
+  return useSyncExternalStore(session.subscribe, session.view);
 }

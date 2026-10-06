@@ -34,8 +34,8 @@ import { strings } from "../i18n";
 import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import { useLayerStyles } from "../look/layers";
 import { Markdown } from "../look/Markdown";
-import type { RoundError } from "../round/round";
-import { useSession, type Session } from "../session/session";
+import type { RoundError, RoundErrorHint, RoundStage } from "../round/round";
+import { usePinView, type PinContent, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
 import { patchSettings, useSettings } from "../settings/settings-store";
 
@@ -52,11 +52,24 @@ const modeLabels: Record<DisplayMode, string> = {
   translation: strings.translationMode,
   both: strings.sideBySideMode,
 };
+const progressLabels: Record<RoundStage, string> = {
+  structuring: strings.structuringStatus,
+  translating: strings.translationStatus,
+};
+const hintLabels: Record<RoundErrorHint, string> = {
+  "image-model-support": strings.imageModelHint,
+  "reasoning-effort": strings.reasoningEffortHint,
+};
 const selectMode = (displayMode: DisplayMode) =>
   void patchSettings({ displayMode }).catch((reason) => console.error("Display mode was not saved:", reason));
 
+const failureLabels: Record<RoundStage, string> = {
+  structuring: strings.structuringFailed,
+  translating: strings.translationFailed,
+};
+
 function errorTitle(error: RoundError): string {
-  const stage = error.stage === "structuring" ? strings.structuringFailed : strings.translationFailed;
+  const stage = failureLabels[error.stage];
   const category = {
     network: strings.networkError,
     "provider-http": strings.providerHttpError,
@@ -143,7 +156,9 @@ function interactiveTarget(target: EventTarget): boolean {
 export function PinWindow({ session }: { session: Session }) {
   const styles = useStyles();
   const layers = useLayerStyles();
-  const { round, hasInput, paused, overlong, configurationFailure } = useSession(session);
+  const { roundId, configurationFailure, content, paused, canRegenerate, canCopySource, canCopyTranslation } =
+    usePinView(session);
+  const round = content?.kind === "round" ? content : null;
   const mode = useSettings().displayMode;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
@@ -245,7 +260,7 @@ export function PinWindow({ session }: { session: Session }) {
   useLayoutEffect(() => {
     scrollDriver.current = null;
     contents.current.forEach((content) => content?.scrollTo({ top: 0 }));
-  }, [round?.id]);
+  }, [roundId]);
 
   const onScroll = (index: number) => {
     const driver = scrollDriver.current;
@@ -288,10 +303,47 @@ export function PinWindow({ session }: { session: Session }) {
     if (!e.ctrlKey && !onScrollbar(e) && !interactiveTarget(e.target)) void hide();
   };
 
+  const roundPane = (round: Extract<PinContent, { kind: "round" }>, kind: "source" | "translation") => {
+    const result = round[kind];
+    return (
+      <>
+        {result.text && <Markdown text={result.text} />}
+        {result.progress && (
+          <Text as="p" block className={styles.status}>
+            {progressLabels[result.progress]}
+          </Text>
+        )}
+        {kind === "translation" && mode !== "both" && round.translation.mutedSource && (
+          <Markdown text={round.translation.mutedSource} muted />
+        )}
+        {result.error && (
+          <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
+            <MessageBarBody>
+              <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
+              <Text as="p" block className={styles.errorDetail}>
+                {result.error.detail}
+              </Text>
+              {result.error.hints?.map((hint) => (
+                <Text key={hint} as="p" block>
+                  {hintLabels[hint]}
+                </Text>
+              ))}
+            </MessageBarBody>
+            {result.error.offersSettings && (
+              <MessageBarActions>
+                <Button size="small" onClick={() => void invoke("open_settings")}>
+                  {strings.openSettings}
+                </Button>
+              </MessageBarActions>
+            )}
+          </MessageBar>
+        )}
+      </>
+    );
+  };
+
   const pane = (kind: "source" | "translation") => {
     const index = kind === "source" ? 0 : 1;
-    const state = round?.state;
-    const result = state?.[kind];
     return (
       <div
         key={kind}
@@ -330,7 +382,12 @@ export function PinWindow({ session }: { session: Session }) {
             </MessageBarActions>
           </MessageBar>
         )}
-        {overlong ? (
+        {content?.kind === "hint" && (
+          <Text as="p" block>
+            {strings.pinEmptyHint}
+          </Text>
+        )}
+        {content?.kind === "overlong" && (
           <MessageBar intent="info">
             <MessageBarBody>
               <MessageBarTitle>{strings.overlongText}</MessageBarTitle>
@@ -341,53 +398,15 @@ export function PinWindow({ session }: { session: Session }) {
               </Button>
             </MessageBarActions>
           </MessageBar>
-        ) : round && state && result ? (
-          state.outcome === "no-text" ? (
-            <MessageBar intent="info">
-              <MessageBarBody>
-                <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
-              </MessageBarBody>
-            </MessageBar>
-          ) : (
-            <>
-              {result.text && <Markdown text={result.text} />}
-              {!result.text && state.outcome === "running" && (
-                <Text as="p" block className={styles.status}>
-                  {state.stage === "structuring" ? strings.structuringStatus : strings.translationStatus}
-                </Text>
-              )}
-              {kind === "translation" && mode !== "both" && !result.text && state.source.text && (
-                <Markdown text={state.source.text} muted />
-              )}
-              {result.error && (
-                <MessageBar intent="error" layout={result.error.offersSettings ? "multiline" : undefined}>
-                  <MessageBarBody>
-                    <MessageBarTitle>{errorTitle(result.error)}</MessageBarTitle>
-                    <Text as="p" block className={styles.errorDetail}>
-                      {result.error.detail}
-                    </Text>
-                    {result.error.hints?.map((hint) => (
-                      <Text key={hint} as="p" block>
-                        {hint === "image-model-support" ? strings.imageModelHint : strings.reasoningEffortHint}
-                      </Text>
-                    ))}
-                  </MessageBarBody>
-                  {result.error.offersSettings && (
-                    <MessageBarActions>
-                      <Button size="small" onClick={() => void invoke("open_settings")}>
-                        {strings.openSettings}
-                      </Button>
-                    </MessageBarActions>
-                  )}
-                </MessageBar>
-              )}
-            </>
-          )
-        ) : !configurationFailure ? (
-          <Text as="p" block>
-            {strings.pinEmptyHint}
-          </Text>
-        ) : null}
+        )}
+        {content?.kind === "no-text" && (
+          <MessageBar intent="info">
+            <MessageBarBody>
+              <MessageBarTitle>{strings.noTextInImage}</MessageBarTitle>
+            </MessageBarBody>
+          </MessageBar>
+        )}
+        {round && roundPane(round, kind)}
       </div>
     );
   };
@@ -444,7 +463,7 @@ export function PinWindow({ session }: { session: Session }) {
               size="small"
               appearance="subtle"
               icon={<ArrowClockwiseRegular />}
-              disabled={!hasInput}
+              disabled={!canRegenerate}
               onClick={session.regenerate}
             />
           </Tooltip>
@@ -453,8 +472,8 @@ export function PinWindow({ session }: { session: Session }) {
               size="small"
               appearance="subtle"
               icon={<DocumentCopyRegular />}
-              disabled={!round?.state.source.text || round.state.source.status !== "done"}
-              onClick={() => round && void invoke("copy_text", { text: round.state.source.text })}
+              disabled={!canCopySource}
+              onClick={() => round && void invoke("copy_text", { text: round.source.text })}
             />
           </Tooltip>
           <Tooltip content={strings.copyTranslation} relationship="label">
@@ -462,8 +481,8 @@ export function PinWindow({ session }: { session: Session }) {
               size="small"
               appearance="subtle"
               icon={<CopyRegular />}
-              disabled={!round?.state.translation.text || round.state.translation.status !== "done"}
-              onClick={() => round && void invoke("copy_text", { text: round.state.translation.text })}
+              disabled={!canCopyTranslation}
+              onClick={() => round && void invoke("copy_text", { text: round.translation.text })}
             />
           </Tooltip>
           <Tooltip content={strings.settingsShortcut} relationship="label">
