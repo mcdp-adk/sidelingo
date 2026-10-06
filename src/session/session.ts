@@ -115,7 +115,7 @@ export function createSession(transport: Transport): Session {
         !controller.signal.aborted &&
         generation === configurationGeneration &&
         completed &&
-        ["done", "no-text"].includes(completed.state.stage)
+        (completed.state.outcome === "done" || completed.state.outcome === "no-text")
       ) {
         lastSuccessful = { input, round: completed };
       }

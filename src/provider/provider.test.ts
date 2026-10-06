@@ -132,22 +132,4 @@ describe("Named Preset endpoints", () => {
       }
     }
   });
-
-  it.each(["medium", "xhigh"] as const)(
-    "rejects DeepSeek's unsupported %s effort before sending",
-    async (reasoningEffort) => {
-      let sent = false;
-      const client = providerClient(async () => {
-        sent = true;
-        return new Response("data: [DONE]\n\n");
-      });
-      const completion = client.streamChat(
-        { preset: "deepseek", baseUrl: "https://ignored.invalid", model: "model", reasoningEffort },
-        [{ role: "user", content: "hello" }],
-        new AbortController().signal,
-      );
-      await expect(completion.next()).rejects.toThrow(RangeError);
-      expect(sent).toBe(false);
-    },
-  );
 });

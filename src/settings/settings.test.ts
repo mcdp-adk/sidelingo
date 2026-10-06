@@ -156,6 +156,12 @@ const REJECTED_VERSION = {
   presets: { custom: { baseUrl: "https://provider.test/v1", model: "rejected-model" } },
 };
 const REJECTED_FIELD = customSettings({}, { displayMode: "everything" });
+/** DeepSeek offers no `medium` effort. */
+const REJECTED_EFFORT = {
+  schemaVersion: 1,
+  activePreset: "deepseek",
+  presets: { deepseek: { model: "deepseek-test", reasoningEffort: "medium" } },
+};
 
 /** What Rust's `read_settings` answers. */
 type Stored = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
@@ -213,6 +219,12 @@ const loading: LoadingRow[] = [
     name: "a document with one invalid field is set aside whole, and defaults load",
     stored: { status: "document", document: REJECTED_FIELD },
     recovery: [setAside("schema", REJECTED_FIELD), notified],
+    outcome: defaults,
+  },
+  {
+    name: "a document with an effort its Preset doesn't offer is set aside whole, and defaults load",
+    stored: { status: "document", document: REJECTED_EFFORT },
+    recovery: [setAside("schema", REJECTED_EFFORT), notified],
     outcome: defaults,
   },
   {
