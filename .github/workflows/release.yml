@@ -75,6 +75,25 @@ jobs:
           [IO.File]::WriteAllText($checksum, "$hash  $($installer.Name)`n", [Text.UTF8Encoding]::new($false))
           gh release upload $env:GITHUB_REF_NAME $checksum --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Checksum upload failed.' }
+      # tauri-action points the updater at api.github.com asset URLs, which share the anonymous
+      # rate limit of the user's IP; the tag's download URLs don't.
+      - name: Point latest.json at the release's download URLs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download $env:GITHUB_REF_NAME --pattern latest.json --dir updater --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'latest.json download failed.' }
+          $assets = gh release view $env:GITHUB_REF_NAME --json assets --jq '.assets' | ConvertFrom-Json
+          $json = Get-Content updater/latest.json -Raw | ConvertFrom-Json
+          foreach ($platform in $json.platforms.PSObject.Properties) {
+            $asset = @($assets | Where-Object apiUrl -eq $platform.Value.url)
+            if ($asset.Count -ne 1) { throw "No release asset for $($platform.Name)'s URL $($platform.Value.url)." }
+            $platform.Value.url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/$([uri]::EscapeDataString($asset[0].name))"
+          }
+          [IO.File]::WriteAllText("$PWD/updater/latest.json", ($json | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+          gh release upload $env:GITHUB_REF_NAME updater/latest.json --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'latest.json upload failed.' }
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
