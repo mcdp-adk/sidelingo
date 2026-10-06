@@ -31,7 +31,8 @@ pub struct Held {
     #[serde(flatten)]
     read: SettingsRead,
     /// Counts the documents written since startup, so a window can tell the newest
-    /// from one whose broadcast arrives late.
+    /// from one whose broadcast arrives late. Setting a broken file aside writes no
+    /// document, so it keeps the revision.
     revision: u64,
 }
 

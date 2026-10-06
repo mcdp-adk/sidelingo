@@ -161,7 +161,7 @@ const REJECTED_EFFORT = {
   presets: { deepseek: { model: "deepseek-test", reasoningEffort: "medium" } },
 };
 
-/** What Rust's `read_settings` answers. */
+/** How Rust read the stored settings file. */
 type Stored = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
 
 interface LoadingRow {

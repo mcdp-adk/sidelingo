@@ -95,13 +95,14 @@ const toInput = (input: Input | string): Input => (typeof input === "string" ? {
 export async function startCore(options: CoreOptions = {}): Promise<Core> {
   const provider = new FakeTransport();
   // What Rust holds: the file's status, its document and its revision.
-  let held: { status: string; document?: unknown; revision: number } = options.fileStatus
-    ? { status: options.fileStatus, revision: ++lastRevision }
-    : {
-        status: "document",
-        document: "settings" in options ? options.settings : customSettings(),
-        revision: ++lastRevision,
-      };
+  let held: { status: NonNullable<CoreOptions["fileStatus"]> | "document"; document?: unknown; revision: number } =
+    options.fileStatus
+      ? { status: options.fileStatus, revision: ++lastRevision }
+      : {
+          status: "document",
+          document: "settings" in options ? options.settings : customSettings(),
+          revision: ++lastRevision,
+        };
   const invoked: Core["invoked"] = [];
   const commands: Record<string, Command> = {
     read_key_environment: () => ({
