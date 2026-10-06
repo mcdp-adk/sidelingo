@@ -1,0 +1,309 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not shipped; delete once an icon is chosen.
+  Question: what should sidelingo's app/tray icon look like, and how should the name be cased?
+  Four structurally different icons (plus the current Tauri default) on mock Windows 11 surfaces,
+  switchable via ?variant=, with ?name= and ?theme= toggles. Double-click to open; ← / → cycle.
+-->
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Icon prototype</title>
+<style>
+  :root {
+    --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    --icons: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+  }
+  body[data-theme="light"] {
+    --page: #f3f3f3; --card: #fbfbfb; --text: #1b1b1b; --sub: #5f5f5f; --line: #e5e5e5;
+    --taskbar: rgba(238, 241, 246, 0.86); --flyout: #f9f9f9; --hover: rgba(0,0,0,.05);
+    --wall: radial-gradient(120% 90% at 70% 110%, #4f8fe8 0%, #9cc3f5 45%, #dfe9f7 100%);
+  }
+  body[data-theme="dark"] {
+    --page: #202020; --card: #2b2b2b; --text: #ffffff; --sub: #c5c5c5; --line: #3a3a3a;
+    --taskbar: rgba(28, 30, 36, 0.88); --flyout: #2c2c2c; --hover: rgba(255,255,255,.06);
+    --wall: radial-gradient(120% 90% at 70% 110%, #1e4fae 0%, #0d2a63 45%, #0a1226 100%);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 14px/1.45 var(--font); padding: 24px 16px 120px; }
+  main > * { min-width: 0; }
+  main { max-width: 1100px; margin: 0 auto; display: grid; gap: 20px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--sub); margin: 0 0 12px; letter-spacing: .02em; }
+  .idea { color: var(--sub); margin: 4px 0 0; max-width: 70ch; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 20px; }
+  .icon { display: block; }
+  .icon svg, .icon img { width: 100%; height: 100%; display: block; }
+  .ladder { display: flex; flex-wrap: wrap; gap: 0; border-radius: 8px; overflow: hidden; }
+  .ladder > div { flex: 1 1 340px; display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; padding: 20px; }
+  .ladder .lt { background: #ffffff; color: #555; }
+  .ladder .dk { background: #1c1c1c; color: #aaa; }
+  .size { display: grid; justify-items: center; gap: 6px; font-size: 11px; }
+  .pixel { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-end; }
+  .pixel canvas { image-rendering: pixelated; border-radius: 2px; }
+  .pixel .pbg { padding: 10px; border-radius: 6px; display: flex; gap: 10px; }
+
+  /* Desktop mock */
+  .desk { position: relative; height: 380px; border-radius: 8px; overflow: hidden; background: var(--wall); }
+  .shortcut { position: absolute; left: 24px; top: 20px; width: 76px; display: grid; justify-items: center; gap: 4px; color: #fff; font-size: 12px; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+  .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: var(--taskbar); backdrop-filter: blur(30px); border-top: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; }
+  .tb-apps { display: flex; gap: 4px; }
+  .tb-app { width: 40px; height: 40px; border-radius: 4px; display: grid; place-items: center; position: relative; }
+  .tb-app.on { background: var(--hover); }
+  .tb-app.on::after { content: ""; position: absolute; bottom: 2px; width: 16px; height: 3px; border-radius: 2px; background: #0f6cbd; }
+  .glyph { font-family: var(--icons); font-size: 16px; color: var(--text); }
+  .tray { position: absolute; right: 8px; top: 0; bottom: 0; display: flex; align-items: center; gap: 2px; }
+  .tray .slot { height: 40px; min-width: 28px; padding: 0 6px; display: grid; place-items: center; border-radius: 4px; }
+  .tray .slot.us { background: var(--hover); }
+  .clock { text-align: right; font-size: 12px; line-height: 1.3; padding: 0 8px; }
+  .tooltip { position: absolute; bottom: 54px; background: var(--flyout); border: 1px solid var(--line); color: var(--text); font-size: 12px; padding: 5px 9px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,.18); white-space: nowrap; }
+  .menu { position: absolute; bottom: 92px; background: var(--flyout); border: 1px solid var(--line); border-radius: 8px; padding: 4px; min-width: 150px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 13px; }
+  .menu div { padding: 6px 12px; border-radius: 4px; }
+  .menu div:first-child { background: var(--hover); }
+  .toast { position: absolute; right: 12px; top: 14px; width: min(330px, calc(100% - 24px)); background: var(--flyout); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 12px; }
+  .toast .hd { display: flex; align-items: center; gap: 8px; color: var(--sub); margin-bottom: 8px; }
+  .toast b { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
+
+  .start { background: var(--flyout); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+  .pins { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; margin-top: 10px; }
+  .pin { display: grid; justify-items: center; gap: 8px; font-size: 12px; padding: 10px 4px; border-radius: 4px; text-align: center; }
+  .pin.us { background: var(--hover); }
+  .ph { width: 32px; height: 32px; border-radius: 6px; }
+  .applist div { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 4px; font-size: 13px; }
+  .applist .us { background: var(--hover); }
+  .applist .ph { width: 24px; height: 24px; }
+  .letter { font-size: 13px; padding: 4px 8px; color: var(--sub); }
+  .approw { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--page); }
+  .approw small { color: var(--sub); font-size: 12px; display: block; }
+  .approw .more { margin-left: auto; font-family: var(--icons); color: var(--sub); }
+  .win { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--page); }
+  .titlebar { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 12px; font-size: 12px; }
+  .titlebar .caps { margin-left: auto; font-family: var(--icons); font-size: 10px; letter-spacing: 26px; color: var(--sub); }
+  .nsis { display: flex; gap: 16px; padding: 18px; border-top: 1px solid var(--line); background: var(--card); }
+
+  /* Prototype switcher: deliberately not Windows-looking. */
+  #bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; background: #111; color: #fff; padding: 8px 10px; border-radius: 999px; box-shadow: 0 8px 30px rgba(0,0,0,.45); font: 13px/1 system-ui, sans-serif; z-index: 10; max-width: calc(100vw - 32px); flex-wrap: wrap; justify-content: center; }
+  #bar button { background: #2a2a2a; color: #fff; border: 0; border-radius: 999px; padding: 7px 11px; cursor: pointer; font: inherit; }
+  #bar button.sel { background: #ffd400; color: #111; }
+  #bar .lbl { min-width: 190px; text-align: center; font-weight: 600; }
+  #bar .sep { width: 1px; height: 20px; background: #444; }
+</style>
+</head>
+<body data-theme="light">
+<main id="app"></main>
+<div id="bar"></div>
+<script>
+const BLUE = "#0F6CBD", BLUE_LT = "#479EF5", ORANGE = "#F7630C";
+const CJK = "'Microsoft YaHei UI','Microsoft YaHei',sans-serif";
+const LAT = "'Segoe UI Variable Display','Segoe UI',sans-serif";
+
+// Each variant: big (>24px) and small (<=24px, simplified for the tray) SVGs on a 256 grid.
+const splitPane = (glyphs) => `
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="gA${glyphs ? 1 : 0}" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="${BLUE_LT}"/><stop offset="1" stop-color="${BLUE}"/></linearGradient></defs>
+  <rect x="${glyphs ? 16 : 8}" y="${glyphs ? 16 : 8}" width="${glyphs ? 224 : 240}" height="${glyphs ? 224 : 240}" rx="${glyphs ? 52 : 56}" fill="url(#gA${glyphs ? 1 : 0})"/>
+  ${glyphs ? `
+  <rect x="44" y="56" width="80" height="144" rx="16" fill="#fff"/>
+  <rect x="132" y="56" width="80" height="144" rx="16" fill="#FFC27A"/>
+  <text x="84" y="154" text-anchor="middle" font-family="${LAT}" font-weight="700" font-size="76" fill="${BLUE}">A</text>
+  <text x="172" y="152" text-anchor="middle" font-family="${CJK}" font-weight="700" font-size="62" fill="#B4400A">文</text>` : `
+  <rect x="44" y="52" width="76" height="152" rx="16" fill="#fff"/>
+  <rect x="136" y="52" width="76" height="152" rx="16" fill="#FFC27A"/>`}
+</svg>`;
+
+const monogram = (w) => `
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke-width="${w}" stroke-linecap="round">
+    <path d="M158.6 62.3 A40 40 0 1 0 128 128" stroke="${BLUE}"/>
+    <path d="M128 128 A40 40 0 1 1 97.4 193.7" stroke="${ORANGE}"/>
+  </g>
+</svg>`;
+
+const bubbles = (text) => `
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs><mask id="cutC${text ? 1 : 0}">
+    <rect width="256" height="256" fill="#fff"/>
+    <g fill="#000" stroke="#000" stroke-width="${text ? 18 : 26}" stroke-linejoin="round">
+      <rect x="104" y="100" width="136" height="112" rx="32"/><path d="M206 206 L216 244 L170 208 Z"/>
+    </g></mask></defs>
+  <g fill="${BLUE}" mask="url(#cutC${text ? 1 : 0})">
+    <rect x="16" y="32" width="136" height="112" rx="32"/><path d="M46 140 L38 184 L90 142 Z"/>
+  </g>
+  <g fill="${ORANGE}">
+    <rect x="104" y="100" width="136" height="112" rx="32"/><path d="M206 206 L216 244 L170 208 Z"/>
+  </g>
+  ${text ? `
+  <text x="84" y="116" text-anchor="middle" font-family="${LAT}" font-weight="700" font-size="76" fill="#fff">A</text>
+  <text x="172" y="180" text-anchor="middle" font-family="${CJK}" font-weight="700" font-size="64" fill="#fff">文</text>` : ""}
+</svg>`;
+
+const pushpin = (needle) => `
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs><clipPath id="lD${needle}"><rect x="0" y="0" width="128" height="256"/></clipPath>
+        <clipPath id="rD${needle}"><rect x="128" y="0" width="128" height="256"/></clipPath></defs>
+  <g transform="rotate(45 128 128) translate(0 6)">
+    <rect x="${128 - needle / 2}" y="130" width="${needle}" height="96" rx="${needle / 2}" fill="#8A8A8A"/>
+    <g clip-path="url(#lD${needle})" fill="${BLUE}">
+      <rect x="80" y="20" width="96" height="30" rx="15"/><path d="M100 44 H156 L164 120 H92 Z"/><rect x="56" y="110" width="144" height="34" rx="17"/>
+    </g>
+    <g clip-path="url(#rD${needle})" fill="${ORANGE}">
+      <rect x="80" y="20" width="96" height="30" rx="15"/><path d="M100 44 H156 L164 120 H92 Z"/><rect x="56" y="110" width="144" height="34" rx="17"/>
+    </g>
+  </g>
+</svg>`;
+
+// The current src-tauri/icons/128x128@2x.png, inlined so the page works from any origin.
+const CURRENT_PNG = "data:image/png;base64,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";
+
+const VARIANTS = [
+  { key: "0", name: "Current", idea: "当前的 Tauri 默认图标，作对照。", png: CURRENT_PNG },
+  { key: "A", name: "Split pane", idea: "两块并排的面板：原文和译文。对应 Side-by-side 显示模式，名字里的 “side” 有了着落。有底板，大尺寸看得到 A / 文，托盘尺寸只剩两块面板。",
+    big: splitPane(true), small: splitPane(false) },
+  { key: "B", name: "Monogram s", idea: "一笔写成的字母 s，上下两半分属两种语言。没有底板，靠字形辨认；托盘尺寸只是把笔画加粗。",
+    big: monogram(36), small: monogram(48) },
+  { key: "C", name: "Twin bubbles", idea: "两个错开的对话气泡，一个说 A，一个说 文：一看就和翻译有关。托盘尺寸去掉文字，只留两个气泡。",
+    big: bubbles(true), small: bubbles(false) },
+  { key: "D", name: "Pushpin", idea: "图钉，对应 Pin 窗口：钉在桌面边上的那块译文。钉帽一半蓝一半橙，表示两种语言；托盘尺寸加粗针杆。",
+    big: pushpin(12), small: pushpin(28) },
+];
+const NAMES = ["sidelingo", "Sidelingo", "SideLingo"];
+
+const params = new URLSearchParams(location.search);
+let state = {
+  variant: VARIANTS.find((v) => v.key === params.get("variant")) ? params.get("variant") : "A",
+  name: NAMES.includes(params.get("name")) ? params.get("name") : "sidelingo",
+  theme: params.get("theme") === "dark" ? "dark" : "light",
+};
+const current = () => VARIANTS.find((v) => v.key === state.variant);
+
+function icon(size) {
+  const v = current();
+  const inner = v.png ? `<img src="${v.png}" alt="">` : (size <= 24 ? v.small : v.big);
+  return `<span class="icon" style="width:${size}px;height:${size}px">${inner}</span>`;
+}
+
+function render() {
+  const v = current(), n = state.name;
+  document.body.dataset.theme = state.theme;
+  const sizes = [16, 20, 24, 32, 48, 64, 128, 256];
+  const ladder = (cls) => `<div class="${cls}">${sizes.map((s) => `<div class="size">${icon(s)}<span>${s}</span></div>`).join("")}</div>`;
+  const ph = (c) => `<span class="ph" style="background:${c}"></span>`;
+  document.getElementById("app").innerHTML = `
+  <header><h1>${v.key} · ${v.name}</h1><p class="idea">${v.idea}</p></header>
+
+  <section class="card"><h2>尺寸阶梯（CSS px，实际像素 = 这里 × 你的显示缩放）</h2>
+    <div class="ladder">${ladder("lt")}${ladder("dk")}</div></section>
+
+  <section class="card"><h2>真实像素：托盘在 100% / 125% / 150% / 200% 缩放下的 16 / 20 / 24 / 32 px 栅格，放大 4 倍</h2>
+    <div class="pixel" id="pixel"></div></section>
+
+  <section class="card"><h2>桌面：任务栏、托盘提示、托盘菜单、通知、桌面快捷方式</h2>
+    <div class="desk">
+      <div class="shortcut">${icon(48)}<span>${n}</span></div>
+      <div class="toast"><div class="hd">${icon(16)}<span>${n}</span></div>
+        <b>有新版本 0.1.2</b>在托盘菜单里选择 “更新到 0.1.2”。</div>
+      <div class="menu" style="right:150px"><div>显示</div><div>设置</div><div>退出</div></div>
+      <div class="tooltip" style="right:146px">${n}</div>
+      <div class="taskbar">
+        <div class="tb-apps">
+          <div class="tb-app"><svg width="22" height="22" viewBox="0 0 22 22"><g fill="#0f6cbd"><rect width="10" height="10"/><rect x="12" width="10" height="10"/><rect y="12" width="10" height="10"/><rect x="12" y="12" width="10" height="10"/></g></svg></div>
+          <div class="tb-app"><span class="glyph">&#xE721;</span></div>
+          <div class="tb-app">${ph("#f2c14e")}</div>
+          <div class="tb-app">${ph("linear-gradient(135deg,#35c1f1,#0f6cbd 60%,#2bb673)")}</div>
+          <div class="tb-app on">${icon(24)}</div>
+        </div>
+        <div class="tray">
+          <div class="slot"><span class="glyph" style="font-size:12px">&#xE70E;</span></div>
+          <div class="slot us">${icon(16)}</div>
+          <div class="slot"><span class="glyph">&#xE701;&nbsp;&nbsp;&#xE995;&nbsp;&nbsp;&#xE83F;</span></div>
+          <div class="clock">14:32<br>2026/10/6</div>
+        </div>
+      </div>
+    </div></section>
+
+  <div class="grid2">
+    <section class="start"><h2>开始菜单 · 已固定</h2>
+      <div class="pins">
+        <div class="pin">${ph("#2b7cd3")}<span>Word</span></div>
+        <div class="pin">${ph("#f2c14e")}<span>文件资源管理器</span></div>
+        <div class="pin">${ph("linear-gradient(135deg,#35c1f1,#0f6cbd 60%,#2bb673)")}<span>Edge</span></div>
+        <div class="pin us">${icon(32)}<span>${n}</span></div>
+        <div class="pin">${ph("#6b6b6b")}<span>设置</span></div>
+        <div class="pin">${ph("#c239b3")}<span>照片</span></div>
+      </div>
+      <h2 style="margin-top:20px">所有应用</h2>
+      <div class="applist">
+        <div class="letter">S</div>
+        <div>${ph("#5c2d91")}<span>Snipping Tool</span></div>
+        <div class="us">${icon(24)}<span>${n}</span></div>
+        <div>${ph("#e81123")}<span>Spotify</span></div>
+      </div></section>
+
+    <section class="card" style="display:grid;gap:16px;align-content:start"><h2>设置 › 应用 › 已安装的应用</h2>
+      <div class="approw">${icon(32)}<div>${n}<small>0.1.1 | mcdp-adk | 2026/10/6</small></div><span class="more">&#xE712;</span></div>
+      <h2>安装程序</h2>
+      <div class="win"><div class="titlebar">${icon(16)}<span>${n} 0.1.1 安装</span><span class="caps">&#xE921;&#xE8BB;</span></div>
+        <div class="nsis">${icon(48)}<div><b>欢迎使用 “${n} 0.1.1” 安装向导</b><br><span style="color:var(--sub)">这个向导将指引你完成 ${n} 的安装进程。</span></div></div></div>
+      <h2>设置窗口标题栏（任务栏悬停 / Alt+Tab 会显示这一行）</h2>
+      <div class="win"><div class="titlebar">${icon(16)}<span>设置</span><span class="caps">&#xE921;&#xE922;&#xE8BB;</span></div></div>
+    </section>
+  </div>`;
+  drawPixels();
+  renderBar();
+  const q = new URLSearchParams({ variant: state.variant, name: state.name, theme: state.theme });
+  history.replaceState(null, "", "?" + q);
+}
+
+// Rasterise the small SVG at the true device size, then show it 4x with hard pixels.
+function drawPixels() {
+  const v = current(), host = document.getElementById("pixel");
+  const src = v.png ? v.png : "data:image/svg+xml;charset=utf-8," + encodeURIComponent(v.small);
+  const bgs = [["#ffffff", "浅色任务栏"], ["#1c1c1c", "深色任务栏"]];
+  bgs.forEach(([bg, label]) => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `<div class="pbg" style="background:${bg}"></div><div style="font-size:11px;color:var(--sub);margin-top:4px">${label}</div>`;
+    const box = wrap.firstChild;
+    [16, 20, 24, 32].forEach((px) => {
+      const c = document.createElement("canvas");
+      c.width = px; c.height = px; c.style.width = px * 4 + "px"; c.style.height = px * 4 + "px";
+      const img = new Image();
+      img.onload = () => { const g = c.getContext("2d"); g.fillStyle = bg; g.fillRect(0, 0, px, px); g.drawImage(img, 0, 0, px, px); };
+      img.src = src;
+      box.appendChild(c);
+    });
+    host.appendChild(wrap);
+  });
+}
+
+function renderBar() {
+  const bar = document.getElementById("bar");
+  bar.innerHTML = `
+    <button data-step="-1">←</button><span class="lbl">${state.variant} (${current().name})</span><button data-step="1">→</button>
+    <span class="sep"></span>${NAMES.map((n) => `<button data-name="${n}" class="${n === state.name ? "sel" : ""}">${n}</button>`).join("")}
+    <span class="sep"></span><button data-theme="1">${state.theme === "light" ? "浅色" : "深色"}</button>`;
+}
+
+function step(d) {
+  const i = VARIANTS.findIndex((v) => v.key === state.variant);
+  state.variant = VARIANTS[(i + d + VARIANTS.length) % VARIANTS.length].key;
+  render();
+}
+document.getElementById("bar").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.step) step(+b.dataset.step);
+  if (b.dataset.name) { state.name = b.dataset.name; render(); }
+  if (b.dataset.theme) { state.theme = state.theme === "light" ? "dark" : "light"; render(); }
+});
+addEventListener("keydown", (e) => {
+  if (e.target.closest("input,textarea,[contenteditable]")) return;
+  if (e.key === "ArrowLeft") step(-1);
+  if (e.key === "ArrowRight") step(1);
+});
+render();
+</script>
+</body>
+</html>
