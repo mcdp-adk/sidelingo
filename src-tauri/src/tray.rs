@@ -82,7 +82,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::new()
         .icon(look::SMALL_ICON)
-        .tooltip("sidelingo")
+        .tooltip("Sidelingo")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

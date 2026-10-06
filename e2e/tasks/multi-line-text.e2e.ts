@@ -58,7 +58,7 @@ describe("Task 2: multi-line text", () => {
     clearClipboard();
     await relaunch();
     const wide = { x: 120, y: 100, width: 1000, height: 600 };
-    setWindowBounds(appExe, "sidelingo", wide);
+    setWindowBounds(appExe, "Sidelingo", wide);
     await setUpCustomProvider(provider.baseUrl);
 
     // 1. The Source text streams under a status, then the Translated text streams.
@@ -135,9 +135,9 @@ describe("Task 2: multi-line text", () => {
         { timeoutMsg: `the panes didn't split ${across ? "side by side" : "one above the other"}` },
       );
     await sideBySide(true);
-    setWindowBounds(appExe, "sidelingo", { ...wide, width: 500, height: 800 });
+    setWindowBounds(appExe, "Sidelingo", { ...wide, width: 500, height: 800 });
     await sideBySide(false);
-    setWindowBounds(appExe, "sidelingo", wide);
+    setWindowBounds(appExe, "Sidelingo", wide);
     await sideBySide(true);
 
     // The panes scroll in step and stay put while the Translation streams on.
@@ -162,12 +162,12 @@ describe("Task 2: multi-line text", () => {
       before.map(({ top }) => top),
     );
     // Long content scrolls inside the window, which keeps its size.
-    expect(windowBounds(appExe, "sidelingo")).toEqual([wide]);
+    expect(windowBounds(appExe, "Sidelingo")).toEqual([wide]);
     expect(provider.requests).toHaveLength(2);
 
     // 4. At its narrowest the window shows the Display modes in a dropdown.
-    const [minimum] = minimumTrackingSizes(appExe, "sidelingo");
-    setWindowBounds(appExe, "sidelingo", { ...wide, width: minimum.width });
+    const [minimum] = minimumTrackingSizes(appExe, "Sidelingo");
+    setWindowBounds(appExe, "Sidelingo", { ...wide, width: minimum.width });
     await expect(dropdown("Display mode")).toBeDisplayed();
     await expect($("[role=tablist]")).not.toBeDisplayed();
     await expectChosen("Display mode", "Side-by-side");
@@ -175,14 +175,14 @@ describe("Task 2: multi-line text", () => {
     await showsSource();
     await chooseOption("Display mode", "Side-by-side");
     await showsBoth();
-    setWindowBounds(appExe, "sidelingo", wide);
+    setWindowBounds(appExe, "Sidelingo", wide);
     await expect(dropdown("Display mode")).not.toExist();
     await expect($("[role=tablist]")).toBeDisplayed();
     expect(provider.requests).toHaveLength(2);
 
     // 6, second half. After a restart the window opens side by side again.
     await browser.reloadSession(capabilities());
-    await browser.waitUntil(() => inspectWindows(appExe, "sidelingo")[0]?.visible, {
+    await browser.waitUntil(() => inspectWindows(appExe, "Sidelingo")[0]?.visible, {
       timeoutMsg: "the Pin window did not show after the restart",
     });
     await expect(regions()).toBeElementsArrayOfSize(2);

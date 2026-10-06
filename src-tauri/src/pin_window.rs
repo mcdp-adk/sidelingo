@@ -104,7 +104,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     };
 
     let window = window
-        .title("sidelingo")
+        .title("Sidelingo")
         .visible(false)
         .inner_size(360.0, 240.0)
         // As narrow as the compact toolbar allows.

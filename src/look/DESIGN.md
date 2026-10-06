@@ -1,6 +1,6 @@
-# sidelingo look
+# Sidelingo look
 
-sidelingo should look like a Windows 11 app built with WinUI 3. It is built on Fluent UI React v9, which looks like Fluent 2 on the web, so this module maps WinUI's values onto Fluent's tokens (ADR 0007). Values come from [microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml/tree/main/controls/dev): `CommonStyles/Common_themeresources_any.xaml`, `CornerRadius_themeresources.xaml`, `TextBlock_themeresources.xaml`, `HyperlinkButton_themeresources.xaml` and `Materials/Acrylic/AcrylicBrush_themeresources.xaml`. `winui.ts` cites the resource behind each value.
+Sidelingo should look like a Windows 11 app built with WinUI 3. It is built on Fluent UI React v9, which looks like Fluent 2 on the web, so this module maps WinUI's values onto Fluent's tokens (ADR 0007). Values come from [microsoft-ui-xaml](https://github.com/microsoft/microsoft-ui-xaml/tree/main/controls/dev): `CommonStyles/Common_themeresources_any.xaml`, `CornerRadius_themeresources.xaml`, `TextBlock_themeresources.xaml`, `HyperlinkButton_themeresources.xaml` and `Materials/Acrylic/AcrylicBrush_themeresources.xaml`. `winui.ts` cites the resource behind each value.
 
 ## The rule
 
@@ -78,7 +78,7 @@ Strokes, subtle hover fills and text stay translucent: they never cover content.
 | Success | `#6CCB5F` on `#393D1B` | `#0F7B0F` on `#DFF6DD` | SystemFillColorSuccess(Background) | `colorStatusSuccess*` |
 | Selection | accent fill, on-brand text | accent fill, on-brand text | text selection highlight | `::selection` in the baseline |
 
-Windows gives sidelingo only the accent itself, not its Light1–3 and Dark1–3 variants, so the brand ramp's steps stand in for them: 110/120/130 for Light1–3 and 70/60/50 for Dark1–3. A link is AccentTextFillColorPrimary at rest, Secondary on hover and Tertiary pressed, as HyperlinkButton is.
+Windows gives Sidelingo only the accent itself, not its Light1–3 and Dark1–3 variants, so the brand ramp's steps stand in for them: 110/120/130 for Light1–3 and 70/60/50 for Dark1–3. A link is AccentTextFillColorPrimary at rest, Secondary on hover and Tertiary pressed, as HyperlinkButton is.
 
 ## Shape
 
@@ -146,7 +146,7 @@ Hover, pressed, selected and disabled come from the token map. Focus uses WinUI'
 
 ## Overlays
 
-One treatment for every Fluent surface that floats over content, listed in `baseline.css` § 2: the menu popover, popover surface, listbox and tooltip. Each is the raised fill with a SurfaceStrokeColorFlyout outline and 8 px corners, over Fluent's shadow. sidelingo shows no dialog, so there is no dialog surface and no smoke.
+One treatment for every Fluent surface that floats over content, listed in `baseline.css` § 2: the menu popover, popover surface, listbox and tooltip. Each is the raised fill with a SurfaceStrokeColorFlyout outline and 8 px corners, over Fluent's shadow. Sidelingo shows no dialog, so there is no dialog surface and no smoke.
 
 ## Component overrides
 
@@ -195,7 +195,7 @@ The whole list, in `baseline.css` § 3:
 | Browser margins on headings, paragraphs, lists, quotes and `pre` | none, outside Markdown |
 | Browser text selection colour | the accent |
 | Streamdown's link-safety modal, code and table chrome | replaced by Fluent pieces in `<Markdown>`; its controls and line numbers are off |
-| Streamdown's utility classes | inert: sidelingo loads no Tailwind, so `markdown.css` is the only style a Markdown element has |
+| Streamdown's utility classes | inert: Sidelingo loads no Tailwind, so `markdown.css` is the only style a Markdown element has |
 | WebView2's status bar URL and new windows from links | links carry no `href` |
 
 ## Decided in review
@@ -211,5 +211,5 @@ The prototype on branch `prototype/winui-look` settled these, reviewed by the ow
 - **Footnote back-references.** Dropped; a footnote shows only its text.
 - **Tailwind.** Removed, since it only styled Streamdown's chrome, which `<Markdown>` replaces; `markdown.css` styles every element.
 - **Scrollbars.** The Fluent overlay scrollbar, as in Edge: thin at rest, and on hover it expands, as Edge's does, with its arrows and track. The owner accepted Edge's hover state on 2026-10-05, replacing the expectation of no arrows and no track.
-- **No dialog.** sidelingo shows no dialog, so the look has no dialog surface and no smoke behind one; the owner decided on 2026-10-05.
+- **No dialog.** Sidelingo shows no dialog, so the look has no dialog surface and no smoke behind one; the owner decided on 2026-10-05.
 - **Translucent control fills.** Tried, as WinUI uses them: Fluent shares their token with overlays, which then showed the content beneath. Over Mica the opaque values look the same.

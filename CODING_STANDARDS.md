@@ -16,7 +16,7 @@ Tests come in five layers, and each contract has one owning test at the layer th
 ### User tasks (`pnpm test:e2e`)
 
 - One test per user task, walking it start to finish. Behaviour visible only in a real webview, such as the split orientation or synced scrolling, is a step in the task where a user meets it.
-- Each test launches the app itself (`relaunch`), so it passes alone and in any order. It starts from an empty data folder and configures sidelingo through its UI. It seeds `settings.json` only when the task is about that document, such as a broken file.
+- Each test launches the app itself (`relaunch`), so it passes alone and in any order. It starts from an empty data folder and configures Sidelingo through its UI. It seeds `settings.json` only when the task is about that document, such as a broken file.
 - A test observes what a user sees on screen, what lands on the clipboard, and what the Provider receives when the task is about the request.
 - Tests find elements as a user does: by role (`[role=toolbar]`, a paragraph), accessible name, or visible text, never by class or component structure. Finding one by its position (the toolbar's last button) is fine when the test's name promises that position.
 

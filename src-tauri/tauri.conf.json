@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "sidelingo",
+  "productName": "Sidelingo",
   "version": "0.1.1",
   "identifier": "io.github.mcdp-adk.sidelingo",
   "build": {
