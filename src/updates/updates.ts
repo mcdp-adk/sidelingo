@@ -72,7 +72,22 @@ async function checkForUpdates(manual: boolean): Promise<void> {
     }
     update = await check({ timeout: CHECK_TIMEOUT_MS, ...(proxyUrl ? { proxy: proxyUrl } : {}) });
   } catch (reason) {
-    publish({ ...status, checking: false, checkError: manual ? failureReason(reason) : null });
+    if (!manual) {
+      // A failed automatic check stays silent and keeps what the last check found.
+      publish({ ...status, checking: false });
+      return;
+    }
+    // A failed Check now shows only its reason, with no earlier result beside it.
+    const previous = availableUpdate;
+    availableUpdate = null;
+    publish({
+      ...status,
+      checking: false,
+      upToDate: false,
+      availableVersion: null,
+      checkError: failureReason(reason),
+    });
+    await previous?.close().catch((reason) => console.error(failureReason(reason)));
     return;
   }
   const previous = availableUpdate;
