@@ -56,12 +56,12 @@ async function expectNothingHeldOver(): Promise<void> {
     `(Get-Process sidelingo -ErrorAction SilentlyContinue | Where-Object Path -eq ${psString(appExe)}).Id`,
   ).trim();
   if (running) throw new Error(`the e2e app is still running as process ${running.split(/\s+/).join(", ")}`);
-  // Windows MOD_WIN | MOD_ALT, VK_Q: the default hotkey every launch registers.
-  const hotkey = await reserveHotkey(0x8 | 0x1, 0x51);
+  // Windows MOD_CONTROL | MOD_SHIFT, VK_Q: the default hotkey every launch registers.
+  const hotkey = await reserveHotkey(0x2 | 0x4, 0x51);
   await hotkey.close();
   if (!hotkey.registered) {
     throw new Error(
-      `another process holds Win+Alt+Q (error ${hotkey.error}); quit sidelingo or the probe that reserved it`,
+      `another process holds Ctrl+Shift+Q (error ${hotkey.error}); quit sidelingo or the probe that reserved it`,
     );
   }
 }

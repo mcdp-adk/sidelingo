@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
     custom: { baseUrl: "", model: "", reasoningEffort: null, keyCiphertext: null },
   },
   targetLanguage: initialTargetLanguage(navigator.language),
-  hotkey: "Win+Alt+Q",
+  hotkey: "Ctrl+Shift+Q",
   displayMode: "translation",
   automaticUpdates: true,
   proxy: { mode: "system", url: "", username: "", passwordCiphertext: null },

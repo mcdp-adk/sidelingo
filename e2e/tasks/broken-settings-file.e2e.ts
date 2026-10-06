@@ -26,7 +26,7 @@ describe("Task 11: sidelingo starts from a broken settings file", () => {
     await notice.$("button=Open settings").click();
     await switchToSettingsWindow(pin);
     await expectChosen("Preset", "Choose a Provider");
-    await expect($("aria/Hotkey")).toHaveText("Win+Alt+Q");
+    await expect($("aria/Hotkey")).toHaveText("Ctrl+Shift+Q");
 
     await chooseOption("Preset", "Custom");
     await browser.waitUntil(() => existsSync(settingsFile), { timeoutMsg: "no fresh settings file was written" });

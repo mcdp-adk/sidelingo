@@ -4,10 +4,8 @@ import { reserveHotkey } from "../support/hotkey";
 import { openSettings } from "../support/settings";
 
 // Windows RegisterHotKey modifiers and virtual keys for the combinations the user records.
-const MOD_ALT = 0x1;
 const MOD_CONTROL = 0x2;
 const MOD_SHIFT = 0x4;
-const MOD_WIN = 0x8;
 const VK_Q = 0x51;
 const VK_F9 = 0x78;
 const VK_F10 = 0x79;
@@ -25,7 +23,7 @@ describe("Task 8: the user changes the hotkey", () => {
     await relaunch();
     await openSettings();
     const recorder = () => $("aria/Hotkey");
-    await expect(recorder()).toHaveText("Win+Alt+Q");
+    await expect(recorder()).toHaveText("Ctrl+Shift+Q");
 
     // A key without a modifier is refused while recording continues; Esc gives up the recording.
     await recorder().click();
@@ -33,14 +31,14 @@ describe("Task 8: the user changes the hotkey", () => {
     await expect($("body")).toHaveText(/Use Ctrl, Alt, Shift, or Win in the combination\./);
     await expect(recorder()).toHaveText("Press a combination…");
     await browser.keys("Escape");
-    await expect(recorder()).toHaveText("Win+Alt+Q");
+    await expect(recorder()).toHaveText("Ctrl+Shift+Q");
     await expect($("body")).not.toHaveText(/Use Ctrl, Alt, Shift, or Win/);
 
     await recorder().click();
     await browser.keys(["Control", "Shift", "F9"]);
     await expect(recorder()).toHaveText("Ctrl+Shift+F9");
     expect(await isFree(MOD_CONTROL | MOD_SHIFT, VK_F9)).toBe(false);
-    expect(await isFree(MOD_WIN | MOD_ALT, VK_Q)).toBe(true);
+    expect(await isFree(MOD_CONTROL | MOD_SHIFT, VK_Q)).toBe(true);
 
     // Another process holds Ctrl+Shift+F10, so recording it is refused and Ctrl+Shift+F9 stays.
     const taken = await reserveHotkey(MOD_CONTROL | MOD_SHIFT, VK_F10);
