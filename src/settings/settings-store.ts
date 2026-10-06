@@ -34,7 +34,10 @@ let snapshot = snapshotOf(
   null,
   0,
 );
-let documentRevision = 0;
+/** How many documents `accept` has started on, so an older, slower decryption can't win. */
+let accepting = 0;
+/** Rust's revision of the newest document taken; Rust counts every document it writes. */
+let takenRevision = -1;
 let pending = Promise.resolve();
 const subscribers = new Set<() => void>();
 const roundConfigurationSubscribers = new Set<() => void>();
@@ -61,13 +64,13 @@ function snapshotOf(
 }
 
 function accept(document: unknown): Promise<void> {
-  const current = ++documentRevision;
+  const current = ++accepting;
   const parsed = parseSettings(document);
   const next = parsed ?? DEFAULT_SETTINGS;
   pending = Promise.all([readEnteredKeys(next), unprotectSecret(next.proxy.passwordCiphertext)]).then(
     ([keys, password]) => {
       // A later document must not be replaced by an older, slower decryption.
-      if (current !== documentRevision) return;
+      if (current !== accepting) return;
       const changed =
         JSON.stringify(roundConfiguration(next)) !== JSON.stringify(roundConfiguration(snapshot.settings));
       snapshot = snapshotOf(next, keys, password, snapshot.roundConfigurationRevision + (changed ? 1 : 0));
@@ -78,19 +81,29 @@ function accept(document: unknown): Promise<void> {
   return pending;
 }
 
-type SettingsRead = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
+/** What `read_settings` answers and each patch broadcasts, with the revision Rust gives every document it writes. */
+type SettingsRead = (
+  { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown }
+) & {
+  revision: number;
+};
+
+/** Takes a document Rust wrote when it's newer than the one taken last; one that arrives late changes nothing. */
+function takeIfNewer(read: SettingsRead) {
+  if (read.status !== "document" || read.revision <= takenRevision) return;
+  takenRevision = read.revision;
+  void accept(read.document);
+}
 
 /** Both windows subscribe before reading, so a concurrent patch cannot be missed. */
 export async function startSettingsStore(): Promise<void> {
   // Every snapshot carries the launch environment, the first included.
   keyEnvironment = await readKeyEnvironment();
-  let changed = false;
-  await listen("settings-document-changed", ({ payload }) => {
-    changed = true;
-    void accept(payload);
-  });
+  // An event can arrive after the read or the Round that already took its document.
+  await listen<SettingsRead>("settings-document-changed", ({ payload }) => takeIfNewer(payload));
   const stored = await invoke<SettingsRead>("read_settings");
-  if (!changed) {
+  if (stored.revision > takenRevision) {
+    takenRevision = stored.revision;
     let document: unknown;
     let brokenReason: "invalidJson" | "schema" | undefined;
     if (stored.status === "invalidJson") {
@@ -112,8 +125,10 @@ export async function startSettingsStore(): Promise<void> {
         return false;
       });
     }
-    if (!changed) accept(document);
-    if (quarantined && !changed) {
+    // A patch from the other window while this one set the file aside wins.
+    const current = takenRevision === stored.revision;
+    if (current) accept(document);
+    if (quarantined && current) {
       void invoke("show_native_notification", {
         title: strings.settingsRecoveredTitle,
         body: strings.settingsRecoveredBody,
@@ -124,8 +139,12 @@ export async function startSettingsStore(): Promise<void> {
   await latestSettings();
 }
 
-/** The newest document's snapshot, once its credentials are decrypted. */
+/**
+ * The newest document's snapshot, once its credentials are decrypted. The newest is the one Rust holds now, even when
+ * its event hasn't reached this webview yet.
+ */
 export async function latestSettings(): Promise<SettingsSnapshot> {
+  takeIfNewer(await invoke<SettingsRead>("read_settings"));
   let latest: Promise<void>;
   do {
     latest = pending;

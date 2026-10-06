@@ -384,6 +384,36 @@ const rows: Row[] = [
     shown: "Japanese",
   },
   {
+    name: "Regenerate runs on a configuration Rust has saved before the window hears of it (#114)",
+    async act(core) {
+      core.provider.reply(kept("Again"), [{ content: "Done" }], kept("Again"), [{ content: "Japanese" }]);
+      await core.copy("Again");
+      await shows(core, "Done");
+      await core.changeSettings(customSettings({}, { targetLanguage: "ja" }), { heard: false });
+      core.session.regenerate();
+      await shows(core, "Japanese");
+    },
+    asked: [...requestsFor("Again"), ...requestsFor("Again", "Japanese")],
+    shown: "Japanese",
+  },
+  {
+    name: "an earlier change's event arriving late changes nothing, so showing the window reuses the later Round",
+    async act(core) {
+      core.provider.reply(kept("Again"), [{ content: "Done" }], kept("Again"), [{ content: "Japanese" }]);
+      await core.copy("Again");
+      await shows(core, "Done");
+      const french = await core.changeSettings(customSettings({}, { targetLanguage: "fr" }), { heard: false });
+      await core.changeSettings(customSettings({}, { targetLanguage: "ja" }), { heard: false });
+      core.session.regenerate();
+      await shows(core, "Japanese");
+      await french();
+      await core.hide();
+      await core.show("Again");
+    },
+    asked: [...requestsFor("Again"), ...requestsFor("Again", "Japanese")],
+    shown: "Japanese",
+  },
+  {
     name: "after the configuration is fixed under its notice, copying the same line again runs a Round (#112)",
     async act(core) {
       core.provider.reply(kept("Unconfigured"), [{ content: "Fixed" }]);

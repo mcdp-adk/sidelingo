@@ -21,12 +21,20 @@ export function customSettings(custom: Record<string, unknown> = {}, document: R
   };
 }
 
+/**
+ * The last revision the fake Rust side gave a settings document. Every core in a test file shares one settings
+ * store, so revisions keep growing across cores, as Rust's do across one run of the app.
+ */
+let lastRevision = 0;
+
 /** A Rust command as the core invokes it: named arguments in, the command's result out. */
 type Command = (args: Record<string, unknown>) => unknown;
 
 export interface CoreOptions {
   /** The stored settings document `read_settings` returns, `null` included; a Custom Preset when left out. */
   settings?: unknown;
+  /** How Rust read a settings file that holds no document, which `read_settings` then returns instead of `settings`. */
+  fileStatus?: "missing" | "invalidJson" | "unreadable";
   /** The launch environment's Provider keys; every variable is unset by default. */
   keyEnvironment?: Record<string, string | null>;
   /** Ciphertexts `unprotect_secret` can decrypt for this Windows user; any other decrypts to null. */
@@ -49,8 +57,11 @@ export interface Core {
   show(input: Input | string | null): Promise<void>;
   /** Rust's event when the Pin window hides. */
   hide(): Promise<void>;
-  /** Rust's event after it writes a new settings document. */
-  changeSettings(document: unknown): Promise<void>;
+  /**
+   * Rust writes a new settings document and sends its event. With `heard: false`, the event hasn't reached the
+   * webview yet, though `read_settings` already answers with the document; the returned function delivers it.
+   */
+  changeSettings(document: unknown, options?: { heard?: boolean }): Promise<() => Promise<void>>;
   /** Resolves with the first published Pin view that satisfies `predicate`, the current one included. */
   until(predicate: (view: PinView) => boolean): Promise<PinView>;
   /** The Pin view once the shown Round has ended (after one Input), and the core has settled. */
@@ -83,6 +94,15 @@ const toInput = (input: Input | string): Input => (typeof input === "string" ? {
  */
 export async function startCore(options: CoreOptions = {}): Promise<Core> {
   const provider = new FakeTransport();
+  // What Rust holds: the file's status, its document and its revision.
+  let held: { status: NonNullable<CoreOptions["fileStatus"]> | "document"; document?: unknown; revision: number } =
+    options.fileStatus
+      ? { status: options.fileStatus, revision: ++lastRevision }
+      : {
+          status: "document",
+          document: "settings" in options ? options.settings : customSettings(),
+          revision: ++lastRevision,
+        };
   const invoked: Core["invoked"] = [];
   const commands: Record<string, Command> = {
     read_key_environment: () => ({
@@ -93,10 +113,7 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
       ...options.keyEnvironment,
     }),
     // A stored JSON `null` is a document too.
-    read_settings: () => ({
-      status: "document",
-      document: "settings" in options ? options.settings : customSettings(),
-    }),
+    read_settings: () => held,
     unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext as string] ?? null,
     pin_window_ready: () => null,
     // The updater finds no update unless a test plays otherwise.
@@ -145,7 +162,12 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     copy: (input) => emit("input", { origin: "copy", input: toInput(input) }),
     show: (input) => emit("input", { origin: "show", input: input === null ? null : toInput(input) }),
     hide: () => emit("pin-window-hidden"),
-    changeSettings: (document) => emit("settings-document-changed", document),
+    changeSettings: async (document, { heard = true } = {}) => {
+      const written = (held = { status: "document", document, revision: ++lastRevision });
+      const deliver = () => emit("settings-document-changed", written);
+      if (heard) await deliver();
+      return deliver;
+    },
     until,
     roundEnds: async () => {
       await until(ended);

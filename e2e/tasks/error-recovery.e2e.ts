@@ -51,6 +51,10 @@ describe("Task 4: recovering from a Provider error", () => {
 
     await browser.switchToWindow(pin);
     await browser.keys(["Control", "r"]);
+    // The core proves a Round runs on the document Rust holds; this proves it across the two webviews (#114), and a
+    // failure names the key Regenerate ran on.
+    await browser.waitUntil(() => provider.requests.length >= 2, { timeoutMsg: "Regenerate sent nothing" });
+    expect(provider.requests[1].headers.authorization).toBe("Bearer right-key");
     await expect($("p")).toHaveText(first);
     await expect(error).not.toExist();
     await expect($("aria/Regenerate (Ctrl+R / F5)")).toBeEnabled();
