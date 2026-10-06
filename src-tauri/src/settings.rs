@@ -25,10 +25,11 @@ pub enum SettingsRead {
     Document(Value),
 }
 
-/// The JSON document as read at startup, with its file and parse status.
+/// The JSON document as last read or written, with its file and parse status.
 pub struct SettingsDocument(Mutex<SettingsRead>);
 
-/// Reads the settings file from the data folder. The file is read at startup only.
+/// Reads the settings file from the data folder at startup. A patch reads it again
+/// only when this read failed.
 pub fn load(app: &AppHandle) -> tauri::Result<()> {
     let path = app.path().app_data_dir()?.join(FILE);
     app.manage(SettingsDocument(Mutex::new(read(&path))));
@@ -136,9 +137,10 @@ pub fn patch_settings(
     let mut next = match current {
         SettingsRead::Document(document) => document,
         SettingsRead::Missing => Value::Object(Default::default()),
-        SettingsRead::InvalidJson | SettingsRead::Unreadable => {
-            return Err("settings.json can't be read, so this change wasn't saved over it".into())
-        }
+        SettingsRead::InvalidJson | SettingsRead::Unreadable => return Err(
+            "settings.json can't be read or isn't valid JSON, so this change wasn't saved over it"
+                .into(),
+        ),
     };
     merge(&mut next, patch);
     write_atomically(&path, &next).map_err(|error| error.to_string())?;
@@ -275,7 +277,7 @@ mod tests {
     }
 
     /// Holds `file` open as another program can, so no one else can read or write it until the handle drops.
-    fn lock(file: &Path) -> std::fs::File {
+    fn hold_exclusively(file: &Path) -> std::fs::File {
         std::fs::OpenOptions::new()
             .read(true)
             .share_mode(0)
@@ -372,7 +374,7 @@ mod tests {
         // Another program held the file open while sidelingo started.
         let app = TestApp::start_with(|file| {
             std::fs::write(file, saved).unwrap();
-            lock(file)
+            hold_exclusively(file)
         });
         assert_eq!(app.read(), json!({ "status": "unreadable" }));
         app.patch(json!({ "displayMode": "both" })).unwrap();
@@ -396,9 +398,9 @@ mod tests {
         let saved = r#"{"schemaVersion":1,"activePreset":"custom"}"#;
         let app = TestApp::start_with(|file| {
             std::fs::write(file, saved).unwrap();
-            lock(file)
+            hold_exclusively(file)
         });
-        let held = lock(&app.file(FILE));
+        let held = hold_exclusively(&app.file(FILE));
         assert!(app.patch(json!({ "displayMode": "both" })).is_err());
         drop(held);
         assert_eq!(app.text(FILE).as_deref(), Some(saved));
