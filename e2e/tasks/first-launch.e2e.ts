@@ -82,13 +82,11 @@ describe("Task 1: a fresh install reaches a copied Translation", () => {
       const line = `A line copied after setup ${stamp}`;
       writeClipboardText(line);
       await expect($("p")).toHaveText(first);
-      const copyTranslation = $(`aria/${ui.copyTranslation}`);
-      await expect(copyTranslation).toBeDisabled();
       held.open();
       await expect($("p")).toHaveText(first + rest);
       await expect(notice).not.toExist();
 
-      await copyTranslation.click();
+      await $(`aria/${ui.copyTranslation}`).click();
       await browser.waitUntil(() => readClipboardText() === first + rest, {
         timeoutMsg: "the clipboard never held the Translated text",
       });

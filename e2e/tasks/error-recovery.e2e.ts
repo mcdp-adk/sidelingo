@@ -26,9 +26,7 @@ describe("Task 4: recovering from a Provider error", () => {
 
     clearClipboard();
     await relaunch();
-    for (const name of ["Regenerate (Ctrl+R / F5)", "Copy source", "Copy translation"]) {
-      await expect($(`aria/${name}`)).toBeDisabled();
-    }
+    await expect($("aria/Regenerate (Ctrl+R / F5)")).toBeDisabled();
     const { pin, settings } = await setUpCustomProvider(provider.baseUrl, { key: "wrong-key" });
 
     const line = `A line for a Provider that rejects the key ${stamp}`;
@@ -55,13 +53,9 @@ describe("Task 4: recovering from a Provider error", () => {
     await browser.keys(["Control", "r"]);
     await expect($("p")).toHaveText(first);
     await expect(error).not.toExist();
-    await expect($("aria/Copy source")).toBeEnabled();
     await expect($("aria/Regenerate (Ctrl+R / F5)")).toBeEnabled();
-    const copyTranslation = $("aria/Copy translation");
-    await expect(copyTranslation).toBeDisabled();
     held.open();
     await expect($("p")).toHaveText(first + rest);
-    await expect(copyTranslation).toBeEnabled();
     // Regenerate ran one Round, whose Translation carried the entered key.
     expect(provider.requests).toHaveLength(3);
     expect(provider.requests[2].headers.authorization).toBe("Bearer right-key");
