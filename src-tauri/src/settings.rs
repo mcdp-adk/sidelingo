@@ -25,14 +25,27 @@ pub enum SettingsRead {
     Document(Value),
 }
 
+/// What `read_settings` answers and each written document broadcasts.
+#[derive(Clone, Serialize)]
+pub struct Held {
+    #[serde(flatten)]
+    read: SettingsRead,
+    /// Counts the documents written since startup, so a window can tell the newest
+    /// from one whose broadcast arrives late.
+    revision: u64,
+}
+
 /// The JSON document as last read or written, with its file and parse status.
-pub struct SettingsDocument(Mutex<SettingsRead>);
+pub struct SettingsDocument(Mutex<Held>);
 
 /// Reads the settings file from the data folder at startup. A patch reads it again
 /// only when this read failed.
 pub fn load(app: &AppHandle) -> tauri::Result<()> {
     let path = app.path().app_data_dir()?.join(FILE);
-    app.manage(SettingsDocument(Mutex::new(read(&path))));
+    app.manage(SettingsDocument(Mutex::new(Held {
+        read: read(&path),
+        revision: 0,
+    })));
     Ok(())
 }
 
@@ -55,7 +68,7 @@ fn read(path: &Path) -> SettingsRead {
 }
 
 #[tauri::command]
-pub fn read_settings(document: State<SettingsDocument>) -> Result<SettingsRead, String> {
+pub fn read_settings(document: State<SettingsDocument>) -> Result<Held, String> {
     document
         .0
         .lock()
@@ -87,7 +100,7 @@ pub fn set_aside_broken_settings(
             return Ok(false);
         }
     } else if reason == "schema" {
-        if !matches!(&*held, SettingsRead::Document(current) if current == &expected_document) {
+        if !matches!(&held.read, SettingsRead::Document(current) if current == &expected_document) {
             return Ok(false);
         }
         let text = match std::fs::read_to_string(&path) {
@@ -104,7 +117,7 @@ pub fn set_aside_broken_settings(
     let broken = path.with_file_name("settings.json.broken");
     match std::fs::rename(&path, broken) {
         Ok(()) => {
-            *held = SettingsRead::Missing;
+            held.read = SettingsRead::Missing;
             Ok(true)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
@@ -130,7 +143,7 @@ pub fn patch_settings(
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join(FILE);
-    let current = match &*held {
+    let current = match &held.read {
         SettingsRead::InvalidJson | SettingsRead::Unreadable => read(&path),
         current => current.clone(),
     };
@@ -144,8 +157,11 @@ pub fn patch_settings(
     };
     merge(&mut next, patch);
     write_atomically(&path, &next).map_err(|error| error.to_string())?;
-    *held = SettingsRead::Document(next.clone());
-    if let Err(error) = app.emit("settings-document-changed", &next) {
+    *held = Held {
+        read: SettingsRead::Document(next),
+        revision: held.revision + 1,
+    };
+    if let Err(error) = app.emit("settings-document-changed", &*held) {
         eprintln!("failed to broadcast settings document: {error}");
     }
     Ok(())
@@ -205,6 +221,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use serde_json::json;
+    use tauri::Listener;
 
     use super::*;
 
@@ -246,8 +263,15 @@ mod tests {
             Self { app, folder }
         }
 
+        /// What `read_settings` answers, without its revision.
         fn read(&self) -> Value {
-            serde_json::to_value(read_settings(self.app.state()).unwrap()).unwrap()
+            let mut read = serde_json::to_value(read_settings(self.app.state()).unwrap()).unwrap();
+            read.as_object_mut().unwrap().remove("revision");
+            read
+        }
+
+        fn revision(&self) -> u64 {
+            read_settings(self.app.state()).unwrap().revision
         }
 
         fn patch(&self, patch: Value) -> Result<(), String> {
@@ -404,6 +428,40 @@ mod tests {
         assert!(app.patch(json!({ "displayMode": "both" })).is_err());
         drop(held);
         assert_eq!(app.text(FILE).as_deref(), Some(saved));
+    }
+
+    #[test]
+    fn each_written_document_takes_the_next_revision_and_is_broadcast_with_it() {
+        let app = TestApp::start(Some(r#"{"schemaVersion":1}"#));
+        let broadcasts = std::sync::Arc::new(Mutex::new(Vec::<Value>::new()));
+        let heard = broadcasts.clone();
+        app.app
+            .listen_any("settings-document-changed", move |event| {
+                heard
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(event.payload()).unwrap());
+            });
+        assert_eq!(app.revision(), 0);
+        app.patch(json!({ "activePreset": "custom" })).unwrap();
+        app.patch(json!({ "displayMode": "both" })).unwrap();
+        assert_eq!(app.revision(), 2);
+        // Neither a refused patch nor a failed write writes a document.
+        assert!(app.patch(json!(["displayMode"])).is_err());
+        std::fs::create_dir(app.file("settings.json.tmp")).unwrap();
+        assert!(app.patch(json!({ "targetLanguage": "ja" })).is_err());
+        assert_eq!(app.revision(), 2);
+        assert_eq!(
+            *broadcasts.lock().unwrap(),
+            [
+                json!({ "status": "document", "document": { "schemaVersion": 1, "activePreset": "custom" }, "revision": 1 }),
+                json!({
+                    "status": "document",
+                    "document": { "schemaVersion": 1, "activePreset": "custom", "displayMode": "both" },
+                    "revision": 2,
+                }),
+            ]
+        );
     }
 
     #[test]

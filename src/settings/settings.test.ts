@@ -246,8 +246,8 @@ const loading: LoadingRow[] = [
 describe("Loading the settings document", () => {
   it.each(loading)("$name", async ({ stored, setAside = true, recovery, outcome }) => {
     const core = await startCore({
+      ...(stored.status === "document" ? { settings: stored.document } : { fileStatus: stored.status }),
       commands: {
-        read_settings: () => stored,
         set_aside_broken_settings: () => setAside,
         show_native_notification: () => null,
       },
@@ -282,8 +282,8 @@ describe("The UI language", () => {
       vi.resetModules();
       const harness = await import("../testing/core");
       const core = await harness.startCore({
+        fileStatus: "invalidJson",
         commands: {
-          read_settings: () => ({ status: "invalidJson" }),
           set_aside_broken_settings: () => true,
           show_native_notification: () => null,
         },
