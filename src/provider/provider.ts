@@ -1,4 +1,4 @@
-import { isReasoningEffort, PRESET_REGISTRY, type Preset, type ReasoningEffort } from "./presets";
+import { PRESET_REGISTRY, type Preset, type ReasoningEffort } from "./presets";
 import type { ClientOptions, Proxy } from "@tauri-apps/plugin-http";
 
 /** Where to reach a Provider over the OpenAI Chat Completions protocol. */
@@ -83,9 +83,6 @@ export function providerClient(transport: Transport): ProviderClient {
       return document.data.map(({ id }: { id: string }) => id);
     },
     async *streamChat({ preset, baseUrl, model, reasoningEffort, key, proxy }, messages, signal) {
-      if (reasoningEffort != null && !isReasoningEffort(preset, reasoningEffort)) {
-        throw new RangeError(`Unsupported reasoning effort for ${PRESET_REGISTRY[preset].label}: ${reasoningEffort}`);
-      }
       const effortField = PRESET_REGISTRY[preset].effortField;
       const effort =
         reasoningEffort == null
