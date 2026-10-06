@@ -43,11 +43,14 @@ Tests sit beside the module they test.
 
 ## Installer builds and releases
 
-`pnpm tauri build` generates the frontend and Rust third-party license texts before building and packages `THIRD-PARTY-NOTICES.html` beside the installed executable. `pnpm notices` generates that file on its own. `pnpm build:local-installer` builds an installer for desktop checks without updater artifacts, so it needs no signing key. Debug builds also copy it to their resource directory, so About uses the same resource path in development and installed builds. New npm packages that omit license text fail the build until their upstream notice is supplied; the existing omissions are documented in `scripts/licenses/README.md`.
+`pnpm tauri build` generates the frontend and Rust third-party license texts before building and packages `THIRD-PARTY-NOTICES.html` beside the installed executable. `pnpm notices` generates that file on its own. Debug builds also copy it to their resource directory, so About uses the same resource path in development and installed builds. New npm packages that omit license text fail the build until their upstream notice is supplied; the existing omissions are documented in `scripts/licenses/README.md`. `pnpm build:local-installer` builds an installer for desktop checks without updater artifacts, so it needs no signing key.
 
-The owner selects each release version. Set that version in `package.json`, `src-tauri/Cargo.toml` (and its lockfile) and `src-tauri/tauri.conf.json` before pushing its `vX.Y.Z` tag. The release workflow checks that they match, builds the per-user NSIS installer, signs updater artifacts through the repository's `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets, and publishes a normal GitHub Release with the installer, signature, `latest.json` and SHA-256 checksum. No private updater key belongs in this repository.
+To release `vX.Y.Z`:
 
-Published-release acceptance still requires checking the downloaded checksum and verifying the updater signature against the configured public key. Installer and uninstall behavior require desktop verification.
+1. In a PR, set the version in `package.json`, `src-tauri/Cargo.toml` (and its lockfile) and `src-tauri/tauri.conf.json`, and add a `## vX.Y.Z` section to `CHANGELOG.md` saying what changed, in users' words.
+2. Once it merges, and only on the owner's word, push the `vX.Y.Z` tag on `main`. The release workflow checks that the versions match, takes the notes from that `CHANGELOG.md` section, builds the per-user NSIS installer, signs the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets, and publishes the release, titled `vX.Y.Z`, as Latest. No private updater key belongs in this repository.
+3. Check the published release: the installer's SHA-256 matches its `.sha256`, its `.sig` verifies against the public key in `tauri.conf.json`, and `releases/latest/download/latest.json` serves this release's `latest.json`, whose URLs are `github.com/…/releases/download/vX.Y.Z/…` links.
+4. Run the desktop checklist on the installed release, and comment the results on the release PR.
 
 ## Tests
 

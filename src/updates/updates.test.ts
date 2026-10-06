@@ -73,3 +73,41 @@ describe("Automatic update checks", () => {
     expect(results.map(({ checkError }) => checkError)).toEqual(Array(checks[2]).fill(null));
   });
 });
+
+describe("Check now", () => {
+  afterEach(() => vi.resetModules());
+
+  it("after a failed check shows only why it failed, not the earlier check's result", async () => {
+    vi.resetModules();
+    const harness = await import("../testing/core");
+    const { emit } = await import("@tauri-apps/api/event");
+    const fail = () => {
+      throw new Error("error sending request");
+    };
+    const results = [
+      () => null,
+      fail,
+      () => ({ rid: 1, currentVersion: "0.1.0", version: "0.1.1", rawJson: {} }),
+      fail,
+    ];
+    const core = await harness.startCore({
+      settings: harness.customSettings({}, { automaticUpdates: false }),
+      commands: { "plugin:updater|check": () => results.shift()!(), "plugin:resources|close": () => null },
+    });
+    const checkNow = async () => {
+      await emit("update-check-requested");
+      await harness.settle();
+    };
+    const last = () => core.updateStatuses.at(-1);
+
+    const failed = { upToDate: false, availableVersion: null, checkError: "Error: error sending request" };
+    await checkNow();
+    expect(last()).toMatchObject({ upToDate: true, availableVersion: null, checkError: null });
+    await checkNow();
+    expect(last()).toMatchObject(failed);
+    await checkNow();
+    expect(last()).toMatchObject({ upToDate: false, availableVersion: "0.1.1", checkError: null });
+    await checkNow();
+    expect(last()).toMatchObject(failed);
+  });
+});
