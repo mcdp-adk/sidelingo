@@ -29,6 +29,21 @@ jobs:
           if ($package.version -ne $version -or $tauri.version -ne $version -or $cargo -ne $version) {
             throw 'The tag, package.json, Cargo.toml and tauri.conf.json versions must match.'
           }
+      - name: Read release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $heading = "## $env:GITHUB_REF_NAME"
+          $lines = Get-Content CHANGELOG.md
+          $start = [array]::IndexOf($lines, $heading)
+          if ($start -lt 0) { throw "CHANGELOG.md has no '$heading' section." }
+          $section = $lines[($start + 1)..($lines.Count - 1)]
+          $end = [array]::FindIndex([string[]]$section, [Predicate[string]] { param($line) $line.StartsWith('## ') })
+          if ($end -ge 0) { $section = $section[0..($end - 1)] }
+          $notes = ($section -join "`n").Trim()
+          if (-not $notes) { throw "CHANGELOG.md's '$heading' section is empty." }
+          $body = "$notes`n`nTo install and check the download, see the [README](https://github.com/$env:GITHUB_REPOSITORY#installation)."
+          "body<<NOTES_END`n$body`nNOTES_END" >> $env:GITHUB_OUTPUT
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -48,13 +63,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: sidelingo ${{ github.ref_name }}
-          releaseBody: |
-            Download the Windows `*-setup.exe` installer and its matching `.sha256` checksum from the assets below. Verify the checksum before running the installer.
-
-            The installer is not Authenticode-signed. If Microsoft Defender SmartScreen displays “Windows protected your PC”, choose **More info → Run anyway** after verifying the checksum. **Smart App Control blocks this unsigned installer**, so a PC enforcing it cannot install sidelingo.
-
-            See the [README installation instructions](https://github.com/mcdp-adk/sidelingo#installation) for checksum commands and installation details.
+          releaseName: ${{ github.ref_name }}
+          releaseBody: ${{ steps.notes.outputs.body }}
           # Stays a draft until every asset is attached, so `latest` never points at a partial release.
           releaseDraft: true
           prerelease: false
