@@ -96,9 +96,9 @@ await writeFile(
   output,
   `<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>sidelingo third-party notices</title>
+<title>Sidelingo third-party notices</title>
 <style>body{font:16px system-ui;max-width:80ch;margin:2rem auto;padding:0 1rem}pre{white-space:pre-wrap;overflow-wrap:anywhere}section{border-top:1px solid #aaa;margin-top:2rem}</style>
-<h1>sidelingo third-party notices</h1>
+<h1>Sidelingo third-party notices</h1>
 <p>Generated from the installed frontend production dependency graph and the locked Rust dependency graph. These notices include the dependency license texts and packaged notices.</p>
 ${sections.join("\n")}
 </html>\n`,

@@ -1,4 +1,4 @@
-# sidelingo
+# Sidelingo
 
 A Windows desktop companion that turns captured text or images into structured, readable content, then translates it.
 
@@ -7,7 +7,7 @@ A Windows desktop companion that turns captured text or images into structured, 
 ### Processing
 
 **Input**:
-The text or image handed to sidelingo for one round of processing.
+The text or image handed to Sidelingo for one round of processing.
 _Avoid_: Query, selection (a selection is one place an Input can come from)
 
 **Round** (一轮):
@@ -35,7 +35,7 @@ The result of Translation.
 ### Presentation
 
 **Pin window** (悬浮窗):
-The single, always-on-top sidelingo window that shows the results of the current round.
+The single, always-on-top Sidelingo window that shows the results of the current round.
 _Avoid_: Popup, overlay, 贴图 (a Snipaste pin holds an image)
 
 **Display mode** (显示模式):
@@ -44,9 +44,9 @@ Which results the window shows: source only, translation only, or side-by-side.
 ### Providers
 
 **Provider** (服务商):
-The service hosting the model that sidelingo calls for every Round.
+The service hosting the model that Sidelingo calls for every Round.
 _Avoid_: Backend, API, vendor
 
 **Preset** (预设):
-One of the Provider choices sidelingo offers: OpenAI, OpenRouter, DeepSeek, Ollama Cloud, or Custom; at most one is active.
+One of the Provider choices Sidelingo offers: OpenAI, OpenRouter, DeepSeek, Ollama Cloud, or Custom; at most one is active.
 _Avoid_: Profile, template

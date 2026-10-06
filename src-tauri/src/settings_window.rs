@@ -34,7 +34,7 @@ pub fn show(app: &AppHandle) -> tauri::Result<()> {
         UiLanguage::En => "Settings",
     };
     let window =
-        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()))
+        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()))?
             .title(title)
             .visible(false)
             .inner_size(640.0, 640.0)

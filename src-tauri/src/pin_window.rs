@@ -63,7 +63,7 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 /// as the process and only ever hides.
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let window =
-        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()));
+        look::webview_defaults(WebviewWindowBuilder::new(app, LABEL, WebviewUrl::default()))?;
 
     #[cfg(not(feature = "desktop-dev"))]
     let window = {
@@ -104,7 +104,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     };
 
     let window = window
-        .title("sidelingo")
+        .title("Sidelingo")
         .visible(false)
         .inner_size(360.0, 240.0)
         // As narrow as the compact toolbar allows.

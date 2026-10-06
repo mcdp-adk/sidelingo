@@ -27,7 +27,7 @@ What needs real input, or shows only outside the webview, is checked here with c
 
 - [ ] The hotkey shows the window, brings it to the front, and hides it.
 - [ ] A tray click and each tray menu item do what they say.
-- [ ] Tray notifications appear and clicking them works. A stored hotkey that another program holds before sidelingo starts gives a notification, and Settings then shows the hotkey flagged with the system's reason, still holding the stored combination.
+- [ ] Tray notifications appear and clicking them works. A stored hotkey that another program holds before Sidelingo starts gives a notification, and Settings then shows the hotkey flagged with the system's reason, still holding the stored combination.
 
 ## Appearance
 
@@ -41,7 +41,7 @@ Run every item in the light theme and again in the dark theme, against the look 
 
 Then check:
 
-- [ ] Both windows show Mica behind their content, selected tabs, primary buttons, links and selections use the system accent, and switching the Windows theme or accent while sidelingo runs changes both windows at once.
+- [ ] Both windows show Mica behind their content, selected tabs, primary buttons, links and selections use the system accent, and switching the Windows theme or accent while Sidelingo runs changes both windows at once.
 - [ ] Overlays are opaque, with a thin outline and 8 px corners, and never show the content beneath them: the Pin window's Copy selection menu (select over the kitchen sink); the dropdown lists of Preset, Reasoning effort, Proxy mode, Target language and Model in Settings, and of Display mode in the narrow toolbar (narrow the Pin window until the tabs give way to a dropdown); and the toolbar's tooltips (hover a Display mode tab and the pause button).
 - [ ] Panes, code blocks, tables and dropdown lists scroll with the Fluent overlay scrollbar, thin at rest and expanding on hover as in Edge (copy any text, then scroll the panes, the tall and the wide code blocks, the wide table, and an open dropdown list). Pressing or dragging the scrollbar of a pane, a code block (down and sideways) or a wide table scrolls it and never moves the Pin window.
 - [ ] The toolbar always shows above the text, opaque on the window's base colour with a divider below it, and nothing sits under it: the text, the MessageBars, the empty-window hint and the status line start below its divider, at every width and in each Display mode. Its controls are readable in both themes. Its Display mode tabs show a subtle fill on hover, with no line under a hovered or pressed tab, and a short accent pill under the selected one. In the narrow toolbar, a Display mode label longer than its dropdown ends in an ellipsis and the dropdown's arrow shows whole, in English and in Chinese.
@@ -50,20 +50,22 @@ Then check:
 - [ ] Settings: the page title and section headings on WinUI's Title and Subtitle, 24 px page padding, 32 px between sections and 16 px between fields, the data folder path in monospace, and Preset, Reasoning effort and Proxy mode as Fluent dropdowns, Preset reading "Choose a Provider" on a fresh data folder.
 - [ ] Right-clicking outside a field shows no page menu (Back, Reload, Save as, Print or Inspect), in either window. A Settings text field keeps its cut, copy and paste menu.
 - [ ] In Settings, F5, Ctrl+F and Ctrl+P do nothing. In the Pin window, F5 regenerates the shown Round.
-- [ ] Settings fields show no spelling squiggles under a typed URL, key or model name, no browser autofill suggestions, and in a secret field only sidelingo's own show-password button, never Edge's reveal button.
+- [ ] Settings fields show no spelling squiggles under a typed URL, key or model name, no browser autofill suggestions, and in a secret field only Sidelingo's own show-password button, never Edge's reveal button.
 - [ ] A link in the kitchen sink shows its URL on hover, and a click opens it in the default browser, with no "Open external link?" page.
 - [ ] The pause border, shown in the caution colour while the toolbar's pause button pauses clipboard monitoring.
 - [ ] No pane shows a horizontal scrollbar for ordinary text at 150 % display scaling.
+- [ ] The tray, the Settings window's title bar, its taskbar button and Alt+Tab show the two-panel icon without lettering; the Start menu, the desktop shortcut, Installed apps and the installer show the icon with A and 文 from 32 px up.
 
 ## Settings window
 
 - [ ] The settings window stays above the Pin window, and only above it.
-- [ ] Start at sign-in starts off. Turning it on and off registers and removes sidelingo for sign-in, and Settings shows a registration changed outside sidelingo after a restart or on reopening.
+- [ ] Start at sign-in starts off. Turning it on and off registers and removes Sidelingo for sign-in, and Settings shows a registration changed outside Sidelingo after a restart or on reopening.
 - [ ] An Autostart launch stays in the tray, sending nothing to the Provider, until the user shows the window.
 - [ ] About shows the running version, and its License, Source code and Third-party notices links open the installed license, the repository and the bundled notices.
 
 ## Installing and updating
 
 - [ ] The installer, including the SmartScreen notes in the README.
+- [ ] The tray tooltip, the Start menu entry, Installed apps and the installer name the app Sidelingo.
 - [ ] The uninstaller's option to delete application data removes both data folders, and leaving it unchecked keeps them.
 - [ ] The update flow end to end against a test release.

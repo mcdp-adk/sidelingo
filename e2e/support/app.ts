@@ -106,16 +106,16 @@ export async function showAgain(): Promise<void> {
 
 /** Waits until the Pin window is hidden, as after Esc or Close. */
 export async function pinWindowHides(): Promise<void> {
-  await browser.waitUntil(() => !inspectWindows(appExe, "sidelingo")[0]?.visible, {
+  await browser.waitUntil(() => !inspectWindows(appExe, "Sidelingo")[0]?.visible, {
     timeoutMsg: "the Pin window is still visible",
   });
 }
 
 /** How many Pin windows the app has, shown or hidden. */
-export const pinWindowCount = (): number => inspectWindows(appExe, "sidelingo").length;
+export const pinWindowCount = (): number => inspectWindows(appExe, "Sidelingo").length;
 
 async function pinWindowShows(): Promise<void> {
-  await browser.waitUntil(() => inspectWindows(appExe, "sidelingo")[0]?.visible, {
+  await browser.waitUntil(() => inspectWindows(appExe, "Sidelingo")[0]?.visible, {
     timeoutMsg: "the Pin window did not show",
   });
 }
