@@ -1,7 +1,7 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { emit, listen } from "@tauri-apps/api/event";
-import type { Input, RoundState } from "../round/round";
-import { createSession, type Session, type SessionState } from "../session/session";
+import type { Input } from "../round/round";
+import { createSession, type PinView, type Session } from "../session/session";
 import { startSettingsStore } from "../settings/settings-store";
 import { startUpdateChecks, type useUpdateStatus } from "../updates/updates";
 import { FakeTransport } from "./fake-transport";
@@ -51,11 +51,22 @@ export interface Core {
   hide(): Promise<void>;
   /** Rust's event after it writes a new settings document. */
   changeSettings(document: unknown): Promise<void>;
-  /** Resolves with the first published Session state that satisfies `predicate`, the current one included. */
-  until(predicate: (state: SessionState) => boolean): Promise<SessionState>;
-  /** The shown Round's state once it stops running (after one Input), and the core has settled. */
-  roundEnds(): Promise<RoundState>;
+  /** Resolves with the first published Pin view that satisfies `predicate`, the current one included. */
+  until(predicate: (view: PinView) => boolean): Promise<PinView>;
+  /** The Pin view once the shown Round has ended (after one Input), and the core has settled. */
+  roundEnds(): Promise<PinView>;
 }
+
+/** Whether the shown Round's panes show an error, so it has failed. */
+export const showsError = ({ content }: PinView) =>
+  content?.kind === "round" && (content.source.error !== null || content.translation.error !== null);
+
+/**
+ * Whether the shown Round has ended, as the Pin window shows it: no text was found, an error shows, or the
+ * Translation can be copied.
+ */
+export const ended = (view: PinView) =>
+  view.content?.kind === "no-text" || showsError(view) || (view.content?.kind === "round" && view.canCopyTranslation);
 
 /**
  * Lets anything the core does next happen before a test looks, such as a request it shouldn't send.
@@ -116,10 +127,10 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
   const until: Core["until"] = (predicate) =>
     new Promise((resolve) => {
       const check = () => {
-        const state = session.state();
-        if (!predicate(state)) return false;
+        const view = session.view();
+        if (!predicate(view)) return false;
         unsubscribe();
-        resolve(state);
+        resolve(view);
         return true;
       };
       const unsubscribe = session.subscribe(check);
@@ -137,9 +148,9 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     changeSettings: (document) => emit("settings-document-changed", document),
     until,
     roundEnds: async () => {
-      await until((state) => state.round !== null && state.round.state.outcome !== "running");
+      await until(ended);
       await settle();
-      return session.state().round!.state;
+      return session.view();
     },
   };
 }

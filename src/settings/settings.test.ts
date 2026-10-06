@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationFailure } from "./settings";
-import { customSettings, settle, startCore, type Reply } from "../testing/core";
+import { customSettings, ended, settle, startCore, type Reply } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
 const UNDECRYPTABLE = "bm90LWEtRFBBUEktY2lwaGVydGV4dA==";
@@ -24,13 +24,11 @@ async function copyOnce(
   core.provider.reply(LINE_KEPT, [{ content: "Translated" }]);
   await core.copy(LINE);
   await afterCopy?.();
-  const state = await core.until(
-    (state) => state.configurationFailure !== null || (state.round !== null && state.round.state.outcome !== "running"),
-  );
+  const view = await core.until((view) => view.configurationFailure !== null || ended(view));
   await settle();
-  if (state.configurationFailure) {
+  if (view.configurationFailure) {
     expect(core.provider.requests).toEqual([]);
-    return { failure: state.configurationFailure };
+    return { failure: view.configurationFailure };
   }
   expect(core.provider.requests).toHaveLength(2);
   const { url, headers } = core.provider.requests[1]!;

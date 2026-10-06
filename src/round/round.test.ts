@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Input, RoundError, RoundPane, RoundState } from "./round";
+import type { Input, RoundError } from "./round";
+import type { PinContent, PinPane, PinView } from "../session/session";
 import { customSettings, startCore, type Core, type Reply, type SentRequest } from "../testing/core";
 
 const IMAGE: Input = { kind: "image", dataUrl: "data:image/png;base64,iVBORw0KGgo=" };
@@ -9,32 +10,58 @@ const EMPTY = "The Provider returned an empty response.";
 const LINE_STRUCTURED: Reply = [{ content: "A single line" }];
 const DROPPED = "The connection dropped.";
 
+/** What the Pin window shows of a Round: its panes, and which of them can be copied. */
+interface Shown {
+  content: PinContent | null;
+  canCopySource: boolean;
+  canCopyTranslation: boolean;
+}
+const shownIn = ({ content, canCopySource, canCopyTranslation }: PinView): Shown => ({
+  content,
+  canCopySource,
+  canCopyTranslation,
+});
+
+const pane = (text: string, rest: Partial<PinPane> = {}): PinPane => ({ text, progress: null, error: null, ...rest });
+/** A shown Round's panes; the Translation pane shows `mutedSource` muted when shown alone. */
+const roundOf = (source: PinPane, translation: PinPane, mutedSource: string | null = null): PinContent => ({
+  kind: "round",
+  source,
+  translation: { ...translation, mutedSource },
+});
+
 interface Row {
   name: string;
   input: Input | string;
   /** The Custom Preset's reasoning effort; Default when absent. */
   reasoningEffort?: string;
   replies: Reply[];
-  error: RoundError;
-  source: RoundPane;
-  translation: RoundPane;
+  shown: Shown;
 }
 
-/** Structuring fails: whatever streamed stays in Source, and Translation never starts. */
+/**
+ * Structuring fails: whatever streamed stays in Source, the error shows in both panes, Translation never starts,
+ * and nothing can be copied.
+ */
 function structuringFails(row: { name: string; input: Input | string; reasoningEffort?: string; reply: Reply }) {
   return (error: Omit<RoundError, "stage">, streamed = ""): Row => {
     const failure = { stage: "structuring", ...error } as const;
     return {
       ...row,
       replies: [row.reply],
-      error: failure,
-      source: { text: streamed, status: "failed", error: failure },
-      translation: { text: "", status: "skipped", error: failure },
+      shown: {
+        content: roundOf(pane(streamed, { error: failure }), pane("", { error: failure }), streamed || null),
+        canCopySource: false,
+        canCopyTranslation: false,
+      },
     };
   };
 }
 
-/** Translation fails: the completed Source text stays, and whatever streamed stays in Translation. */
+/**
+ * Translation fails: the completed Source text stays and can be copied, and whatever streamed stays in Translation,
+ * which can't be.
+ */
 function translationFails(row: {
   name: string;
   input: Input | string;
@@ -46,9 +73,11 @@ function translationFails(row: {
     const failure = { stage: "translating", ...error } as const;
     return {
       ...row,
-      error: failure,
-      source: { text: row.source, status: "done" },
-      translation: { text: streamed, status: "failed", error: failure },
+      shown: {
+        content: roundOf(pane(row.source), pane(streamed, { error: failure }), streamed ? null : row.source),
+        canCopySource: true,
+        canCopyTranslation: false,
+      },
     };
   };
 }
@@ -176,40 +205,52 @@ const rows: Row[] = [
 ];
 
 describe("The Round's Provider errors", () => {
-  it.each(rows)("$name", async ({ input, reasoningEffort, replies, source, translation }) => {
+  it.each(rows)("$name", async ({ input, reasoningEffort, replies, shown }) => {
     const core = await startCore({ settings: customSettings(reasoningEffort ? { reasoningEffort } : {}) });
     core.provider.reply(...replies);
     await core.copy(input);
 
-    expect(await core.roundEnds()).toEqual({ outcome: "failed", source, translation });
+    expect(shownIn(await core.roundEnds())).toEqual(shown);
     // Nothing more is sent after a failure: Translation never starts once Structuring fails.
     expect(core.provider.requests).toHaveLength(replies.length);
   });
 });
 
-/** A Round's published states, from the panes' text. */
-const structuring = (source: string): RoundState => ({
-  stage: "structuring",
-  outcome: "running",
-  source: { text: source, status: "streaming" },
-  translation: { text: "", status: "waiting" },
+/**
+ * What the Pin window shows as a Round runs, from the panes' text. A pane with no text yet shows the stage's status
+ * line, and the Translation pane shows streamed Source text muted until Translated text arrives.
+ */
+/** Structuring has started and nothing has streamed: both panes show its status line. */
+const structuringStarts: Shown = {
+  content: roundOf(pane("", { progress: "structuring" }), pane("", { progress: "structuring" })),
+  canCopySource: false,
+  canCopyTranslation: false,
+};
+const structuring = (source: string): Shown => ({
+  content: roundOf(pane(source), pane("", { progress: "structuring" }), source),
+  canCopySource: false,
+  canCopyTranslation: false,
 });
-const translating = (source: string, translation: string): RoundState => ({
-  stage: "translating",
-  outcome: "running",
-  source: { text: source, status: "done" },
-  translation: { text: translation, status: "streaming" },
+const translationStarts = (source: string): Shown => ({
+  content: roundOf(pane(source), pane("", { progress: "translating" }), source),
+  canCopySource: true,
+  canCopyTranslation: false,
 });
-const done = (source: string, translation: string): RoundState => ({
-  outcome: "done",
-  source: { text: source, status: "done" },
-  translation: { text: translation, status: "done" },
+const translating = (source: string, translation: string): Shown => ({
+  content: roundOf(pane(source), pane(translation)),
+  canCopySource: true,
+  canCopyTranslation: false,
+});
+const done = (source: string, translation: string): Shown => ({
+  content: roundOf(pane(source), pane(translation)),
+  canCopySource: true,
+  canCopyTranslation: true,
 });
 /** A Source text streamed in one chunk, then translated in one chunk. */
 const structuredThenTranslated = (source: string, translation: string) => [
-  structuring(""),
+  structuringStarts,
   structuring(source),
-  translating(source, ""),
+  translationStarts(source),
   translating(source, translation),
   done(source, translation),
 ];
@@ -306,8 +347,8 @@ interface PipelineRow {
   replies: Reply[];
   /** Runs once the Round has started. */
   meanwhile?: (core: Core) => Promise<void>;
-  /** Every distinct Round state the Session publishes, in order. */
-  shown: RoundState[];
+  /** Everything distinct the Pin window shows of the Round, in order. */
+  shown: Shown[];
   /** What each request carried, in order. */
   sent: ReturnType<typeof structuringRequest>[];
 }
@@ -325,10 +366,10 @@ const pipeline: PipelineRow[] = [
     input: LINES,
     replies: [[{ content: "## Clean" }, { content: "\nwith the rest" }], [{ content: "Translated" }]],
     shown: [
-      structuring(""),
+      structuringStarts,
       structuring("## Clean"),
       structuring("## Clean\nwith the rest"),
-      translating("## Clean\nwith the rest", ""),
+      translationStarts("## Clean\nwith the rest"),
       translating("## Clean\nwith the rest", "Translated"),
       done("## Clean\nwith the rest", "Translated"),
     ],
@@ -345,14 +386,7 @@ const pipeline: PipelineRow[] = [
     name: "an image whose Source text is exactly NO_TEXT ends the Round as no text, never showing NO_TEXT",
     input: IMAGE,
     replies: [[{ content: " \nNO" }, { content: "_TEXT\n " }]],
-    shown: [
-      structuring(""),
-      {
-        outcome: "no-text",
-        source: { text: "", status: "done" },
-        translation: { text: "", status: "skipped" },
-      },
-    ],
+    shown: [structuringStarts, { content: { kind: "no-text" }, canCopySource: false, canCopyTranslation: false }],
     sent: [structuringRequest(IMAGE_PART)],
   },
   {
@@ -394,15 +428,15 @@ const pipeline: PipelineRow[] = [
       [{ content: "Unmarked translation" }, { content: "</th" }, { content: "ink>" }, { content: "Translated" }],
     ],
     shown: [
-      structuring(""),
+      structuringStarts,
       structuring("Unmarked structure"),
       structuring("Unmarked structure</th"),
-      structuring(""),
+      structuringStarts,
       structuring("## Source"),
-      translating("## Source", ""),
+      translationStarts("## Source"),
       translating("## Source", "Unmarked translation"),
       translating("## Source", "Unmarked translation</th"),
-      translating("## Source", ""),
+      translationStarts("## Source"),
       translating("## Source", "Translated"),
       done("## Source", "Translated"),
     ],
@@ -514,14 +548,15 @@ const pipeline: PipelineRow[] = [
 describe("The Round's pipeline", () => {
   it.each(pipeline)("$name", async ({ settings, keyEnvironment, input, replies, meanwhile, shown, sent }) => {
     const core = await startCore({ ...(settings === undefined ? {} : { settings }), keyEnvironment });
-    const published: RoundState[] = [];
+    const published: Shown[] = [];
     core.session.subscribe(() => {
-      const state = core.session.state().round?.state;
-      if (state && JSON.stringify(state) !== JSON.stringify(published.at(-1))) published.push(state);
+      const view = core.session.view();
+      const shown = shownIn(view);
+      if (view.roundId !== null && JSON.stringify(shown) !== JSON.stringify(published.at(-1))) published.push(shown);
     });
     core.provider.reply(...replies);
     await core.copy(input);
-    if (meanwhile) await core.until((state) => state.round !== null).then(() => meanwhile(core));
+    if (meanwhile) await core.until((view) => view.roundId !== null).then(() => meanwhile(core));
 
     await core.roundEnds();
     expect(published).toEqual(shown);
