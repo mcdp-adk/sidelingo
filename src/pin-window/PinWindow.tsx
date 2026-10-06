@@ -60,8 +60,16 @@ const hintLabels: Record<RoundErrorHint, string> = {
   "image-model-support": strings.imageModelHint,
   "reasoning-effort": strings.reasoningEffortHint,
 };
+// The Pin window has no room for a notice, and a tab that doesn't change says nothing of why.
 const selectMode = (displayMode: DisplayMode) =>
-  void patchSettings({ displayMode }).catch((reason) => console.error("Display mode was not saved:", reason));
+  void patchSettings({ displayMode }).catch((reason) => {
+    console.error("Display mode was not saved:", reason);
+    void invoke("show_native_notification", {
+      title: strings.settingsNotSaved,
+      body: String(reason),
+      target: null,
+    }).catch((error) => console.error("Could not show settings notification:", error));
+  });
 
 const failureLabels: Record<RoundStage, string> = {
   structuring: strings.structuringFailed,
