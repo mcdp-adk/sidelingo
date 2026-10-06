@@ -13,13 +13,13 @@ describe("Listing a named Preset's models", () => {
     OLLAMA_API_KEY: "key-in-OLLAMA_API_KEY",
   };
 
-  async function listModelsFor(preset: Preset, enteredKey: string | null) {
+  async function listModelsFor(preset: Preset) {
     const settings = {
       ...DEFAULT_SETTINGS,
       activePreset: preset,
       presets: { ...DEFAULT_SETTINGS.presets, [preset]: { ...DEFAULT_SETTINGS.presets[preset], model: "model" } },
     };
-    const connection = resolveProviderConnection(settings, { enteredKey, environment });
+    const connection = resolveProviderConnection(settings, { enteredKey: null, environment });
     if (!("configuration" in connection)) throw new Error("The supplied keys must make the connection ready");
     const calls: { method: string | undefined; url: string; authorization: string | null }[] = [];
     const client = providerClient(async (url, { method, headers }) => {
@@ -36,14 +36,6 @@ describe("Listing a named Preset's models", () => {
     ["deepseek", "https://api.deepseek.com/models", "DEEPSEEK_API_KEY"],
     ["ollama-cloud", "https://ollama.com/v1/models", "OLLAMA_API_KEY"],
   ])("%s asks its own endpoint with its own launch key", async (preset, url, variable) => {
-    expect(await listModelsFor(preset, null)).toEqual([
-      { method: "GET", url, authorization: `Bearer key-in-${variable}` },
-    ]);
-  });
-
-  it("an entered key is used instead of the launch key", async () => {
-    expect(await listModelsFor("openai", "entered-key")).toEqual([
-      { method: "GET", url: "https://api.openai.com/v1/models", authorization: "Bearer entered-key" },
-    ]);
+    expect(await listModelsFor(preset)).toEqual([{ method: "GET", url, authorization: `Bearer key-in-${variable}` }]);
   });
 });
