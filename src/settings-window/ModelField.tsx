@@ -5,7 +5,7 @@ import { Combobox, Field, Option, Spinner } from "@fluentui/react-components";
 import { strings } from "../i18n";
 import { providerClient } from "../provider/provider";
 import { resolveProviderConnection, type ConnectionFailure, type Preset, type Settings } from "../settings/settings";
-import { currentKeySources, currentProxyPassword } from "../settings/settings-store";
+import { useSettings } from "../settings/settings-store";
 
 const client = providerClient(fetch);
 function connectionMessage(failure: ConnectionFailure): string {
@@ -37,8 +37,8 @@ export function ModelField({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectionEvent = useRef<unknown>(null);
-  const proxyPassword = currentProxyPassword();
-  const resolved = resolveProviderConnection(settings, currentKeySources(preset), proxyPassword);
+  const { keySources, proxyPassword } = useSettings();
+  const resolved = resolveProviderConnection(settings, keySources(preset), proxyPassword);
   const key = "configuration" in resolved ? resolved.configuration.key : null;
   const baseUrl = "configuration" in resolved ? resolved.configuration.baseUrl : null;
   const connectionError = "error" in resolved ? resolved.error : null;

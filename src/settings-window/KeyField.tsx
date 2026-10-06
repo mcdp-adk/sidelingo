@@ -1,6 +1,6 @@
 import { strings } from "../i18n";
 import { PRESET_REGISTRY, type Preset } from "../provider/presets";
-import { currentEnteredKey, currentKeySources } from "../settings/settings-store";
+import { useSettings } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 
 export function KeyField({
@@ -12,9 +12,9 @@ export function KeyField({
   ciphertext: string | null;
   commit: (ciphertext: string | null) => Promise<void>;
 }) {
-  const enteredKey = currentEnteredKey(preset);
+  const { enteredKey, environment } = useSettings().keySources(preset);
   const variable = PRESET_REGISTRY[preset].keyVariable;
-  const environmentKey = variable ? currentKeySources(preset).environment?.[variable] : null;
+  const environmentKey = variable ? environment?.[variable] : null;
   const undecryptable = ciphertext !== null && enteredKey === null;
   const placeholder = undecryptable
     ? variable

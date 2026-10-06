@@ -2,7 +2,7 @@ import { Field } from "@fluentui/react-components";
 import { strings } from "../i18n";
 import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import type { Settings } from "../settings/settings";
-import { currentProxyPassword } from "../settings/settings-store";
+import { useSettings } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 import { TextSetting } from "./TextSetting";
 
@@ -26,6 +26,7 @@ export function NetworkSettings({
   commit: (patch: Record<string, unknown>) => Promise<void>;
 }) {
   const proxy = settings.proxy;
+  const { proxyPassword } = useSettings();
   const proxyModeLabels = { system: strings.systemProxy, manual: strings.manualProxy };
   return (
     <>
@@ -53,7 +54,7 @@ export function NetworkSettings({
           />
           <SecretField
             label={strings.proxyPassword}
-            value={currentProxyPassword()}
+            value={proxyPassword}
             ciphertext={proxy.passwordCiphertext}
             showLabel={strings.showPassword}
             hideLabel={strings.hidePassword}

@@ -9,7 +9,7 @@ import { LookProvider } from "./look/LookProvider";
 import { PinWindow } from "./pin-window/PinWindow";
 import { SettingsWindow } from "./settings-window/SettingsWindow";
 import { createSession, type Session } from "./session/session";
-import { currentSettings, startSettingsStore } from "./settings/settings-store";
+import { settingsSnapshot, startSettingsStore } from "./settings/settings-store";
 import { startUpdateChecks, startUpdateStatus } from "./updates/updates";
 
 document.documentElement.lang = uiLanguage;
@@ -33,7 +33,7 @@ createRoot(document.getElementById("root")!).render(
 );
 
 if (session) {
-  const hotkey = currentSettings().hotkey;
+  const hotkey = settingsSnapshot().settings.hotkey;
   await invoke("register_hotkey", { hotkey }).catch((reason) => {
     console.error(reason);
     void invoke("show_native_notification", {

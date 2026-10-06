@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { DEFAULT_SETTINGS, parseSettings, SCHEMA_VERSION, type Settings } from "./settings";
+import { DEFAULT_SETTINGS, parseSettings, roundConfiguration, SCHEMA_VERSION, type Settings } from "./settings";
 import { PRESETS, PRESET_REGISTRY, type Preset } from "../provider/presets";
 import {
   readEnteredKeys,
@@ -13,30 +13,66 @@ import {
 } from "../provider/credentials";
 import { strings } from "../i18n";
 
-let settings: Settings = DEFAULT_SETTINGS;
-let enteredKeys = Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys;
+/** One document's Settings with the credentials decrypted from it, published together. */
+export interface SettingsSnapshot {
+  settings: Settings;
+  /** The entered key and launch environment key for `preset`; none without a Preset. */
+  keySources(preset: Preset | null): KeySourcesSnapshot;
+  proxyPassword: string | null;
+  /** Changes exactly when the Round configuration changes. */
+  roundConfigurationRevision: number;
+}
+
 let keyEnvironment: KeyEnvironmentSnapshot = Object.fromEntries(
   PRESETS.map((preset) => PRESET_REGISTRY[preset].keyVariable)
     .filter((variable): variable is NonNullable<typeof variable> => variable !== null)
     .map((variable) => [variable, null]),
 ) as KeyEnvironmentSnapshot;
-let proxyPassword: string | null = null;
-let revision = 0;
+let snapshot = snapshotOf(
+  DEFAULT_SETTINGS,
+  Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys,
+  null,
+  0,
+);
+let documentRevision = 0;
 let pending = Promise.resolve();
 const subscribers = new Set<() => void>();
+const roundConfigurationSubscribers = new Set<() => void>();
+
+function snapshotOf(
+  settings: Settings,
+  enteredKeys: EnteredKeys,
+  proxyPassword: string | null,
+  roundConfigurationRevision: number,
+): SettingsSnapshot {
+  const environment = keyEnvironment;
+  return {
+    settings,
+    keySources(preset) {
+      const variable = preset ? PRESET_REGISTRY[preset].keyVariable : null;
+      return {
+        enteredKey: preset ? enteredKeys[preset] : null,
+        ...(variable ? { environment: { [variable]: environment[variable] } } : {}),
+      };
+    },
+    proxyPassword,
+    roundConfigurationRevision,
+  };
+}
 
 function accept(document: unknown): Promise<void> {
-  const current = ++revision;
+  const current = ++documentRevision;
   const parsed = parseSettings(document);
   const next = parsed ?? DEFAULT_SETTINGS;
   pending = Promise.all([readEnteredKeys(next), unprotectSecret(next.proxy.passwordCiphertext)]).then(
     ([keys, password]) => {
       // A later document must not be replaced by an older, slower decryption.
-      if (current !== revision) return;
-      settings = next;
-      enteredKeys = keys;
-      proxyPassword = password;
+      if (current !== documentRevision) return;
+      const changed =
+        JSON.stringify(roundConfiguration(next)) !== JSON.stringify(roundConfiguration(snapshot.settings));
+      snapshot = snapshotOf(next, keys, password, snapshot.roundConfigurationRevision + (changed ? 1 : 0));
       for (const notify of subscribers) notify();
+      if (changed) for (const notify of roundConfigurationSubscribers) notify();
     },
   );
   return pending;
@@ -46,12 +82,13 @@ type SettingsRead = { status: "missing" | "invalidJson" | "unreadable" } | { sta
 
 /** Both windows subscribe before reading, so a concurrent patch cannot be missed. */
 export async function startSettingsStore(): Promise<void> {
+  // Every snapshot carries the launch environment, the first included.
+  keyEnvironment = await readKeyEnvironment();
   let changed = false;
   await listen("settings-document-changed", ({ payload }) => {
     changed = true;
     void accept(payload);
   });
-  keyEnvironment = await readKeyEnvironment();
   const stored = await invoke<SettingsRead>("read_settings");
   if (!changed) {
     let document: unknown;
@@ -84,43 +121,38 @@ export async function startSettingsStore(): Promise<void> {
       }).catch((error) => console.error("Could not show settings recovery notification:", error));
     }
   }
-  await waitForSettings();
+  await latestSettings();
 }
 
-/** Waits for the newest document's settings and decrypted credentials to publish together. */
-export async function waitForSettings(): Promise<void> {
+/** The newest document's snapshot, once its credentials are decrypted. */
+export async function latestSettings(): Promise<SettingsSnapshot> {
   let latest: Promise<void>;
   do {
     latest = pending;
     await latest;
   } while (latest !== pending);
+  return snapshot;
 }
 
-export function currentSettings(): Settings {
-  return settings;
+/** The snapshot published last; a new object whenever it changes. */
+export function settingsSnapshot(): SettingsSnapshot {
+  return snapshot;
 }
 
-export function currentEnteredKey(preset: Preset | null): string | null {
-  return preset ? enteredKeys[preset] : null;
+/** Calls `notify` after each published snapshot, until the returned function unsubscribes. */
+export function subscribeSettings(notify: () => void): () => void {
+  subscribers.add(notify);
+  return () => subscribers.delete(notify);
 }
 
-export function currentKeySources(preset: Preset | null): KeySourcesSnapshot {
-  const variable = preset ? PRESET_REGISTRY[preset].keyVariable : null;
-  return {
-    enteredKey: currentEnteredKey(preset),
-    ...(variable ? { environment: { [variable]: keyEnvironment[variable] } } : {}),
-  };
+/** Calls `notify` after each snapshot whose Round configuration changed, until the returned function unsubscribes. */
+export function onRoundConfigurationChange(notify: () => void): () => void {
+  roundConfigurationSubscribers.add(notify);
+  return () => roundConfigurationSubscribers.delete(notify);
 }
 
-export function currentProxyPassword(): string | null {
-  return proxyPassword;
-}
-
-export function useSettings(): Settings {
-  return useSyncExternalStore((notify) => {
-    subscribers.add(notify);
-    return () => subscribers.delete(notify);
-  }, currentSettings);
+export function useSettings(): SettingsSnapshot {
+  return useSyncExternalStore(subscribeSettings, settingsSnapshot);
 }
 
 /** Rust merges only the changed fields, preserving concurrent changes from the other window. */

@@ -3,14 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { providerClient, type Transport } from "../provider/provider";
 import { run, type Input, type RoundError, type RoundPane, type RoundStage, type RoundState } from "../round/round";
-import {
-  DEFAULT_SETTINGS,
-  parseSettings,
-  providerConfiguration,
-  roundSettings,
-  type ConfigurationFailure,
-} from "../settings/settings";
-import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "../settings/settings-store";
+import { providerConfiguration, type ConfigurationFailure } from "../settings/settings";
+import { latestSettings, onRoundConfigurationChange, settingsSnapshot } from "../settings/settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -127,8 +121,6 @@ export function createSession(transport: Transport): Session {
   let currentInput: Input | null = null;
   /** Only the last fully successful Round is reusable; nothing is written to disk. */
   let lastSuccessful: { input: Input; round: ShownRound } | null = null;
-  /** A configuration change also invalidates a result still being produced with older settings. */
-  let configurationGeneration = 0;
   let lastRoundId = 0;
   /** Cancels the Round in flight. */
   let inFlight: AbortController | null = null;
@@ -147,20 +139,9 @@ export function createSession(transport: Transport): Session {
   async function startRound(input: Input) {
     const controller = (inFlight = new AbortController());
     try {
-      let generation = configurationGeneration;
-      while (true) {
-        await waitForSettings();
-        if (controller.signal.aborted) return;
-        // Another raw settings event may arrive while the store publishes its snapshot.
-        if (generation === configurationGeneration) break;
-        generation = configurationGeneration;
-      }
-      const settings = currentSettings();
-      const resolved = providerConfiguration(
-        settings,
-        currentKeySources(settings.activePreset),
-        currentProxyPassword(),
-      );
+      const { settings, keySources, proxyPassword, roundConfigurationRevision } = await latestSettings();
+      if (controller.signal.aborted) return;
+      const resolved = providerConfiguration(settings, keySources(settings.activePreset), proxyPassword);
       if ("error" in resolved) {
         publish(snapshot.round, { configurationFailure: resolved.error });
         return;
@@ -181,7 +162,8 @@ export function createSession(transport: Transport): Session {
       }
       if (
         !controller.signal.aborted &&
-        generation === configurationGeneration &&
+        // A Round configuration change also invalidates a result still being produced with older settings.
+        roundConfigurationRevision === settingsSnapshot().roundConfigurationRevision &&
         completed &&
         (completed.state.outcome === "done" || completed.state.outcome === "no-text")
       ) {
@@ -197,12 +179,7 @@ export function createSession(transport: Transport): Session {
 
   return {
     async start() {
-      let configuration = JSON.stringify(roundSettings(currentSettings()));
-      await listen("settings-document-changed", ({ payload }) => {
-        const changed = JSON.stringify(roundSettings(parseSettings(payload) ?? DEFAULT_SETTINGS));
-        if (changed === configuration) return;
-        configuration = changed;
-        ++configurationGeneration;
+      onRoundConfigurationChange(() => {
         lastSuccessful = null;
       });
       await listen("pin-window-hidden", () => {

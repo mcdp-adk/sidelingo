@@ -170,7 +170,7 @@ export function parseSettings(document: unknown): Settings | null {
 }
 
 /** The settings a Round runs with; the Display mode, hotkey and update checks change nothing it sends. */
-export function roundSettings({ activePreset, presets, proxy, targetLanguage }: Settings) {
+export function roundConfiguration({ activePreset, presets, proxy, targetLanguage }: Settings) {
   return { activePreset, presets, proxy, targetLanguage };
 }
 
