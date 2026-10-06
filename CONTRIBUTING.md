@@ -81,7 +81,7 @@ cd src-tauri
 cargo test
 ```
 
-It covers the Rust logic that is already pure: the settings document and notification links.
+It covers each Rust module's own rules through its functions and commands, such as the settings document and notification links.
 
 ### Real Provider
 
@@ -106,7 +106,7 @@ pnpm test:e2e
 
 It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into `src-tauri/target/e2e`, so it never touches your own Sidelingo's data or a running copy. `pnpm build:e2e` makes that build alone. That build checks for updates at a local endpoint the tests serve on port 47561, not on GitHub. It also writes the Windows clipboard, so only one run uses a machine at a time: a second run stops at once, naming the process that holds the run.
 
-A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run.
+A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run. If another program wrote the clipboard while a failing task ran, such as a copy you made mid-run, the run names that program at the end and calls itself invalid: its failures say nothing about the app, so run it again without copying.
 
 `pnpm check:tasks`, which CI runs, refuses a task test or support helper that finds an element by class, `#id`, another attribute or XPath, and a task test that seeds or reads the settings document.
 

@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { appExe, buildApp, capabilities, resetDataFolders } from "./support/app";
+import { watchClipboardWriters } from "./support/clipboard-writers";
 import { SevereServiceError } from "webdriverio";
 import { driverDir, startDriver, stopDriver } from "./support/driver";
 import { reserveHotkey } from "./support/hotkey";
@@ -10,6 +11,11 @@ import { psString, runPowerShell } from "./support/powershell";
 
 /** A failing test leaves its screenshot and page source here. */
 const failuresDir = resolve(import.meta.dirname, "failures");
+/** Names each failed task during which another program wrote the clipboard, which makes the run say nothing. */
+const outsideWritesFile = join(failuresDir, "outside-clipboard-writes.txt");
+
+let clipboardWriters: Awaited<ReturnType<typeof watchClipboardWriters>> | undefined;
+let testStarted = new Date();
 
 /**
  * One run per machine, across every checkout: each run drives the real clipboard, the default hotkey and the e2e
@@ -97,6 +103,12 @@ export const config: WebdriverIO.Config = {
 
   onComplete() {
     releaseRunLock();
+    if (existsSync(outsideWritesFile)) {
+      console.error(
+        "\nThis run is invalid: another program wrote the clipboard while these tasks ran, so their failures say " +
+          `nothing about the app. Rerun without copying.\n${readFileSync(outsideWritesFile, "utf8")}`,
+      );
+    }
   },
 
   // Every spec file starts the app from empty data folders.
@@ -105,10 +117,24 @@ export const config: WebdriverIO.Config = {
     await startDriver();
   },
 
+  async before() {
+    clipboardWriters = await watchClipboardWriters();
+  },
+
+  beforeTest() {
+    testStarted = new Date();
+  },
+
   async afterTest(test, _context, { passed }) {
     if (passed) return;
     const name = `${test.parent} ${test.title}`.replace(/[^\w.-]+/g, "_");
     mkdirSync(failuresDir, { recursive: true });
+    const outside = clipboardWriters?.outsideWritesSince(testStarted) ?? [];
+    if (outside.length > 0) {
+      const writers = outside.map(({ at, writer }) => `${at.toISOString()} ${writer}`).join(", ");
+      appendFileSync(outsideWritesFile, `${test.parent}: ${writers}\n`);
+      console.error(`${test.parent} failed after another program wrote the clipboard: ${writers}`);
+    }
     try {
       await browser.saveScreenshot(join(failuresDir, `${name}.png`));
       writeFileSync(join(failuresDir, `${name}.html`), await browser.getPageSource());
@@ -116,6 +142,10 @@ export const config: WebdriverIO.Config = {
       // A test that hid the window or lost its session can leave nothing to capture.
       console.warn(`Couldn't capture "${name}": ${error}`);
     }
+  },
+
+  after() {
+    clipboardWriters?.stop();
   },
 
   async afterSession() {

@@ -30,7 +30,7 @@ Tests come in five layers, and each contract has one owning test at the layer th
 
 ### Rust modules (`cargo test`)
 
-- `#[cfg(test)]` tests cover only logic that is already pure. No function is split out to make it testable.
+- `#[cfg(test)]` tests drive a module through its own functions and commands, on a real app and the real file system when its rules depend on them. No function is split out to make it testable.
 
 ### Real Provider (`pnpm test:real`)
 

@@ -6,7 +6,7 @@ sidelingo's tests form five layers, and each contract has exactly one owning tes
 | --- | --- | --- |
 | User tasks | A user can complete each of the 13 tasks, start to finish, through the UI from an empty data folder | The built app on the real clipboard, against the fake Provider; locally before a code PR merges |
 | Webview core | Every rule inside the window's logic: following Inputs, reuse, cancellation, pause, Structuring and Translation, errors and hints, configuration readiness, settings parsing, the Provider client | Vitest (`pnpm test`), in CI on every PR |
-| Rust modules | Rust logic that is already pure: the settings document, notification links | `cargo test`, in CI on every PR |
+| Rust modules | Each Rust module's own rules, through its functions and commands: the settings document, notification links | `cargo test`, in CI on every PR |
 | Real Provider | A real model still answers a Round through the Provider client | Locally, before a release and when the Provider client or a prompt changes |
 | Desktop checklist | sidelingo works on the desktop: always on top, tray, hotkey, notifications, appearance, installer, updates | Computer-use, before each release, plus the items a PR touches |
 

@@ -353,6 +353,21 @@ interface PipelineRow {
   sent: ReturnType<typeof structuringRequest>[];
 }
 
+/** Each named Preset with its chat endpoint, its launch key variable and how it sends a `high` effort. */
+const NAMED_PRESETS = [
+  ["openai", "https://api.openai.com/v1/chat/completions", "OPENAI_API_KEY", { reasoning_effort: "high" }],
+  [
+    "openrouter",
+    "https://openrouter.ai/api/v1/chat/completions",
+    "OPENROUTER_API_KEY",
+    { reasoning: { effort: "high" } },
+  ],
+  ["deepseek", "https://api.deepseek.com/chat/completions", "DEEPSEEK_API_KEY", { reasoning_effort: "high" }],
+  ["ollama-cloud", "https://ollama.com/v1/chat/completions", "OLLAMA_API_KEY", { reasoning_effort: "high" }],
+] as const;
+/** Every named Preset's launch key, each a different value. */
+const LAUNCH_KEYS = Object.fromEntries(NAMED_PRESETS.map(([, , variable]) => [variable, `key-in-${variable}`]));
+
 const pipeline: PipelineRow[] = [
   {
     name: "a single line sends a Structuring request, then a Translation request of its Structuring result",
@@ -487,32 +502,23 @@ const pipeline: PipelineRow[] = [
       translationRequest("## Source", { fields: { reasoning_effort: reasoningEffort } }),
     ],
   })),
-  {
-    name: "OpenRouter's effort is sent as reasoning.effort",
-    settings: {
-      schemaVersion: 1,
-      activePreset: "openrouter",
-      presets: { openrouter: { model: "router-model", reasoningEffort: "high" } },
-    },
-    keyEnvironment: { OPENROUTER_API_KEY: "router-key" },
-    input: "A single line",
-    replies: [LINE_STRUCTURED, [{ content: "Translated" }]],
-    shown: structuredThenTranslated("A single line", "Translated"),
-    sent: [
-      structuringRequest(textPart("A single line"), {
-        fields: { reasoning: { effort: "high" } },
-        model: "router-model",
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        authorization: "Bearer router-key",
-      }),
-      translationRequest("A single line", {
-        fields: { reasoning: { effort: "high" } },
-        model: "router-model",
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        authorization: "Bearer router-key",
-      }),
-    ],
-  },
+  ...NAMED_PRESETS.map(([preset, url, variable, fields]): PipelineRow => {
+    const request = { fields, model: "named-model", url, authorization: `Bearer key-in-${variable}` };
+    return {
+      name: `${preset} sends both stages to its own endpoint, with its own launch key and its effort field`,
+      settings: {
+        schemaVersion: 1,
+        activePreset: preset,
+        presets: { [preset]: { model: "named-model", reasoningEffort: "high" } },
+      },
+      // Every named Preset's key is set, so each must pick its own.
+      keyEnvironment: LAUNCH_KEYS,
+      input: "A single line",
+      replies: [LINE_STRUCTURED, [{ content: "Translated" }]],
+      shown: structuredThenTranslated("A single line", "Translated"),
+      sent: [structuringRequest(textPart("A single line"), request), translationRequest("A single line", request)],
+    };
+  }),
   {
     name: "an effort changed during a Round leaves that Round's requests unchanged",
     settings: customSettings({ reasoningEffort: "low" }),
