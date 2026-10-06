@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Input } from "../round/round";
 import { customSettings, settle, startCore, type Core, type Reply, type SentRequest } from "../testing/core";
 
 const OVERLONG = "x".repeat(10_001);
+const IMAGE: Input = { kind: "image", dataUrl: "data:image/png;base64,iVBORw0KGgo=" };
 const LONGEST = "a".repeat(10_000);
 const UNAVAILABLE = { status: 503, message: "Unavailable" };
 
@@ -31,10 +33,13 @@ const streaming = (core: Core, text: string) => core.until((state) => state.roun
 /** Structuring's reply that keeps a one-line Input as it is, so its Translation request carries the Input. */
 const kept = (input: string): Reply => [{ content: input }];
 
-/** Each request as "Structuring: <Input>" or "<Target language>: <Source text>"; every Source text here is one line. */
+/**
+ * Each request as "Structuring: <Input>", "Structuring: an image", or "<Target language>: <Source text>";
+ * every Source text here is one line.
+ */
 const asked = ({ body }: SentRequest) => {
   const user = body.messages[1].content;
-  if (Array.isArray(user)) return `Structuring: ${user[0].text}`;
+  if (Array.isArray(user)) return `Structuring: ${user[0].type === "image_url" ? "an image" : user[0].text}`;
   const [, language, source] = /^Translate to (\w+):\n[\s\S]*\n(.*)$/.exec(user)!;
   return `${language}: ${source}`;
 };
@@ -50,6 +55,8 @@ interface Row {
   cancelled?: number[];
   /** The Translated text shown at the end, or null when no Round is shown. */
   shown: string | null;
+  /** How the shown Round ended; `done` when one is shown. */
+  outcome?: "done" | "no-text";
   paused?: boolean;
   overlong?: boolean;
 }
@@ -147,6 +154,19 @@ const rows: Row[] = [
     },
     asked: requestsFor("Hidden"),
     shown: "Partial and the rest",
+  },
+  {
+    name: "showing the window with the image of the last no-text Round reuses it",
+    async act(core) {
+      core.provider.reply([{ content: "NO_TEXT" }]);
+      await core.copy(IMAGE);
+      await shows(core, "");
+      await core.hide();
+      await core.show(IMAGE);
+    },
+    asked: ["Structuring: an image"],
+    shown: "",
+    outcome: "no-text",
   },
   {
     name: "a failed Round is not reused",
@@ -343,22 +363,27 @@ const rows: Row[] = [
 ];
 
 describe("The Session's Input rules", () => {
-  it.each(rows)("$name", async ({ act, asked: expected, cancelled, shown, paused = false, overlong = false }) => {
-    const core = await startCore({ settings: customSettings({}, { targetLanguage: "en" }) });
+  it.each(rows)(
+    "$name",
+    async ({ act, asked: expected, cancelled, shown, outcome = "done", paused = false, overlong = false }) => {
+      const core = await startCore({ settings: customSettings({}, { targetLanguage: "en" }) });
 
-    await act(core);
-    await settle();
+      await act(core);
+      await settle();
 
-    expect(core.provider.requests.map(asked)).toEqual(expected);
-    if (cancelled) {
-      expect(core.provider.requests.flatMap(({ signal }, index) => (signal.aborted ? [index] : []))).toEqual(cancelled);
-    }
-    const state = core.session.state();
-    expect({
-      shown: state.round?.state.translation.text ?? null,
-      outcome: state.round?.state.outcome ?? null,
-      paused: state.paused,
-      overlong: state.overlong,
-    }).toEqual({ shown, outcome: shown === null ? null : "done", paused, overlong });
-  });
+      expect(core.provider.requests.map(asked)).toEqual(expected);
+      if (cancelled) {
+        expect(core.provider.requests.flatMap(({ signal }, index) => (signal.aborted ? [index] : []))).toEqual(
+          cancelled,
+        );
+      }
+      const state = core.session.state();
+      expect({
+        shown: state.round?.state.translation.text ?? null,
+        outcome: state.round?.state.outcome ?? null,
+        paused: state.paused,
+        overlong: state.overlong,
+      }).toEqual({ shown, outcome: shown === null ? null : outcome, paused, overlong });
+    },
+  );
 });
