@@ -81,7 +81,7 @@ cd src-tauri
 cargo test
 ```
 
-It covers the Rust logic that is already pure: the settings document and notification links.
+It covers each Rust module's own rules through its functions and commands, such as the settings document and notification links.
 
 ### Real Provider
 
