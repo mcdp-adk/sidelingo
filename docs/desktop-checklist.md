@@ -22,6 +22,7 @@ What needs real input, or shows only outside the webview, is checked here with c
 - [ ] Side by side, the two panes scroll in step from the keyboard (PageDown and Home in the focused pane, in either pane) and from a held pointer dragging either pane's scrollbar.
 - [ ] At the native minimum size (264 × 172), the compact toolbar's controls all fit without overlapping, with the Display mode dropdown showing "Side-by-side" or 对照 whole beside its arrow, in English and in Simplified Chinese. In Source or Translation alone, an error with a one-line detail and Open settings shows whole below the toolbar. A size saved smaller than the minimum (from an earlier version) reopens at the minimum.
 - [ ] A refresh never takes focus.
+- [ ] With `settings.json` held open by another program since Sidelingo started, choosing another Display mode gives a "Settings were not saved" notification with the reason, and the file is unchanged once released.
 
 ## Hotkey and tray
 
