@@ -176,12 +176,12 @@ const rows: Row[] = [
 ];
 
 describe("The Round's Provider errors", () => {
-  it.each(rows)("$name", async ({ input, reasoningEffort, replies, error, source, translation }) => {
+  it.each(rows)("$name", async ({ input, reasoningEffort, replies, source, translation }) => {
     const core = await startCore({ settings: customSettings(reasoningEffort ? { reasoningEffort } : {}) });
     core.provider.reply(...replies);
     await core.copy(input);
 
-    expect(await core.roundEnds()).toEqual({ stage: error.stage, outcome: "failed", source, translation });
+    expect(await core.roundEnds()).toEqual({ outcome: "failed", source, translation });
     // Nothing more is sent after a failure: Translation never starts once Structuring fails.
     expect(core.provider.requests).toHaveLength(replies.length);
   });
@@ -201,7 +201,6 @@ const translating = (source: string, translation: string): RoundState => ({
   translation: { text: translation, status: "streaming" },
 });
 const done = (source: string, translation: string): RoundState => ({
-  stage: "done",
   outcome: "done",
   source: { text: source, status: "done" },
   translation: { text: translation, status: "done" },
@@ -349,7 +348,6 @@ const pipeline: PipelineRow[] = [
     shown: [
       structuring(""),
       {
-        stage: "no-text",
         outcome: "no-text",
         source: { text: "", status: "done" },
         translation: { text: "", status: "skipped" },

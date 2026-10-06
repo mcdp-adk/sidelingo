@@ -12,13 +12,13 @@ export interface RoundConfiguration {
   targetLanguage: TargetLanguage;
 }
 
-export type RoundStage = "structuring" | "translating" | "done" | "no-text";
-export type RoundOutcome = "running" | "done" | "no-text" | "failed";
+export type RoundStage = "structuring" | "translating";
 export type RoundErrorHint = "image-model-support" | "reasoning-effort";
 
 export interface RoundError {
-  stage: "structuring" | "translating";
-  category: ProviderError["category"];
+  stage: RoundStage;
+  /** `unexpected` is a failure inside the Round that isn't the Provider's. */
+  category: ProviderError["category"] | "unexpected";
   status?: number;
   detail: string;
   hints?: RoundErrorHint[];
@@ -32,13 +32,13 @@ export interface RoundPane {
   error?: RoundError;
 }
 
-/** A Round's progress, from its first update to its last. */
-export interface RoundState {
-  stage: RoundStage;
-  outcome: RoundOutcome;
-  source: RoundPane;
-  translation: RoundPane;
-}
+/**
+ * A Round's progress, from its first update to its last. Every Round ends in one of `done`, `no-text` or
+ * `failed`; only a running Round has a stage.
+ */
+export type RoundState = { source: RoundPane; translation: RoundPane } & (
+  { outcome: "running"; stage: RoundStage } | { outcome: "done" | "no-text" | "failed" }
+);
 
 /** The Structuring prompt's whole answer for an image without text. */
 const NO_TEXT = "NO_TEXT";
@@ -161,7 +161,6 @@ export async function* run(
     if (signal.aborted) return;
     const error = roundError(reason, "structuring", input, configuration);
     yield {
-      stage: "structuring",
       outcome: "failed",
       source: { text: sourceText, status: "failed", error },
       translation: { text: "", status: "skipped", error },
@@ -170,7 +169,6 @@ export async function* run(
   }
   if (input.kind === "image" && sourceText.trim() === NO_TEXT) {
     yield {
-      stage: "no-text",
       outcome: "no-text",
       source: { text: "", status: "done" },
       translation: { text: "", status: "skipped" },
@@ -180,9 +178,9 @@ export async function* run(
   const source: RoundPane = { text: sourceText, status: "done" };
   let translated = "";
   let translation: RoundPane = { text: translated, status: "streaming" };
-  const messages = translationMessages(sourceText, configuration.targetLanguage);
   yield { stage: "translating", outcome: "running", source, translation };
   try {
+    const messages = translationMessages(sourceText, configuration.targetLanguage);
     for await (const cleaned of withoutReasoning(client.streamChat(configuration.provider, messages, signal))) {
       translated = cleaned;
       translation = { text: translated, status: "streaming" };
@@ -193,7 +191,6 @@ export async function* run(
     if (signal.aborted) return;
     const error = roundError(reason, "translating", input, configuration);
     yield {
-      stage: "translating",
       outcome: "failed",
       source,
       translation: { text: translated, status: "failed", error },
@@ -201,20 +198,22 @@ export async function* run(
     return;
   }
   yield {
-    stage: "done",
     outcome: "done",
     source,
     translation: { text: translated, status: "done" },
   };
 }
 
-function roundError(
-  reason: unknown,
-  stage: RoundError["stage"],
-  input: Input,
-  configuration: RoundConfiguration,
-): RoundError {
-  if (!(reason instanceof ProviderError)) throw reason;
+function roundError(reason: unknown, stage: RoundStage, input: Input, configuration: RoundConfiguration): RoundError {
+  if (!(reason instanceof ProviderError)) {
+    console.error("The Round failed unexpectedly:", reason);
+    return {
+      stage,
+      category: "unexpected",
+      detail: reason instanceof Error ? reason.message : String(reason),
+      offersSettings: false,
+    };
+  }
   const hints: RoundErrorHint[] = [];
   if (reason.status === 400) {
     if (input.kind === "image") hints.push("image-model-support");

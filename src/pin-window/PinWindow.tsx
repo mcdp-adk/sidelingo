@@ -57,14 +57,13 @@ const selectMode = (displayMode: DisplayMode) =>
 
 function errorTitle(error: RoundError): string {
   const stage = error.stage === "structuring" ? strings.structuringFailed : strings.translationFailed;
-  const category =
-    error.category === "network"
-      ? strings.networkError
-      : error.category === "provider-http"
-        ? strings.providerHttpError
-        : error.category === "provider-error"
-          ? strings.providerError
-          : strings.emptyResponseError;
+  const category = {
+    network: strings.networkError,
+    "provider-http": strings.providerHttpError,
+    "provider-error": strings.providerError,
+    "empty-response": strings.emptyResponseError,
+    unexpected: strings.unexpectedError,
+  }[error.category];
   return `${stage}: ${category}${error.status === undefined ? "" : ` ${error.status}`}`;
 }
 
