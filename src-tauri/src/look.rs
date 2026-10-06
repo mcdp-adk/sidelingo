@@ -1,5 +1,6 @@
 //! The native half of the look module (`src/look/`): what every sidelingo webview takes
 //! from Windows rather than from the browser engine.
+use tauri::image::Image;
 use tauri::webview::ScrollBarStyle;
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindowBuilder};
 use windows::core::{IInspectable, Ref};
@@ -9,14 +10,20 @@ use windows::UI::ViewManagement::{UIColorType, UISettings};
 /// The event every webview receives with the new accent when Windows' accent changes.
 const ACCENT_CHANGED: &str = "accent-changed";
 
-/// Fluent overlay scrollbars, as in Edge, and no browser autofill popups under text fields.
-/// Both windows must go through this, since WebView2 fixes the scrollbar style per environment.
+/// The tray's and the windows' icon, which Windows only shows at 16–24 px: the simplified
+/// `icons/icon-small.svg`, since the full icon's lettering blurs together at those sizes.
+pub const SMALL_ICON: Image<'static> = tauri::include_image!("icons/icon-small.png");
+
+/// Fluent overlay scrollbars, as in Edge, no browser autofill popups under text fields, and the
+/// small icon. Both windows must go through this, since WebView2 fixes the scrollbar style per
+/// environment.
 pub fn webview_defaults<'a, R: Runtime, M: Manager<R>>(
     builder: WebviewWindowBuilder<'a, R, M>,
-) -> WebviewWindowBuilder<'a, R, M> {
+) -> tauri::Result<WebviewWindowBuilder<'a, R, M>> {
     builder
         .scroll_bar_style(ScrollBarStyle::FluentOverlay)
         .general_autofill_enabled(false)
+        .icon(SMALL_ICON)
 }
 
 /// The system accent colour as `#rrggbb`, or none when Windows can't say. The

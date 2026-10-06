@@ -54,6 +54,7 @@ Then check:
 - [ ] A link in the kitchen sink shows its URL on hover, and a click opens it in the default browser, with no "Open external link?" page.
 - [ ] The pause border, shown in the caution colour while the toolbar's pause button pauses clipboard monitoring.
 - [ ] No pane shows a horizontal scrollbar for ordinary text at 150 % display scaling.
+- [ ] The tray, the Settings window's title bar, its taskbar button and Alt+Tab show the two-panel icon without lettering; the Start menu, the desktop shortcut, Installed apps and the installer show the icon with A and 文 from 32 px up.
 
 ## Settings window
 

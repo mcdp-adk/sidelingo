@@ -2,6 +2,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::look;
 use crate::ui_language::UiLanguage;
 use crate::{pin_window, settings_window};
 
@@ -79,12 +80,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     )?;
     app.manage(menu.clone());
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or_else(|| tauri::Error::AssetNotFound("tray icon".into()))?;
     TrayIconBuilder::new()
-        .icon(icon)
+        .icon(look::SMALL_ICON)
         .tooltip("sidelingo")
         .menu(&menu)
         .show_menu_on_left_click(false)
