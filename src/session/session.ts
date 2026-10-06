@@ -48,7 +48,7 @@ export type PinContent =
 export interface PinView {
   /** Changes with each new Round, so the panes scroll back to the top. */
   roundId: number | null;
-  /** Shown above the content until the next Input or Regenerate. */
+  /** Shown above the content until the next Input, Regenerate or Round configuration change. */
   configurationFailure: ConfigurationFailure | null;
   /** `null` under a configuration notice with no Round to show. */
   content: PinContent | null;
@@ -119,6 +119,8 @@ export function createSession(transport: Transport): Session {
   };
   let view = pinView(snapshot);
   let currentInput: Input | null = null;
+  /** Until a Round sends for the current Input, copying it again tries again (#112). */
+  let currentInputSent = false;
   /** Only the last fully successful Round is reusable; nothing is written to disk. */
   let lastSuccessful: { input: Input; round: ShownRound } | null = null;
   let lastRoundId = 0;
@@ -147,6 +149,7 @@ export function createSession(transport: Transport): Session {
         return;
       }
       const provider = resolved.configuration;
+      currentInputSent = true;
       const id = ++lastRoundId;
       let completed: ShownRound | null = null;
       for await (const state of run(
@@ -181,6 +184,8 @@ export function createSession(transport: Transport): Session {
     async start() {
       onRoundConfigurationChange(() => {
         lastSuccessful = null;
+        // A notice's advice is stale once its configuration changes; the user's next copy or show runs a Round (#112).
+        if (snapshot.configurationFailure) publish(snapshot.round, { configurationFailure: null });
       });
       await listen("pin-window-hidden", () => {
         if (snapshot.paused) publish(snapshot.round, { paused: false });
@@ -188,12 +193,18 @@ export function createSession(transport: Transport): Session {
       await listen<InputEvent>("input", ({ payload }) => {
         if (payload.origin === "copy" && snapshot.paused) return;
         // Nothing usable on show keeps the current content.
-        if (!payload.input || (payload.origin === "copy" && sameInput(currentInput, payload.input))) return;
+        if (
+          !payload.input ||
+          (payload.origin === "copy" && currentInputSent && sameInput(currentInput, payload.input))
+        ) {
+          return;
+        }
         // A Round still running on the shown Input keeps running and shows its whole result.
         if (payload.origin === "show" && inFlight && sameInput(currentInput, payload.input)) return;
         inFlight?.abort();
         inFlight = null;
         currentInput = payload.input;
+        currentInputSent = false;
         if (payload.origin === "show" && lastSuccessful && sameInput(lastSuccessful.input, payload.input)) {
           publish(lastSuccessful.round, { overlong: false, configurationFailure: null });
         } else if (payload.input.kind === "text" && payload.input.text.length > 10_000) {
