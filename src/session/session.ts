@@ -3,14 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { providerClient, type Transport } from "../provider/provider";
 import { run, type Input, type RoundError, type RoundPane, type RoundStage, type RoundState } from "../round/round";
-import {
-  DEFAULT_SETTINGS,
-  parseSettings,
-  providerConfiguration,
-  roundSettings,
-  type ConfigurationFailure,
-} from "../settings/settings";
-import { currentKeySources, currentProxyPassword, currentSettings, waitForSettings } from "../settings/settings-store";
+import { providerConfiguration, type ConfigurationFailure } from "../settings/settings";
+import { latestSettings, onRoundConfigurationChange, settingsSnapshot } from "../settings/settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -54,7 +48,7 @@ export type PinContent =
 export interface PinView {
   /** Changes with each new Round, so the panes scroll back to the top. */
   roundId: number | null;
-  /** Shown above the content until the next Input or Regenerate. */
+  /** Shown above the content until the next Input, Regenerate or Round configuration change. */
   configurationFailure: ConfigurationFailure | null;
   /** `null` under a configuration notice with no Round to show. */
   content: PinContent | null;
@@ -125,10 +119,10 @@ export function createSession(transport: Transport): Session {
   };
   let view = pinView(snapshot);
   let currentInput: Input | null = null;
+  /** Until a Round sends for the current Input, copying it again tries again (#112). */
+  let currentInputSent = false;
   /** Only the last fully successful Round is reusable; nothing is written to disk. */
   let lastSuccessful: { input: Input; round: ShownRound } | null = null;
-  /** A configuration change also invalidates a result still being produced with older settings. */
-  let configurationGeneration = 0;
   let lastRoundId = 0;
   /** Cancels the Round in flight. */
   let inFlight: AbortController | null = null;
@@ -147,25 +141,15 @@ export function createSession(transport: Transport): Session {
   async function startRound(input: Input) {
     const controller = (inFlight = new AbortController());
     try {
-      let generation = configurationGeneration;
-      while (true) {
-        await waitForSettings();
-        if (controller.signal.aborted) return;
-        // Another raw settings event may arrive while the store publishes its snapshot.
-        if (generation === configurationGeneration) break;
-        generation = configurationGeneration;
-      }
-      const settings = currentSettings();
-      const resolved = providerConfiguration(
-        settings,
-        currentKeySources(settings.activePreset),
-        currentProxyPassword(),
-      );
+      const { settings, keySources, proxyPassword, roundConfigurationRevision } = await latestSettings();
+      if (controller.signal.aborted) return;
+      const resolved = providerConfiguration(settings, keySources(settings.activePreset), proxyPassword);
       if ("error" in resolved) {
         publish(snapshot.round, { configurationFailure: resolved.error });
         return;
       }
       const provider = resolved.configuration;
+      currentInputSent = true;
       const id = ++lastRoundId;
       let completed: ShownRound | null = null;
       for await (const state of run(
@@ -181,7 +165,8 @@ export function createSession(transport: Transport): Session {
       }
       if (
         !controller.signal.aborted &&
-        generation === configurationGeneration &&
+        // A Round configuration change also invalidates a result still being produced with older settings.
+        roundConfigurationRevision === settingsSnapshot().roundConfigurationRevision &&
         completed &&
         (completed.state.outcome === "done" || completed.state.outcome === "no-text")
       ) {
@@ -197,13 +182,10 @@ export function createSession(transport: Transport): Session {
 
   return {
     async start() {
-      let configuration = JSON.stringify(roundSettings(currentSettings()));
-      await listen("settings-document-changed", ({ payload }) => {
-        const changed = JSON.stringify(roundSettings(parseSettings(payload) ?? DEFAULT_SETTINGS));
-        if (changed === configuration) return;
-        configuration = changed;
-        ++configurationGeneration;
+      onRoundConfigurationChange(() => {
         lastSuccessful = null;
+        // A notice's advice is stale once its configuration changes; the user's next copy or show runs a Round (#112).
+        if (snapshot.configurationFailure) publish(snapshot.round, { configurationFailure: null });
       });
       await listen("pin-window-hidden", () => {
         if (snapshot.paused) publish(snapshot.round, { paused: false });
@@ -211,12 +193,18 @@ export function createSession(transport: Transport): Session {
       await listen<InputEvent>("input", ({ payload }) => {
         if (payload.origin === "copy" && snapshot.paused) return;
         // Nothing usable on show keeps the current content.
-        if (!payload.input || (payload.origin === "copy" && sameInput(currentInput, payload.input))) return;
+        if (
+          !payload.input ||
+          (payload.origin === "copy" && currentInputSent && sameInput(currentInput, payload.input))
+        ) {
+          return;
+        }
         // A Round still running on the shown Input keeps running and shows its whole result.
         if (payload.origin === "show" && inFlight && sameInput(currentInput, payload.input)) return;
         inFlight?.abort();
         inFlight = null;
         currentInput = payload.input;
+        currentInputSent = false;
         if (payload.origin === "show" && lastSuccessful && sameInput(lastSuccessful.input, payload.input)) {
           publish(lastSuccessful.round, { overlong: false, configurationFailure: null });
         } else if (payload.input.kind === "text" && payload.input.text.length > 10_000) {

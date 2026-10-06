@@ -159,7 +159,7 @@ export function PinWindow({ session }: { session: Session }) {
   const { roundId, configurationFailure, content, paused, canRegenerate, canCopySource, canCopyTranslation } =
     usePinView(session);
   const round = content?.kind === "round" ? content : null;
-  const mode = useSettings().displayMode;
+  const mode = useSettings().settings.displayMode;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLDivElement>(null);

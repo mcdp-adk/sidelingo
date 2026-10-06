@@ -46,7 +46,7 @@ function presetLabel(id: Preset): string {
 
 export function SettingsWindow() {
   const styles = useStyles();
-  const settings = useSettings();
+  const { settings } = useSettings();
   const [error, setError] = useState<string | null>(null);
   const page = useRef<HTMLElement>(null);
   const general = useRef<HTMLElement>(null);

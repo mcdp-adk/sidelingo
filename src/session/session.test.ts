@@ -372,6 +372,33 @@ const rows: Row[] = [
     asked: [...requestsFor("Configured"), ...requestsFor("Configured", "Japanese")],
     shown: "Japanese",
   },
+  {
+    name: "a copy right after a configuration change runs with the new configuration",
+    async act(core) {
+      core.provider.reply(kept("Fresh"), [{ content: "Japanese" }]);
+      await core.changeSettings(customSettings({}, { targetLanguage: "ja" }));
+      await core.copy("Fresh");
+      await shows(core, "Japanese");
+    },
+    asked: requestsFor("Fresh", "Japanese"),
+    shown: "Japanese",
+  },
+  {
+    name: "after the configuration is fixed under its notice, copying the same line again runs a Round (#112)",
+    async act(core) {
+      core.provider.reply(kept("Unconfigured"), [{ content: "Fixed" }]);
+      await core.changeSettings({ schemaVersion: 1 });
+      await core.copy("Unconfigured");
+      await core.until((view) => view.configurationFailure !== null);
+      await core.changeSettings(customSettings({}, { targetLanguage: "en" }));
+      await settle();
+      expect(core.provider.requests).toEqual([]);
+      await core.copy("Unconfigured");
+      await shows(core, "Fixed");
+    },
+    asked: requestsFor("Unconfigured"),
+    shown: "Fixed",
+  },
 ];
 
 describe("The Session's Input rules", () => {
@@ -446,6 +473,47 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: { kind: "no-provider" },
       content: null,
+      paused: false,
+      canRegenerate: true,
+      canCopySource: false,
+      canCopyTranslation: false,
+    },
+  },
+  {
+    name: "under a notice, a change outside the Round configuration sends nothing and keeps the notice",
+    settings: { schemaVersion: 1 },
+    async act(core) {
+      await core.copy("Unconfigured");
+      await core.until((view) => view.configurationFailure !== null);
+      await core.changeSettings({ schemaVersion: 1, displayMode: "both" });
+      await settle();
+      expect(core.provider.requests).toEqual([]);
+    },
+    view: {
+      roundId: null,
+      configurationFailure: { kind: "no-provider" },
+      content: null,
+      paused: false,
+      canRegenerate: true,
+      canCopySource: false,
+      canCopyTranslation: false,
+    },
+  },
+  {
+    name: "a Round configuration change clears the notice its advice no longer fits, and sends nothing",
+    settings: { schemaVersion: 1 },
+    async act(core) {
+      await core.copy("Unconfigured");
+      await core.until((view) => view.configurationFailure !== null);
+      await core.changeSettings(customSettings({ model: "" }));
+      await core.until((view) => view.configurationFailure === null);
+      await settle();
+      expect(core.provider.requests).toEqual([]);
+    },
+    view: {
+      roundId: null,
+      configurationFailure: null,
+      content: { kind: "hint" },
       paused: false,
       canRegenerate: true,
       canCopySource: false,

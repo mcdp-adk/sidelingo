@@ -14,6 +14,10 @@ _Avoid_: Query, selection (a selection is one place an Input can come from)
 One pass of processing, from an Input through Structuring to a finished Translation.
 _Avoid_: Request, job (a Round may involve several model requests)
 
+**Round configuration** (Round 配置):
+The settings that decide what a Round sends and where: which Preset is active, every Preset's Provider details, the proxy, and the Target language. When it changes, an earlier result is no longer reused.
+_Avoid_: Round settings
+
 **Structuring** (整理):
 Turning an Input into Source text laid out the way its content is meant to be read, without changing its words; always applied, whether the Input is plain text or an image.
 _Avoid_: Formatting, Markdown conversion, OCR
