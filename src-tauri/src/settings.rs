@@ -112,7 +112,8 @@ pub fn set_aside_broken_settings(
 }
 
 /// Serializes patches from both windows. A failed write changes neither the held
-/// document nor the document other windows receive.
+/// document nor the document other windows receive. A file that couldn't be read
+/// is read again rather than replaced, and the patch is refused while it still can't.
 #[tauri::command]
 pub fn patch_settings(
     app: AppHandle,
@@ -123,16 +124,23 @@ pub fn patch_settings(
         return Err("A settings patch must be an object".into());
     }
     let mut held = document.0.lock().map_err(|error| error.to_string())?;
-    let mut next = match &*held {
-        SettingsRead::Document(document) => document.clone(),
-        _ => Value::Object(Default::default()),
-    };
-    merge(&mut next, patch);
     let path = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join(FILE);
+    let current = match &*held {
+        SettingsRead::InvalidJson | SettingsRead::Unreadable => read(&path),
+        current => current.clone(),
+    };
+    let mut next = match current {
+        SettingsRead::Document(document) => document,
+        SettingsRead::Missing => Value::Object(Default::default()),
+        SettingsRead::InvalidJson | SettingsRead::Unreadable => {
+            return Err("settings.json can't be read, so this change wasn't saved over it".into())
+        }
+    };
+    merge(&mut next, patch);
     write_atomically(&path, &next).map_err(|error| error.to_string())?;
     *held = SettingsRead::Document(next.clone());
     if let Err(error) = app.emit("settings-document-changed", &next) {
@@ -190,6 +198,7 @@ fn write_atomically(path: &Path, document: &Value) -> Result<(), Box<dyn std::er
 
 #[cfg(test)]
 mod tests {
+    use std::os::windows::fs::OpenOptionsExt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -213,8 +222,8 @@ mod tests {
             })
         }
 
-        /// Starts after `prepare` has had the settings file's path.
-        fn start_with(prepare: impl FnOnce(&Path)) -> Self {
+        /// Starts after `prepare` has had the settings file's path, keeping what it returns until the file is read.
+        fn start_with<T>(prepare: impl FnOnce(&Path) -> T) -> Self {
             static NEXT: AtomicUsize = AtomicUsize::new(0);
             let mut context = tauri::generate_context!();
             context.config_mut().identifier = format!(
@@ -229,8 +238,9 @@ mod tests {
             let folder = app.path().app_data_dir().unwrap();
             let _ = std::fs::remove_dir_all(&folder);
             std::fs::create_dir_all(&folder).unwrap();
-            prepare(&folder.join(FILE));
+            let prepared = prepare(&folder.join(FILE));
             load(app.handle()).unwrap();
+            drop(prepared);
             Self { app, folder }
         }
 
@@ -262,6 +272,15 @@ mod tests {
         fn written(&self) -> Value {
             serde_json::from_str(&self.text(FILE).expect("settings.json exists")).unwrap()
         }
+    }
+
+    /// Holds `file` open as another program can, so no one else can read or write it until the handle drops.
+    fn lock(file: &Path) -> std::fs::File {
+        std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(file)
+            .unwrap()
     }
 
     impl Drop for TestApp {
@@ -335,8 +354,8 @@ mod tests {
     }
 
     #[test]
-    fn a_patch_without_a_readable_document_starts_from_an_empty_one() {
-        for start in [None, Some("{bad json"), Some("[1, 2]")] {
+    fn a_patch_without_a_file_or_onto_a_non_object_starts_from_an_empty_one() {
+        for start in [None, Some("[1, 2]")] {
             let app = TestApp::start(start);
             app.patch(json!({ "schemaVersion": 1 })).unwrap();
             assert_eq!(
@@ -345,6 +364,44 @@ mod tests {
                 "from {start:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_patch_merges_onto_a_file_that_could_not_be_read_at_startup() {
+        let saved = r#"{"schemaVersion":1,"activePreset":"custom","presets":{"custom":{"keyCiphertext":"kept"}}}"#;
+        // Another program held the file open while sidelingo started.
+        let app = TestApp::start_with(|file| {
+            std::fs::write(file, saved).unwrap();
+            lock(file)
+        });
+        assert_eq!(app.read(), json!({ "status": "unreadable" }));
+        app.patch(json!({ "displayMode": "both" })).unwrap();
+        assert_eq!(
+            app.written(),
+            json!({
+                "schemaVersion": 1,
+                "activePreset": "custom",
+                "presets": { "custom": { "keyCiphertext": "kept" } },
+                "displayMode": "both",
+            })
+        );
+    }
+
+    #[test]
+    fn a_patch_is_refused_and_writes_nothing_while_the_file_cannot_be_read() {
+        let app = TestApp::start(Some("{bad json"));
+        assert!(app.patch(json!({ "displayMode": "both" })).is_err());
+        assert_eq!(app.text(FILE).as_deref(), Some("{bad json"));
+
+        let saved = r#"{"schemaVersion":1,"activePreset":"custom"}"#;
+        let app = TestApp::start_with(|file| {
+            std::fs::write(file, saved).unwrap();
+            lock(file)
+        });
+        let held = lock(&app.file(FILE));
+        assert!(app.patch(json!({ "displayMode": "both" })).is_err());
+        drop(held);
+        assert_eq!(app.text(FILE).as_deref(), Some(saved));
     }
 
     #[test]
@@ -416,8 +473,9 @@ mod tests {
 
     #[test]
     fn a_file_rewritten_since_it_was_read_is_not_set_aside() {
-        // Another window's patch replaced the broken file before this window set it aside.
+        // Another window set the broken file aside and patched before this window set it aside.
         let app = TestApp::start(Some("{bad json"));
+        assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(true));
         app.patch(json!({ "schemaVersion": 1 })).unwrap();
         assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(false));
 
