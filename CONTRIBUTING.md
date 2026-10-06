@@ -49,7 +49,7 @@ To release `vX.Y.Z`:
 
 1. In a PR, set the version in `package.json`, `src-tauri/Cargo.toml` (and its lockfile) and `src-tauri/tauri.conf.json`, and add a `## vX.Y.Z` section to `CHANGELOG.md` saying what changed, in users' words.
 2. Once it merges, and only on the owner's word, push the `vX.Y.Z` tag on `main`. The release workflow checks that the versions match, takes the notes from that `CHANGELOG.md` section, builds the per-user NSIS installer, signs the updater artifacts with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets, and publishes the release, titled `vX.Y.Z`, as Latest. No private updater key belongs in this repository.
-3. Check the published release: the installer's SHA-256 matches its `.sha256`, its `.sig` verifies against the public key in `tauri.conf.json`, and `releases/latest/download/latest.json` serves this release's `latest.json`, whose URLs are `github.com/…/releases/download/vX.Y.Z/…` links.
+3. Run `pnpm verify:release vX.Y.Z`. It checks the published release's title, that it is Latest, its checksum and updater signature, and that `latest.json` downloads from the tag.
 4. Run the desktop checklist on the installed release, and comment the results on the release PR.
 
 ## Tests
