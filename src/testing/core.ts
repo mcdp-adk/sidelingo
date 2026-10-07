@@ -86,6 +86,17 @@ export const ended = (view: PinView) =>
  */
 export const settle = () => new Promise<void>((resolve) => setTimeout(resolve));
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** `document` with `patch` merged in as Rust's `merge` does: objects field by field, anything else replaced. */
+function merge(document: unknown, patch: unknown): unknown {
+  if (!isObject(patch)) return patch;
+  const merged = isObject(document) ? { ...document } : {};
+  for (const [key, value] of Object.entries(patch)) merged[key] = merge(merged[key], value);
+  return merged;
+}
+
 const toInput = (input: Input | string): Input => (typeof input === "string" ? { kind: "text", text: input } : input);
 
 /**
@@ -114,6 +125,13 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     }),
     // A stored JSON `null` is a document too.
     read_settings: () => held,
+    // Rust merges a patch into the document it holds, writes it with the next revision and broadcasts it.
+    patch_settings: async ({ patch }) => {
+      if (held.status !== "document" && held.status !== "missing") throw new Error(`settings.json is ${held.status}`);
+      held = { status: "document", document: merge(held.document, patch), revision: ++lastRevision };
+      await emit("settings-document-changed", held);
+      return null;
+    },
     unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext as string] ?? null,
     pin_window_ready: () => null,
     // The updater finds no update unless a test plays otherwise.
