@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.1
+
+- After you change a Preset you aren't using, or the proxy address while the System proxy is selected, opening the Pin window on the same text still shows the last result instead of translating it again. A proxy address that isn't in use no longer makes Settings reload the model list.
+
 ## v0.2.0
 
 - Sidelingo has its own icon in the tray, the taskbar, the title bar and the installer, and its name is now written Sidelingo.
