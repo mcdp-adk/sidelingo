@@ -2,7 +2,7 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { emit, listen } from "@tauri-apps/api/event";
 import type { Input } from "../round/round";
 import { createSession, type PinView, type Session } from "../session/session";
-import { startSettingsStore } from "../settings/settings-store";
+import { startSettingsStore, type SettingsRead } from "../settings/settings-store";
 import { startUpdateChecks, type useUpdateStatus } from "../updates/updates";
 import { FakeTransport } from "./fake-transport";
 
@@ -34,7 +34,7 @@ export interface CoreOptions {
   /** The stored settings document `read_settings` returns, `null` included; a Custom Preset when left out. */
   settings?: unknown;
   /** How Rust read a settings file that holds no document, which `read_settings` then returns instead of `settings`. */
-  fileStatus?: "missing" | "invalidJson" | "unreadable";
+  fileStatus?: Exclude<SettingsRead["status"], "document">;
   /** The launch environment's Provider keys; every variable is unset by default. */
   keyEnvironment?: Record<string, string | null>;
   /** Ciphertexts `unprotect_secret` can decrypt for this Windows user; any other decrypts to null. */
@@ -106,14 +106,13 @@ const toInput = (input: Input | string): Input => (typeof input === "string" ? {
 export async function startCore(options: CoreOptions = {}): Promise<Core> {
   const provider = new FakeTransport();
   // What Rust holds: the file's status, its document and its revision.
-  let held: { status: NonNullable<CoreOptions["fileStatus"]> | "document"; document?: unknown; revision: number } =
-    options.fileStatus
-      ? { status: options.fileStatus, revision: ++lastRevision }
-      : {
-          status: "document",
-          document: "settings" in options ? options.settings : customSettings(),
-          revision: ++lastRevision,
-        };
+  let held: SettingsRead = options.fileStatus
+    ? { status: options.fileStatus, revision: ++lastRevision }
+    : {
+        status: "document",
+        document: "settings" in options ? options.settings : customSettings(),
+        revision: ++lastRevision,
+      };
   const invoked: Core["invoked"] = [];
   const commands: Record<string, Command> = {
     read_key_environment: () => ({
@@ -128,7 +127,8 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
     // Rust merges a patch into the document it holds, writes it with the next revision and broadcasts it.
     patch_settings: async ({ patch }) => {
       if (held.status !== "document" && held.status !== "missing") throw new Error(`settings.json is ${held.status}`);
-      held = { status: "document", document: merge(held.document, patch), revision: ++lastRevision };
+      const document = merge(held.status === "document" ? held.document : undefined, patch);
+      held = { status: "document", document, revision: ++lastRevision };
       await emit("settings-document-changed", held);
       return null;
     },

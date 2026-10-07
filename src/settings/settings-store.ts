@@ -90,7 +90,7 @@ function accept(document: unknown): Promise<void> {
 }
 
 /** What `read_settings` answers and each patch broadcasts, with the revision Rust gives every document it writes. */
-type SettingsRead = (
+export type SettingsRead = (
   { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown }
 ) & {
   revision: number;
