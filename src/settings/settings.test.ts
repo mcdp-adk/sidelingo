@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationFailure, SettingsChange } from "./settings";
 import { saveSettings, settingsSnapshot } from "./settings-store";
-import { customSettings, ended, settle, startCore, type Reply } from "../testing/core";
+import { customSettings, ended, settle, startCore, type CoreOptions, type Reply } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
 const UNDECRYPTABLE = "bm90LWEtRFBBUEktY2lwaGVydGV4dA==";
@@ -162,22 +162,21 @@ const REJECTED_EFFORT = {
   presets: { deepseek: { model: "deepseek-test", reasoningEffort: "medium" } },
 };
 
-/** How Rust read the stored settings file. */
-type Stored = { status: "missing" | "invalidJson" | "unreadable" } | { status: "document"; document: unknown };
-
 interface LoadingRow {
   name: string;
-  stored: Stored;
-  /** Whether Rust sets the file aside when asked; false when it changed since it was read. */
-  setAside?: boolean;
+  /** How Rust read the stored settings file: its document, or a status without one. */
+  stored: Pick<CoreOptions, "settings" | "fileStatus">;
+  /** Whether Rust refuses to set the file aside, as when it changed since it was read. */
+  refused?: boolean;
   /** The recovery commands the store invokes, in order. */
   recovery: unknown[];
   outcome: Outcome;
 }
 
-const setAside = (reason: "invalidJson" | "schema", expectedDocument: unknown) => ({
+/** The fake Rust side sets the file aside only for the revision it holds, so a notification proves the store sent it. */
+const setAside = (reason: "invalidJson" | "schema") => ({
   command: "set_aside_broken_settings",
-  args: { reason, expectedDocument },
+  args: { revision: expect.any(Number), reason },
 });
 const notified = { command: "show_native_notification" };
 const ready = { sent: { url: CUSTOM_CHAT, authorization: null } };
@@ -186,58 +185,57 @@ const defaults = { failure: { kind: "no-provider" } } as const;
 const loading: LoadingRow[] = [
   {
     name: "a missing document loads defaults and sets nothing aside",
-    stored: { status: "missing" },
+    stored: { fileStatus: "missing" },
     recovery: [],
     outcome: defaults,
   },
   {
     name: "an unreadable document loads defaults and sets nothing aside",
-    stored: { status: "unreadable" },
+    stored: { fileStatus: "unreadable" },
     recovery: [],
     outcome: defaults,
   },
   {
     name: "a document holding JSON null is set aside as rejected by the schema, and defaults load",
-    stored: { status: "document", document: null },
-    recovery: [setAside("schema", null), notified],
+    stored: { settings: null },
+    recovery: [setAside("schema"), notified],
     outcome: defaults,
   },
   {
     name: "a document that isn't JSON is set aside, and defaults load",
-    stored: { status: "invalidJson" },
-    recovery: [setAside("invalidJson", null), notified],
+    stored: { fileStatus: "invalidJson" },
+    recovery: [setAside("invalidJson"), notified],
     outcome: defaults,
   },
   {
     name: "a document with another schema version is set aside, and defaults load",
-    stored: { status: "document", document: REJECTED_VERSION },
-    recovery: [setAside("schema", REJECTED_VERSION), notified],
+    stored: { settings: REJECTED_VERSION },
+    recovery: [setAside("schema"), notified],
     outcome: defaults,
   },
   {
     name: "a document with one invalid field is set aside whole, and defaults load",
-    stored: { status: "document", document: REJECTED_FIELD },
-    recovery: [setAside("schema", REJECTED_FIELD), notified],
+    stored: { settings: REJECTED_FIELD },
+    recovery: [setAside("schema"), notified],
     outcome: defaults,
   },
   {
     name: "a document with an effort its Preset doesn't offer is set aside whole, and defaults load",
-    stored: { status: "document", document: REJECTED_EFFORT },
-    recovery: [setAside("schema", REJECTED_EFFORT), notified],
+    stored: { settings: REJECTED_EFFORT },
+    recovery: [setAside("schema"), notified],
     outcome: defaults,
   },
   {
     name: "a rejected document Rust doesn't set aside still loads defaults, with no notification",
-    stored: { status: "document", document: REJECTED_VERSION },
-    setAside: false,
-    recovery: [setAside("schema", REJECTED_VERSION)],
+    stored: { settings: REJECTED_VERSION },
+    refused: true,
+    recovery: [setAside("schema")],
     outcome: defaults,
   },
   {
     name: "a document that leaves fields out loads it with defaults for the rest",
     stored: {
-      status: "document",
-      document: { schemaVersion: 1, activePreset: "custom", presets: { custom: customSettings().presets.custom } },
+      settings: { schemaVersion: 1, activePreset: "custom", presets: { custom: customSettings().presets.custom } },
     },
     recovery: [],
     outcome: ready,
@@ -245,11 +243,11 @@ const loading: LoadingRow[] = [
 ];
 
 describe("Loading the settings document", () => {
-  it.each(loading)("$name", async ({ stored, setAside = true, recovery, outcome }) => {
+  it.each(loading)("$name", async ({ stored, refused = false, recovery, outcome }) => {
     const core = await startCore({
-      ...(stored.status === "document" ? { settings: stored.document } : { fileStatus: stored.status }),
+      ...stored,
       commands: {
-        set_aside_broken_settings: () => setAside,
+        ...(refused && { set_aside_broken_settings: () => false }),
         show_native_notification: () => null,
       },
     });
@@ -341,10 +339,7 @@ describe("The UI language", () => {
       const harness = await import("../testing/core");
       const core = await harness.startCore({
         fileStatus: "invalidJson",
-        commands: {
-          set_aside_broken_settings: () => true,
-          show_native_notification: () => null,
-        },
+        commands: { show_native_notification: () => null },
       });
       const notifications = core.invoked.filter(({ command }) => command === "show_native_notification");
       expect(notifications.map(({ args }) => (args as { title: string }).title)).toEqual([title]);
