@@ -1,6 +1,6 @@
 [package]
 name = "sidelingo"
-version = "0.2.0"
+version = "0.2.1"
 description = "Structures and translates what you copy"
 authors = ["mcdp-adk"]
 license = "GPL-3.0-only"
