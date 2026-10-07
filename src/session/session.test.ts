@@ -126,6 +126,21 @@ const rows: Row[] = [
     shown: "Done",
   },
   {
+    name: "showing the window reuses the last successful Input after a change to a Preset that isn't active",
+    async act(core) {
+      core.provider.reply(kept("Reused"), [{ content: "Done" }]);
+      await core.copy("Reused");
+      await shows(core, "Done");
+      const settings = customSettings();
+      await core.changeSettings({ ...settings, presets: { ...settings.presets, openai: { model: "gpt-other" } } });
+      await settle();
+      await core.hide();
+      await core.show("Reused");
+    },
+    asked: requestsFor("Reused"),
+    shown: "Done",
+  },
+  {
     name: "showing the window with nothing usable keeps the shown result",
     async act(core) {
       core.provider.reply(kept("Kept"), [{ content: "Done" }]);
@@ -566,7 +581,7 @@ const viewRows: ViewRow[] = [
     },
   },
   {
-    name: "a Round configuration change clears the notice its advice no longer fits, and sends nothing",
+    name: "a change to why a Round can't run clears the notice its advice no longer fits, and sends nothing",
     settings: { schemaVersion: 1 },
     async act(core) {
       await core.copy("Unconfigured");

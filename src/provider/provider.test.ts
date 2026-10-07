@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { providerClient } from "./provider";
 import type { Preset } from "./presets";
-import { DEFAULT_SETTINGS, resolveProviderConnection } from "../settings/settings";
+import { settingsSnapshot } from "../settings/settings-store";
+import { startCore } from "../testing/core";
 
 // The Round's requests are proven through the webview core (`round.test.ts`). The model list has no owner there
-// yet: only the settings window asks for it.
+// yet: only the settings window asks for it, on the connection the settings snapshot publishes for its Preset.
 describe("Listing a named Preset's models", () => {
   const environment = {
     OPENAI_API_KEY: "key-in-OPENAI_API_KEY",
@@ -14,19 +15,15 @@ describe("Listing a named Preset's models", () => {
   };
 
   async function listModelsFor(preset: Preset) {
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      activePreset: preset,
-      presets: { ...DEFAULT_SETTINGS.presets, [preset]: { ...DEFAULT_SETTINGS.presets[preset], model: "model" } },
-    };
-    const connection = resolveProviderConnection(settings, { enteredKey: null, environment });
-    if (!("configuration" in connection)) throw new Error("The supplied keys must make the connection ready");
+    await startCore({ settings: { schemaVersion: 1, activePreset: preset }, keyEnvironment: environment });
+    const connection = settingsSnapshot().connections[preset];
+    if (!("connection" in connection)) throw new Error("The supplied keys must make the connection ready");
     const calls: { method: string | undefined; url: string; authorization: string | null }[] = [];
     const client = providerClient(async (url, { method, headers }) => {
       calls.push({ method, url, authorization: new Headers(headers).get("Authorization") });
       return new Response(JSON.stringify({ data: [{ id: "listed-model" }] }));
     });
-    expect(await client.listModels(connection.configuration, new AbortController().signal)).toEqual(["listed-model"]);
+    expect(await client.listModels(connection.connection, new AbortController().signal)).toEqual(["listed-model"]);
     return calls;
   }
 

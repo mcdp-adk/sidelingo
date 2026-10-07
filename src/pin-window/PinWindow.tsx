@@ -28,13 +28,13 @@ import {
   PauseRegular,
   SettingsRegular,
 } from "@fluentui/react-icons";
-import { strings } from "../i18n";
+import { configurationFailureMessage, strings } from "../i18n";
 import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import { useLayerStyles } from "../look/layers";
 import { Markdown } from "../look/Markdown";
 import type { RoundError, RoundErrorHint, RoundStage } from "../round/round";
 import { usePinView, type PaneKind, type PinContent, type Session } from "../session/session";
-import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
+import { DISPLAY_MODES, type DisplayMode } from "../settings/settings";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
@@ -71,21 +71,6 @@ function errorTitle(error: RoundError): string {
     unexpected: strings.unexpectedError,
   }[error.category];
   return `${stage}: ${category}${error.status === undefined ? "" : ` ${error.status}`}`;
-}
-
-function configurationFailureMessage(failure: ConfigurationFailure): string {
-  switch (failure.kind) {
-    case "no-provider":
-      return strings.chooseProvider;
-    case "missing-model":
-      return strings.missingModel;
-    case "missing-base-url":
-      return strings.missingBaseUrl;
-    case "missing-key":
-      return failure.cause === "environment-unset"
-        ? strings.keyMissingEnvironment(failure.variable)
-        : strings.keyUndecryptable;
-  }
 }
 
 const useStyles = makeStyles({

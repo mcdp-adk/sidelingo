@@ -1,3 +1,5 @@
+import type { ConfigurationFailure } from "./settings/settings";
+
 export type UiLanguage = "zh-Hans" | "en";
 
 /** Any Chinese gives Simplified Chinese, anything else English. */
@@ -96,8 +98,6 @@ const en = {
   settingsRecoveredBody: "Invalid settings were moved to settings.json.broken. Defaults are now in use.",
   fetchingModels: "Fetching models",
   modelListError: "Can't fetch the model list: ",
-  noProvider: "No Provider configured",
-  missingKey: "No API key configured",
   missingBaseUrl: "Enter a Base URL",
 };
 
@@ -192,8 +192,6 @@ const zhHans: typeof en = {
   settingsRecoveredBody: "无效设置已移至 settings.json.broken。现已使用默认设置。",
   fetchingModels: "正在获取模型列表",
   modelListError: "无法获取模型列表：",
-  noProvider: "尚未配置服务商",
-  missingKey: "尚未配置 API 密钥",
   missingBaseUrl: "请输入 Base URL",
 };
 
@@ -201,3 +199,19 @@ const zhHans: typeof en = {
 export const uiLanguage = uiLanguageOf(navigator.language);
 
 export const strings = uiLanguage === "zh-Hans" ? zhHans : en;
+
+/** What the user is told about a failure that stops a Round, or a model list for the Preset shown. */
+export function configurationFailureMessage(failure: ConfigurationFailure): string {
+  switch (failure.kind) {
+    case "no-provider":
+      return strings.chooseProvider;
+    case "missing-model":
+      return strings.missingModel;
+    case "missing-base-url":
+      return strings.missingBaseUrl;
+    case "missing-key":
+      return failure.cause === "environment-unset"
+        ? strings.keyMissingEnvironment(failure.variable)
+        : strings.keyUndecryptable;
+  }
+}

@@ -2,24 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { fetch } from "@tauri-apps/plugin-http";
 import { Combobox, Field, Option, Spinner } from "@fluentui/react-components";
-import { strings } from "../i18n";
+import { configurationFailureMessage, strings } from "../i18n";
 import { providerClient } from "../provider/provider";
-import { resolveProviderConnection, type ConnectionFailure, type Preset, type Settings } from "../settings/settings";
+import type { Preset, Settings } from "../settings/settings";
 import { useSettings } from "../settings/settings-store";
 
 const client = providerClient(fetch);
-function connectionMessage(failure: ConnectionFailure): string {
-  switch (failure.kind) {
-    case "no-provider":
-      return strings.noProvider;
-    case "missing-key":
-      return failure.cause === "environment-unset"
-        ? strings.keyMissingEnvironment(failure.variable)
-        : strings.keyUndecryptable;
-    case "missing-base-url":
-      return strings.missingBaseUrl;
-  }
-}
 
 export function ModelField({
   settings,
@@ -37,20 +25,16 @@ export function ModelField({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectionEvent = useRef<unknown>(null);
-  const { keySources, proxyPassword } = useSettings();
-  const resolved = resolveProviderConnection(settings, keySources(preset), proxyPassword);
-  const key = "configuration" in resolved ? resolved.configuration.key : null;
-  const baseUrl = "configuration" in resolved ? resolved.configuration.baseUrl : null;
-  const connectionError = "error" in resolved ? resolved.error : null;
-  const connectionErrorMessage = connectionError ? connectionMessage(connectionError) : null;
+  // A new object exactly when this Preset's connection changes; a changed model changes nothing here.
+  const connection = useSettings().connections[preset];
 
   useEffect(() => {
     setDraft(value);
     setFiltering(false);
   }, [value]);
   useEffect(() => {
-    if ("error" in resolved) {
-      setError(connectionMessage(resolved.error));
+    if ("failure" in connection) {
+      setError(configurationFailureMessage(connection.failure));
       setModels([]);
       setLoading(false);
       return;
@@ -64,7 +48,7 @@ export function ModelField({
       setLoading(true);
       setModels([]);
       try {
-        const ids = await client.listModels(resolved.configuration, current.signal);
+        const ids = await client.listModels(connection.connection, current.signal);
         if (current.signal.aborted) return;
         setModels(ids);
         setError(null);
@@ -81,23 +65,7 @@ export function ModelField({
       controller?.abort();
       void unlisten.then((stop) => stop());
     };
-    // A changed model does not change the connection or refresh its list.
-  }, [
-    preset,
-    baseUrl,
-    connectionError?.kind,
-    connectionError?.kind === "missing-key" ? connectionError.cause : null,
-    connectionError?.kind === "missing-key" && connectionError.cause === "environment-unset"
-      ? connectionError.variable
-      : null,
-    connectionErrorMessage,
-    key,
-    settings.proxy.mode,
-    settings.proxy.url,
-    settings.proxy.username,
-    settings.proxy.passwordCiphertext,
-    proxyPassword,
-  ]);
+  }, [connection]);
 
   const save = () => {
     if (draft !== value) void commit(draft);
