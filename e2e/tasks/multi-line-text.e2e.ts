@@ -77,16 +77,11 @@ describe("Task 2: multi-line text", () => {
     await copySource.click();
     await browser.waitUntil(() => readClipboardText() === source, { timeoutMsg: "Copy source didn't copy the Source" });
 
-    // 2. The tabs and Ctrl+1–3 switch Display modes.
+    // 2. A tab and Ctrl+3 switch Display modes; which panes each mode shows is the Session's rule.
     const regions = () => $$("[role=region]");
     const showsSource = async () => {
       await expect(regions()).toBeElementsArrayOfSize(1);
       await expect(regions()[0].$("h1")).toHaveText("标题");
-    };
-    const showsTranslation = async () => {
-      await expect(regions()).toBeElementsArrayOfSize(1);
-      await expect(regions()[0]).toHaveText("Translation paragraph 40", { containing: true });
-      await expect(regions()[0].$("h1")).not.toExist();
     };
     const showsBoth = async () => {
       await expect(regions()).toBeElementsArrayOfSize(2);
@@ -114,14 +109,6 @@ describe("Task 2: multi-line text", () => {
     );
     expect(await overflowsSideways(await sourcePane.$("pre").getElement())).toBe(true);
 
-    await (await tab("Translation")).click();
-    await showsTranslation();
-    await (await tab("Side-by-side")).click();
-    await showsBoth();
-    await browser.keys(["Control", "1"]);
-    await showsSource();
-    await browser.keys(["Control", "2"]);
-    await showsTranslation();
     await browser.keys(["Control", "3"]);
     await showsBoth();
 

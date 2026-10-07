@@ -1,6 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   makeStyles,
@@ -35,9 +33,8 @@ import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import { useLayerStyles } from "../look/layers";
 import { Markdown } from "../look/Markdown";
 import type { RoundError, RoundErrorHint, RoundStage } from "../round/round";
-import { usePinView, type PinContent, type Session } from "../session/session";
+import { usePinView, type PaneKind, type PinContent, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
-import { saveSettings, useSettings } from "../settings/settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
@@ -46,7 +43,6 @@ const SCROLL_INTENT_LINGER = 400;
 /** How far from a scroller's right or bottom edge a press reaches its overlay scrollbar, which takes no layout width. */
 const SCROLLBAR_REACH = 16;
 
-const hide = () => invoke("hide_pin_window");
 const modeLabels: Record<DisplayMode, string> = {
   source: strings.sourceMode,
   translation: strings.translationMode,
@@ -60,17 +56,6 @@ const hintLabels: Record<RoundErrorHint, string> = {
   "image-model-support": strings.imageModelHint,
   "reasoning-effort": strings.reasoningEffortHint,
 };
-// The Pin window has no room for a notice, and a tab that doesn't change says nothing of why.
-const selectMode = (displayMode: DisplayMode) =>
-  void saveSettings({ displayMode }).catch((reason) => {
-    console.error("Display mode was not saved:", reason);
-    void invoke("show_native_notification", {
-      title: strings.settingsNotSaved,
-      body: String(reason),
-      target: null,
-    }).catch((error) => console.error("Could not show settings notification:", error));
-  });
-
 const failureLabels: Record<RoundStage, string> = {
   structuring: strings.structuringFailed,
   translating: strings.translationFailed,
@@ -164,10 +149,19 @@ function interactiveTarget(target: EventTarget): boolean {
 export function PinWindow({ session }: { session: Session }) {
   const styles = useStyles();
   const layers = useLayerStyles();
-  const { roundId, configurationFailure, content, paused, canRegenerate, canCopySource, canCopyTranslation } =
-    usePinView(session);
+  const {
+    roundId,
+    configurationFailure,
+    content,
+    displayMode,
+    panes,
+    paused,
+    canRegenerate,
+    canCopySource,
+    canCopyTranslation,
+  } = usePinView(session);
   const round = content?.kind === "round" ? content : null;
-  const mode = useSettings().settings.displayMode;
+  const sideBySide = panes.length === 2;
   const root = useRef<HTMLDivElement>(null);
   const toolbar = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLDivElement>(null);
@@ -216,14 +210,14 @@ export function PinWindow({ session }: { session: Session }) {
       const mode = DISPLAY_MODES[Number(e.key) - 1];
       if (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey && /^[123]$/.test(e.key) && mode) {
         e.preventDefault();
-        selectMode(mode);
+        session.chooseDisplayMode(mode);
       }
       if (e.ctrlKey && e.key === ",") {
         e.preventDefault();
-        void invoke("open_settings");
+        session.openSettings();
       }
       // Esc in the right-click menu closes only the menu.
-      if (e.key === "Escape" && !(e.target as Element).closest("[role=menu]")) void hide();
+      if (e.key === "Escape" && !(e.target as Element).closest("[role=menu]")) session.hide();
     };
     // The window drag starts only past the threshold, so a click never loses its mouse-up to it
     // (tauri-apps/tauri#10767).
@@ -245,7 +239,7 @@ export function PinWindow({ session }: { session: Session }) {
       scrollDriver.current = null;
     };
     // A hidden window shows again with no menu.
-    const unlistenHidden = listen("pin-window-hidden", () => {
+    const unsubscribeHidden = session.onHidden(() => {
       setMenu(null);
       onPointerCancel();
     });
@@ -255,7 +249,7 @@ export function PinWindow({ session }: { session: Session }) {
     window.addEventListener("pointercancel", onPointerCancel);
     window.addEventListener("blur", onPointerCancel);
     return () => {
-      void unlistenHidden.then((unlisten) => unlisten());
+      unsubscribeHidden();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
@@ -272,7 +266,7 @@ export function PinWindow({ session }: { session: Session }) {
 
   const onScroll = (index: number) => {
     const driver = scrollDriver.current;
-    if (mode !== "both" || driver?.index !== index || performance.now() >= driver.until) return;
+    if (!sideBySide || driver?.index !== index || performance.now() >= driver.until) return;
     const content = contents.current[index]!;
     const other = contents.current[1 - index]!;
     const max = content.scrollHeight - content.clientHeight;
@@ -308,10 +302,10 @@ export function PinWindow({ session }: { session: Session }) {
   };
 
   const onDoubleClick = (e: MouseEvent<HTMLElement>) => {
-    if (!e.ctrlKey && !onScrollbar(e) && !interactiveTarget(e.target)) void hide();
+    if (!e.ctrlKey && !onScrollbar(e) && !interactiveTarget(e.target)) session.hide();
   };
 
-  const roundPane = (round: Extract<PinContent, { kind: "round" }>, kind: "source" | "translation") => {
+  const roundPane = (round: Extract<PinContent, { kind: "round" }>, kind: PaneKind) => {
     const result = round[kind];
     return (
       <>
@@ -321,7 +315,7 @@ export function PinWindow({ session }: { session: Session }) {
             {progressLabels[result.progress]}
           </Text>
         )}
-        {kind === "translation" && mode !== "both" && round.translation.mutedSource && (
+        {kind === "translation" && round.translation.mutedSource && (
           <Markdown text={round.translation.mutedSource} muted />
         )}
         {result.error && (
@@ -339,7 +333,7 @@ export function PinWindow({ session }: { session: Session }) {
             </MessageBarBody>
             {result.error.offersSettings && (
               <MessageBarActions>
-                <Button size="small" onClick={() => void invoke("open_settings")}>
+                <Button size="small" onClick={session.openSettings}>
                   {strings.openSettings}
                 </Button>
               </MessageBarActions>
@@ -350,7 +344,7 @@ export function PinWindow({ session }: { session: Session }) {
     );
   };
 
-  const pane = (kind: "source" | "translation") => {
+  const pane = (kind: PaneKind) => {
     const index = kind === "source" ? 0 : 1;
     return (
       <div
@@ -384,7 +378,7 @@ export function PinWindow({ session }: { session: Session }) {
               <MessageBarTitle>{configurationFailureMessage(configurationFailure)}</MessageBarTitle>
             </MessageBarBody>
             <MessageBarActions>
-              <Button size="small" onClick={() => void invoke("open_settings")}>
+              <Button size="small" onClick={session.openSettings}>
                 {strings.openSettings}
               </Button>
             </MessageBarActions>
@@ -435,8 +429,8 @@ export function PinWindow({ session }: { session: Session }) {
             inert={compact}
             appearance="subtle"
             size="small"
-            selectedValue={mode}
-            onTabSelect={(_, data) => selectMode(data.value as DisplayMode)}
+            selectedValue={displayMode}
+            onTabSelect={(_, data) => session.chooseDisplayMode(data.value as DisplayMode)}
           >
             {DISPLAY_MODES.map((value, index) => (
               <Tooltip key={value} content={`${modeLabels[value]} (Ctrl+${index + 1})`} relationship="description">
@@ -450,9 +444,9 @@ export function PinWindow({ session }: { session: Session }) {
               size="small"
               className={styles.dropdown}
               choices={DISPLAY_MODES}
-              value={mode}
+              value={displayMode}
               labelOf={(value) => modeLabels[value]}
-              onChoose={selectMode}
+              onChoose={session.chooseDisplayMode}
             />
           )}
         </div>
@@ -481,7 +475,7 @@ export function PinWindow({ session }: { session: Session }) {
               appearance="subtle"
               icon={<DocumentCopyRegular />}
               disabled={!canCopySource}
-              onClick={() => round && void invoke("copy_text", { text: round.source.text })}
+              onClick={() => session.copyPane("source")}
             />
           </Tooltip>
           <Tooltip content={strings.copyTranslation} relationship="label">
@@ -490,31 +484,24 @@ export function PinWindow({ session }: { session: Session }) {
               appearance="subtle"
               icon={<CopyRegular />}
               disabled={!canCopyTranslation}
-              onClick={() => round && void invoke("copy_text", { text: round.translation.text })}
+              onClick={() => session.copyPane("translation")}
             />
           </Tooltip>
           <Tooltip content={strings.settingsShortcut} relationship="label">
-            <Button
-              size="small"
-              appearance="subtle"
-              icon={<SettingsRegular />}
-              onClick={() => void invoke("open_settings")}
-            />
+            <Button size="small" appearance="subtle" icon={<SettingsRegular />} onClick={session.openSettings} />
           </Tooltip>
           <Tooltip content={strings.close} relationship="label">
-            <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={() => void hide()} />
+            <Button size="small" appearance="subtle" icon={<DismissRegular />} onClick={session.hide} />
           </Tooltip>
         </div>
       </Toolbar>
-      <div className={mergeClasses(styles.panes, mode === "both" && (tall ? styles.rows : styles.columns))}>
-        {mode === "both" ? (
+      <div className={mergeClasses(styles.panes, sideBySide && (tall ? styles.rows : styles.columns))}>
+        {pane(panes[0])}
+        {sideBySide && (
           <>
-            {pane("source")}
             <div role="separator" aria-orientation={tall ? "horizontal" : "vertical"} className={styles.divider} />
-            {pane("translation")}
+            {pane(panes[1])}
           </>
-        ) : (
-          pane(mode)
         )}
       </div>
       <Menu
