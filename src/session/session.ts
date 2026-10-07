@@ -3,8 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { providerClient, type Transport } from "../provider/provider";
 import { run, type Input, type RoundError, type RoundPane, type RoundStage, type RoundState } from "../round/round";
-import { providerConfiguration, type ConfigurationFailure } from "../settings/settings";
-import { latestSettings, onRoundConfigurationChange, settingsSnapshot } from "../settings/settings-store";
+import { strings } from "../i18n";
+import { providerConfiguration, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
+import {
+  latestSettings,
+  onRoundConfigurationChange,
+  saveSettings,
+  settingsSnapshot,
+  subscribeSettings,
+} from "../settings/settings-store";
 
 /** The Input event from Rust: `show` carries nothing when the clipboard holds nothing usable. */
 type InputEvent = { origin: "copy"; input: Input } | { origin: "show"; input: Input | null };
@@ -22,7 +29,11 @@ interface Snapshot {
   paused: boolean;
   overlong: boolean;
   configurationFailure: ConfigurationFailure | null;
+  displayMode: DisplayMode;
 }
+
+/** A pane of the Pin window. */
+export type PaneKind = "source" | "translation";
 
 /** One pane of a shown Round. */
 export interface PinPane {
@@ -40,7 +51,7 @@ export type PinContent =
   | {
       kind: "round";
       source: PinPane;
-      /** `mutedSource` is the Source text a Translation pane shown alone shows muted until Translated text arrives. */
+      /** The Source text the Translation pane, shown alone, shows muted until Translated text arrives. */
       translation: PinPane & { mutedSource: string | null };
     };
 
@@ -52,13 +63,16 @@ export interface PinView {
   configurationFailure: ConfigurationFailure | null;
   /** `null` under a configuration notice with no Round to show. */
   content: PinContent | null;
+  displayMode: DisplayMode;
+  /** The panes shown, in order: one alone, or Source then Translation side by side. */
+  panes: PaneKind[];
   paused: boolean;
   canRegenerate: boolean;
   canCopySource: boolean;
   canCopyTranslation: boolean;
 }
 
-function pinView({ round, hasInput, paused, overlong, configurationFailure }: Snapshot): PinView {
+function pinView({ round, hasInput, paused, overlong, configurationFailure, displayMode }: Snapshot): PinView {
   const state = round?.state;
   const paneOf = (shown: RoundState, roundPane: RoundPane): PinPane => ({
     text: roundPane.text,
@@ -75,7 +89,8 @@ function pinView({ round, hasInput, paused, overlong, configurationFailure }: Sn
       source: paneOf(state, state.source),
       translation: {
         ...paneOf(state, state.translation),
-        mutedSource: !state.translation.text && state.source.text ? state.source.text : null,
+        mutedSource:
+          displayMode === "translation" && !state.translation.text && state.source.text ? state.source.text : null,
       },
     };
   } else content = configurationFailure ? null : { kind: "hint" };
@@ -83,6 +98,8 @@ function pinView({ round, hasInput, paused, overlong, configurationFailure }: Sn
     roundId: round?.id ?? null,
     configurationFailure,
     content,
+    displayMode,
+    panes: displayMode === "both" ? ["source", "translation"] : [displayMode],
     paused,
     canRegenerate: hasInput,
     canCopySource: copyable(state?.source),
@@ -90,7 +107,10 @@ function pinView({ round, hasInput, paused, overlong, configurationFailure }: Sn
   };
 }
 
-/** Follows the Inputs Rust sends and runs their Rounds; the Pin webview creates one at startup. */
+/**
+ * Follows the Inputs Rust sends and runs their Rounds, and performs what the Pin window's controls do; the Pin webview
+ * creates one at startup.
+ */
 export interface Session {
   /**
    * Starts following the Inputs Rust sends. The Pin window shows only once this listens, so the
@@ -105,6 +125,14 @@ export interface Session {
   toggleClipboardPause(): void;
   /** Reruns the current Input with current settings, bypassing successful reuse. */
   regenerate(): void;
+  /** Saves `mode`, which shows once Rust broadcasts the document; a native notification says when it isn't saved. */
+  chooseDisplayMode(mode: DisplayMode): void;
+  /** Copies the pane's text as written, only while the Pin view offers its copy; the copy starts no Round. */
+  copyPane(pane: PaneKind): void;
+  openSettings(): void;
+  hide(): void;
+  /** Calls `notify` each time the Pin window has hidden, however it was hidden, until the returned function unsubscribes. */
+  onHidden(notify: () => void): () => void;
 }
 
 /** A Session whose Rounds reach the Provider through `transport`: `tauri-plugin-http`'s `fetch` in the app. */
@@ -116,6 +144,7 @@ export function createSession(transport: Transport): Session {
     paused: false,
     overlong: false,
     configurationFailure: null,
+    displayMode: settingsSnapshot().settings.displayMode,
   };
   let view = pinView(snapshot);
   let currentInput: Input | null = null;
@@ -127,10 +156,11 @@ export function createSession(transport: Transport): Session {
   /** Cancels the Round in flight. */
   let inFlight: AbortController | null = null;
   const subscribers = new Set<() => void>();
+  const hiddenSubscribers = new Set<() => void>();
 
   function publish(
     round: ShownRound | null,
-    controls: Partial<Pick<Snapshot, "paused" | "overlong" | "configurationFailure">> = {},
+    controls: Partial<Pick<Snapshot, "paused" | "overlong" | "configurationFailure" | "displayMode">> = {},
   ) {
     snapshot = { ...snapshot, ...controls, round, hasInput: currentInput !== null };
     view = pinView(snapshot);
@@ -187,8 +217,15 @@ export function createSession(transport: Transport): Session {
         // A notice's advice is stale once its configuration changes; the user's next copy or show runs a Round (#112).
         if (snapshot.configurationFailure) publish(snapshot.round, { configurationFailure: null });
       });
+      const followDisplayMode = () => {
+        const { displayMode } = settingsSnapshot().settings;
+        if (displayMode !== snapshot.displayMode) publish(snapshot.round, { displayMode });
+      };
+      subscribeSettings(followDisplayMode);
+      followDisplayMode();
       await listen("pin-window-hidden", () => {
         if (snapshot.paused) publish(snapshot.round, { paused: false });
+        for (const notify of hiddenSubscribers) notify();
       });
       await listen<InputEvent>("input", ({ payload }) => {
         if (payload.origin === "copy" && snapshot.paused) return;
@@ -232,7 +269,31 @@ export function createSession(transport: Transport): Session {
       publish(snapshot.round, { overlong: false, configurationFailure: null });
       void startRound(currentInput);
     },
+    chooseDisplayMode(displayMode) {
+      // The Pin window has no room for a notice, and a tab that doesn't change says nothing of why.
+      saveSettings({ displayMode }).catch((reason) => {
+        console.error("Display mode was not saved:", reason);
+        command("show_native_notification", { title: strings.settingsNotSaved, body: String(reason), target: null });
+      });
+    },
+    copyPane(pane) {
+      const state = snapshot.round?.state;
+      const copyable = pane === "source" ? view.canCopySource : view.canCopyTranslation;
+      // The app's own copy, which the clipboard follower knows as sidelingo's and so starts no Round.
+      if (state && copyable) command("copy_text", { text: state[pane].text });
+    },
+    openSettings: () => command("open_settings"),
+    hide: () => command("hide_pin_window"),
+    onHidden(notify) {
+      hiddenSubscribers.add(notify);
+      return () => hiddenSubscribers.delete(notify);
+    },
   };
+}
+
+/** Invokes a Rust command whose failure the user can do nothing more about, so it is only logged. */
+function command(name: string, args?: Record<string, unknown>) {
+  invoke(name, args).catch((reason) => console.error(`\`${name}\` failed:`, reason));
 }
 
 /** Identity belongs to the session; text and image payloads compare as delivered. */

@@ -463,6 +463,34 @@ interface ViewRow {
   view: PinView;
 }
 
+/** Copies a line Structuring keeps, and holds the Translation before any Translated text arrives. */
+async function structuredOnly(core: Core) {
+  core.provider.reply(kept("Structured"), [{ wait: new Promise<void>(() => {}) }]);
+  await core.copy("Structured");
+  await core.until(({ content }) => content?.kind === "round" && content.translation.progress === "translating");
+}
+
+/** The Pin view of `structuredOnly`'s Round in a Display mode. */
+const structuredView = ({
+  displayMode,
+  panes,
+  mutedSource,
+}: Pick<PinView, "displayMode" | "panes"> & { mutedSource: string | null }): PinView => ({
+  roundId: expect.any(Number),
+  configurationFailure: null,
+  content: {
+    kind: "round",
+    source: { text: "Structured", progress: null, error: null },
+    translation: { text: "", progress: "translating", error: null, mutedSource },
+  },
+  displayMode,
+  panes,
+  paused: false,
+  canRegenerate: true,
+  canCopySource: true,
+  canCopyTranslation: false,
+});
+
 const viewRows: ViewRow[] = [
   {
     name: "before any Input, the window shows the empty hint and offers neither Regenerate nor a copy",
@@ -471,6 +499,8 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: null,
       content: { kind: "hint" },
+      displayMode: "translation",
+      panes: ["translation"],
       paused: false,
       canRegenerate: false,
       canCopySource: false,
@@ -486,6 +516,8 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: null,
       content: { kind: "overlong" },
+      displayMode: "translation",
+      panes: ["translation"],
       paused: false,
       canRegenerate: true,
       canCopySource: false,
@@ -503,6 +535,8 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: { kind: "no-provider" },
       content: null,
+      displayMode: "translation",
+      panes: ["translation"],
       paused: false,
       canRegenerate: true,
       canCopySource: false,
@@ -523,6 +557,8 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: { kind: "no-provider" },
       content: null,
+      displayMode: "both",
+      panes: ["source", "translation"],
       paused: false,
       canRegenerate: true,
       canCopySource: false,
@@ -544,6 +580,8 @@ const viewRows: ViewRow[] = [
       roundId: null,
       configurationFailure: null,
       content: { kind: "hint" },
+      displayMode: "translation",
+      panes: ["translation"],
       paused: false,
       canRegenerate: true,
       canCopySource: false,
@@ -568,11 +606,40 @@ const viewRows: ViewRow[] = [
         source: { text: "Earlier", progress: null, error: null },
         translation: { text: "Done", progress: null, error: null, mutedSource: null },
       },
+      displayMode: "translation",
+      panes: ["translation"],
       paused: false,
       canRegenerate: true,
       canCopySource: true,
       canCopyTranslation: true,
     },
+  },
+  {
+    name: "the Translation pane shown alone shows the Source text muted until Translated text arrives",
+    settings: customSettings({}, { displayMode: "translation" }),
+    act: structuredOnly,
+    view: structuredView({ displayMode: "translation", panes: ["translation"], mutedSource: "Structured" }),
+  },
+  {
+    name: "Source alone shows only the Source pane, with no muted Source text",
+    settings: customSettings({}, { displayMode: "source" }),
+    act: structuredOnly,
+    view: structuredView({ displayMode: "source", panes: ["source"], mutedSource: null }),
+  },
+  {
+    name: "side by side shows the Source pane then the Translation pane, with no muted Source text",
+    settings: customSettings({}, { displayMode: "both" }),
+    act: structuredOnly,
+    view: structuredView({ displayMode: "both", panes: ["source", "translation"], mutedSource: null }),
+  },
+  {
+    name: "choosing a Display mode saves it, and the window shows its panes once Rust broadcasts it",
+    settings: customSettings({}, { displayMode: "translation" }),
+    async act(core) {
+      await structuredOnly(core);
+      core.session.chooseDisplayMode("both");
+    },
+    view: structuredView({ displayMode: "both", panes: ["source", "translation"], mutedSource: null }),
   },
 ];
 
@@ -584,5 +651,100 @@ describe("What the Pin window shows", () => {
     await settle();
 
     expect(core.session.view()).toEqual(view);
+  });
+});
+
+/** The Rust commands the Pin window's controls reach through the Session. */
+const CONTROL_COMMANDS = [
+  "patch_settings",
+  "show_native_notification",
+  "copy_text",
+  "open_settings",
+  "hide_pin_window",
+];
+
+interface ControlRow {
+  name: string;
+  /** How Rust answers `patch_settings`; the core's Rust side saves and broadcasts the patch when absent. */
+  patchSettings?: () => unknown;
+  /** Plays the Provider's replies and Rust's events, then the user's control. */
+  act(core: Core): Promise<void>;
+  /** The control commands invoked, in order. */
+  invoked: { command: string; args: unknown }[];
+}
+
+const controlRows: ControlRow[] = [
+  {
+    name: "a Display mode that isn't saved shows a native notification with Rust's reason",
+    patchSettings: () => Promise.reject("The settings file is read-only"),
+    async act(core) {
+      core.session.chooseDisplayMode("source");
+    },
+    invoked: [
+      { command: "patch_settings", args: { patch: { schemaVersion: 1, displayMode: "source" } } },
+      {
+        command: "show_native_notification",
+        args: { title: "Settings were not saved", body: "The settings file is read-only", target: null },
+      },
+    ],
+  },
+  {
+    name: "Copy source copies the Source text while the Translation still streams",
+    async act(core) {
+      await structuredOnly(core);
+      core.session.copyPane("source");
+    },
+    invoked: [{ command: "copy_text", args: { text: "Structured" } }],
+  },
+  {
+    name: "Copy translation does nothing while the Translation still streams",
+    async act(core) {
+      await structuredOnly(core);
+      core.session.copyPane("translation");
+    },
+    invoked: [],
+  },
+  {
+    name: "Copy translation copies the Translated text once the Round is done",
+    async act(core) {
+      core.provider.reply(kept("Copied"), [{ content: "Done" }]);
+      await core.copy("Copied");
+      await shows(core, "Done");
+      core.session.copyPane("translation");
+    },
+    invoked: [{ command: "copy_text", args: { text: "Done" } }],
+  },
+  {
+    name: "Open settings opens the settings window",
+    async act(core) {
+      core.session.openSettings();
+    },
+    invoked: [{ command: "open_settings", args: {} }],
+  },
+  {
+    name: "Close hides the Pin window",
+    async act(core) {
+      core.session.hide();
+    },
+    invoked: [{ command: "hide_pin_window", args: {} }],
+  },
+];
+
+describe("What the Pin window's controls do", () => {
+  it.each(controlRows)("$name", async ({ patchSettings, act, invoked }) => {
+    const core = await startCore({
+      commands: {
+        ...(patchSettings && { patch_settings: patchSettings }),
+        show_native_notification: () => null,
+        copy_text: () => null,
+        open_settings: () => null,
+        hide_pin_window: () => null,
+      },
+    });
+
+    await act(core);
+    await settle();
+
+    expect(core.invoked.filter(({ command }) => CONTROL_COMMANDS.includes(command))).toEqual(invoked);
   });
 });
