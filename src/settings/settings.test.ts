@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigurationFailure } from "./settings";
+import type { ConfigurationFailure, SettingsChange } from "./settings";
+import { saveSettings, settingsSnapshot } from "./settings-store";
 import { customSettings, ended, settle, startCore, type Reply } from "../testing/core";
 
 /** A ciphertext `unprotect_secret` can't decrypt for this Windows user. */
@@ -257,6 +258,63 @@ describe("Loading the settings document", () => {
       .map(({ command, args }) => (command === "show_native_notification" ? { command } : { command, args }));
     expect(recoveryCommands).toEqual(recovery);
     expect(await copyOnce(core)).toEqual(outcome);
+  });
+});
+
+interface SavingRow {
+  name: string;
+  change: SettingsChange;
+  /** Whether the schema accepts the change, so it reaches Rust; one it rejects is refused before. */
+  saved: boolean;
+}
+
+/** A change the type system would refuse, as a caller with a wrong value at runtime would send it. */
+const untyped = (change: unknown) => change as SettingsChange;
+
+const saving: SavingRow[] = [
+  {
+    name: "a Display mode reaches Rust and is published",
+    change: { displayMode: "both" },
+    saved: true,
+  },
+  {
+    name: "a Preset's reasoning effort reaches Rust as the nested patch and is published",
+    change: { presets: { deepseek: { reasoningEffort: "high" } } },
+    saved: true,
+  },
+  {
+    name: "a reasoning effort the Preset doesn't offer is refused",
+    change: { presets: { deepseek: { reasoningEffort: "medium" } } },
+    saved: false,
+  },
+  {
+    name: "an unknown Display mode is refused",
+    change: untyped({ displayMode: "everything" }),
+    saved: false,
+  },
+  {
+    name: "an unknown Preset is refused",
+    change: untyped({ activePreset: "anthropic" }),
+    saved: false,
+  },
+];
+
+describe("Saving a settings change", () => {
+  it.each(saving)("$name", async ({ change, saved }) => {
+    const core = await startCore();
+    const before = settingsSnapshot();
+    const saving = saveSettings(change);
+    if (saved) await saving;
+    else await expect(saving).rejects.toBeInstanceOf(Error);
+    await settle();
+    const patches = core.invoked.filter(({ command }) => command === "patch_settings").map(({ args }) => args);
+    if (saved) {
+      expect(patches).toEqual([{ patch: { schemaVersion: 1, ...change } }]);
+      expect(settingsSnapshot().settings).toMatchObject(change);
+    } else {
+      expect(patches).toEqual([]);
+      expect(settingsSnapshot()).toBe(before);
+    }
   });
 });
 

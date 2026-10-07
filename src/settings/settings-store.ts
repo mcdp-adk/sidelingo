@@ -1,7 +1,15 @@
 import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { DEFAULT_SETTINGS, parseSettings, roundConfiguration, SCHEMA_VERSION, type Settings } from "./settings";
+import {
+  changedSettings,
+  DEFAULT_SETTINGS,
+  parseSettings,
+  roundConfiguration,
+  SCHEMA_VERSION,
+  type Settings,
+  type SettingsChange,
+} from "./settings";
 import { PRESETS, PRESET_REGISTRY, type Preset } from "../provider/presets";
 import {
   readEnteredKeys,
@@ -174,7 +182,13 @@ export function useSettings(): SettingsSnapshot {
   return useSyncExternalStore(subscribeSettings, settingsSnapshot);
 }
 
-/** Rust merges only the changed fields, preserving concurrent changes from the other window. */
-export async function patchSettings(patch: Record<string, unknown>): Promise<void> {
-  await invoke("patch_settings", { patch: { schemaVersion: SCHEMA_VERSION, ...patch } });
+/**
+ * Saves `change` when the schema accepts it over the published settings, and refuses it with an error, sending
+ * nothing, when it doesn't. Rust merges only the changed fields, preserving concurrent changes from the other window.
+ */
+export async function saveSettings(change: SettingsChange): Promise<void> {
+  if (!changedSettings(snapshot.settings, change)) {
+    throw new Error(`Settings can't hold this change, so it wasn't saved: ${JSON.stringify(change)}`);
+  }
+  await invoke("patch_settings", { patch: { schemaVersion: SCHEMA_VERSION, ...change } });
 }

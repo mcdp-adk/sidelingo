@@ -54,10 +54,39 @@ export const DEFAULT_SETTINGS: Settings = {
   proxy: { mode: "system", url: "", username: "", passwordCiphertext: null },
 };
 
+/** A change to some settings, in their own shape; a saved document merges it in field by field. */
+export type SettingsChange = {
+  [K in Exclude<keyof Settings, "schemaVersion" | "presets" | "proxy">]?: Settings[K];
+} & {
+  presets?: { [P in Preset]?: Partial<PresetSettings[P]> };
+  proxy?: Partial<Settings["proxy"]>;
+};
+
+/** A change to `preset`'s fields alone; a key computed from a Preset would escape `SettingsChange`'s check. */
+export function presetChange<P extends Preset>(preset: P, fields: Partial<PresetSettings[P]>): SettingsChange {
+  return { presets: { [preset]: fields } };
+}
+
 type JsonObject = Record<string, unknown>;
 
 const isJsonObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** `document` with `patch` merged in as Rust merges it: objects field by field, anything else replaced. */
+function merged(document: unknown, patch: unknown): unknown {
+  if (!isJsonObject(patch)) return patch;
+  const result = isJsonObject(document) ? { ...document } : {};
+  for (const [key, value] of Object.entries(patch)) result[key] = merged(result[key], value);
+  return result;
+}
+
+/**
+ * `settings` with `change` merged in, or null when the schema rejects the result. Each field's rule is independent of
+ * the others, so a change valid on these settings is valid on any valid document.
+ */
+export function changedSettings(settings: Settings, change: SettingsChange): Settings | null {
+  return parseSettings(merged(settings, change));
+}
 
 /** `document[key]` when it passes `valid`, `fallback` when absent, and `undefined` when invalid. */
 function field<T>(

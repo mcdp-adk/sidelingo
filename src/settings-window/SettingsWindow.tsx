@@ -16,7 +16,8 @@ import { ChoiceDropdown } from "../look/ChoiceDropdown";
 import { AboutSection } from "./AboutSection";
 import { AutostartSetting } from "./AutostartSetting";
 import { PRESET_REGISTRY, PRESETS, type Preset } from "../provider/presets";
-import { patchSettings, useSettings } from "../settings/settings-store";
+import { presetChange, type SettingsChange } from "../settings/settings";
+import { saveSettings, useSettings } from "../settings/settings-store";
 import { ModelField } from "./ModelField";
 import { KeyField } from "./KeyField";
 import { TargetLanguageSetting } from "./TargetLanguageSetting";
@@ -79,9 +80,9 @@ export function SettingsWindow() {
       void unlisten.then((stop) => stop());
     };
   }, []);
-  const commit = async (patch: Record<string, unknown>) => {
+  const commit = async (change: SettingsChange) => {
     try {
-      await patchSettings(patch);
+      await saveSettings(change);
       setError(null);
     } catch (reason) {
       setError(String(reason));
@@ -126,13 +127,13 @@ export function SettingsWindow() {
                 key={`key-${preset}`}
                 preset={preset}
                 ciphertext={settings.presets[preset].keyCiphertext}
-                commit={(keyCiphertext) => commit({ presets: { [preset]: { keyCiphertext } } })}
+                commit={(keyCiphertext) => commit(presetChange(preset, { keyCiphertext }))}
               />
               <ModelField
                 key={`model-${preset}`}
                 settings={settings}
                 preset={preset}
-                commit={(model) => commit({ presets: { [preset]: { model } } })}
+                commit={(model) => commit(presetChange(preset, { model }))}
               />
               <Field label={strings.reasoningEffort}>
                 <ChoiceDropdown
@@ -141,9 +142,7 @@ export function SettingsWindow() {
                   value={settings.presets[preset].reasoningEffort ?? DEFAULT_EFFORT}
                   labelOf={(effort) => (effort === DEFAULT_EFFORT ? strings.defaultEffort : effort)}
                   onChoose={(effort) =>
-                    void commit({
-                      presets: { [preset]: { reasoningEffort: effort === DEFAULT_EFFORT ? null : effort } },
-                    })
+                    void commit(presetChange(preset, { reasoningEffort: effort === DEFAULT_EFFORT ? null : effort }))
                   }
                 />
               </Field>
@@ -164,9 +163,7 @@ export function SettingsWindow() {
             recorderRef={hotkeyRecorder}
             value={settings.hotkey}
             onSaveError={setError}
-            commit={async (hotkey) => {
-              await patchSettings({ hotkey });
-            }}
+            commit={(hotkey) => saveSettings({ hotkey })}
           />
           <AutostartSetting />
         </section>
