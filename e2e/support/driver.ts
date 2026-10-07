@@ -36,11 +36,21 @@ function listeningProcessIds(port: number): number[] {
   return [...processIds];
 }
 
+/** Names the process `pid` as "<image> (process <pid>)", so a port left held says who holds it. */
+function processName(pid: number): string {
+  const row = execFileSync("tasklist", ["/fi", `PID eq ${pid}`, "/fo", "csv", "/nh"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  const image = row.match(/^"([^"]+)"/)?.[1];
+  return image ? `${image} (process ${pid})` : `process ${pid}`;
+}
+
 function assertPortsFree(): void {
   for (const port of [4444, 4445]) {
     const owners = listeningProcessIds(port);
     if (owners.length > 0) {
-      throw new Error(`E2E port ${port} is already owned by process ${owners.join(", ")}`);
+      throw new Error(`E2E port ${port} is already owned by ${owners.map(processName).join(", ")}`);
     }
   }
 }
@@ -144,7 +154,10 @@ export async function stopDriver(): Promise<void> {
       driverState.isolated = false;
       return;
     }
-    if (Date.now() >= deadline) throw new Error("The owned E2E driver ports were not released");
+    if (Date.now() >= deadline) {
+      const held = owners.map(({ port, pid }) => `${port} by ${processName(pid)}`).join(", ");
+      throw new Error(`The owned E2E driver ports were not released: ${held}`);
+    }
     await setTimeout(25);
   }
 }
