@@ -18,11 +18,15 @@ export async function switchToSettingsWindow(pin: string): Promise<string> {
   return settings;
 }
 
-/** Replace a controlled text field as a user does, without WebDriver's synthetic clear. */
+/**
+ * Replace a controlled text field as a user does, without WebDriver's synthetic clear. Fails at once when the field
+ * doesn't hold what was typed, rather than later on whatever the app did with it.
+ */
 export async function replaceTextField(label: string, value: string): Promise<void> {
   await $(`aria/${label}`).click();
   await browser.keys(["Control", "a"]);
   await browser.keys(value);
+  await expect($(`aria/${label}`)).toHaveValue(value, { message: `the ${label} field doesn't hold what was typed` });
 }
 
 /** The Model `setUpCustomProvider` enters. */

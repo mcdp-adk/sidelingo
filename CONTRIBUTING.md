@@ -108,6 +108,8 @@ It builds the app with its own identifier (`src-tauri/tauri.e2e.conf.json`) into
 
 A failing test leaves a screenshot and the page's HTML in `e2e/failures/`, cleared at the start of each run. If another program wrote the clipboard while a failing task ran, such as a copy you made mid-run, the run names that program at the end and calls itself invalid: its failures say nothing about the app, so run it again without copying.
 
+The app's windows come to the front and take the keyboard while tasks run, so typing or clicking mid-run reaches them too: a run once sent a Base URL with two letters in it that no task types. Nothing names that, so leave the keyboard and mouse alone during a run. A field filled by a task is checked against what it typed, so input that lands in one fails the task at that field.
+
 `pnpm check:tasks`, which CI runs, refuses a task test or support helper that finds an element by class, `#id`, another attribute or XPath, and a task test that seeds or reads the settings document.
 
 ## Structuring eval
