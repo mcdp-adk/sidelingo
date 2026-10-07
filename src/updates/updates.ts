@@ -2,7 +2,6 @@ import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { proxyConfiguration } from "../settings/settings";
 import { latestSettings } from "../settings/settings-store";
 
 interface UpdateStatus {
@@ -57,8 +56,7 @@ async function checkForUpdates(manual: boolean): Promise<void> {
   publish({ ...status, checking: true, checkError: null });
   let update: Update | null;
   try {
-    const { settings, proxyPassword } = await latestSettings();
-    const proxy = proxyConfiguration(settings, proxyPassword)?.all;
+    const proxy = (await latestSettings()).proxy?.all;
     let proxyUrl: string | undefined;
     if (proxy) {
       const configuration = typeof proxy === "string" ? { url: proxy } : proxy;

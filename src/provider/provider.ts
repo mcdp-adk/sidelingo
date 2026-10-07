@@ -1,17 +1,21 @@
 import { PRESET_REGISTRY, type Preset, type ReasoningEffort } from "./presets";
 import type { ClientOptions, Proxy } from "@tauri-apps/plugin-http";
 
-/** Where to reach a Provider over the OpenAI Chat Completions protocol. */
-export interface ProviderConfiguration {
+/** Where to reach a Provider over the OpenAI Chat Completions protocol, which is all listing its models needs. */
+export interface ProviderConnection {
   preset: Preset;
   /** Used as entered, with or without `/v1`. */
   baseUrl: string;
-  model: string;
-  /** Default omits the field; explicit none remains a sent level. */
-  reasoningEffort?: ReasoningEffort | null;
   key?: string | null;
   /** Absent follows the System proxy; a Manual proxy is fixed with the Round. */
   proxy?: Proxy;
+}
+
+/** A connection with the model a chat completion asks for. */
+export interface ProviderConfiguration extends ProviderConnection {
+  model: string;
+  /** Default omits the field; explicit none remains a sent level. */
+  reasoningEffort?: ReasoningEffort | null;
 }
 
 export interface ChatMessage {
@@ -48,7 +52,7 @@ export class ProviderError extends Error {
 
 export interface ProviderClient {
   /** Lists the Provider's model ids without requiring a model to be selected. */
-  listModels(configuration: ProviderConfiguration, signal: AbortSignal): Promise<string[]>;
+  listModels(connection: ProviderConnection, signal: AbortSignal): Promise<string[]>;
   /** Streams one chat completion's content deltas. */
   streamChat(
     configuration: ProviderConfiguration,
@@ -63,12 +67,12 @@ interface ChunkChoice {
 
 export function providerClient(transport: Transport): ProviderClient {
   return {
-    async listModels(configuration, signal) {
+    async listModels(connection, signal) {
       const response = await request(
         transport,
-        `${baseOf(configuration)}/models`,
-        { method: "GET", headers: keyHeaders(configuration.key), signal },
-        configuration.proxy,
+        `${baseOf(connection)}/models`,
+        { method: "GET", headers: keyHeaders(connection.key), signal },
+        connection.proxy,
       );
       let document;
       try {
@@ -173,7 +177,7 @@ function networkError(reason: unknown): ProviderError {
   return new ProviderError("network", reason instanceof Error ? reason.message : String(reason));
 }
 
-function baseOf({ preset, baseUrl }: Pick<ProviderConfiguration, "preset" | "baseUrl">): string {
+function baseOf({ preset, baseUrl }: Pick<ProviderConnection, "preset" | "baseUrl">): string {
   return (PRESET_REGISTRY[preset].baseUrl ?? baseUrl).replace(/\/+$/, "");
 }
 

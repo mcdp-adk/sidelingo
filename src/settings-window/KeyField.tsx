@@ -1,4 +1,5 @@
 import { strings } from "../i18n";
+import { undecryptable } from "../provider/credentials";
 import { PRESET_REGISTRY, type Preset } from "../provider/presets";
 import { useSettings } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
@@ -15,8 +16,7 @@ export function KeyField({
   const { enteredKey, environment } = useSettings().keySources(preset);
   const variable = PRESET_REGISTRY[preset].keyVariable;
   const environmentKey = variable ? environment?.[variable] : null;
-  const undecryptable = ciphertext !== null && enteredKey === null;
-  const placeholder = undecryptable
+  const placeholder = undecryptable(ciphertext, enteredKey)
     ? variable
       ? strings.keyNoEnvironment
       : strings.keyNone

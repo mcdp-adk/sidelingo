@@ -4,10 +4,10 @@ import { listen } from "@tauri-apps/api/event";
 import { providerClient, type Transport } from "../provider/provider";
 import { run, type Input, type RoundError, type RoundPane, type RoundStage, type RoundState } from "../round/round";
 import { strings } from "../i18n";
-import { providerConfiguration, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
+import type { ConfigurationFailure, DisplayMode } from "../settings/settings";
 import {
   latestSettings,
-  onRoundConfigurationChange,
+  onRoundReadinessChange,
   saveSettings,
   settingsSnapshot,
   subscribeSettings,
@@ -59,7 +59,7 @@ export type PinContent =
 export interface PinView {
   /** Changes with each new Round, so the panes scroll back to the top. */
   roundId: number | null;
-  /** Shown above the content until the next Input, Regenerate or Round configuration change. */
+  /** Shown above the content until the next Input, Regenerate, or change to the Round configuration or its failure. */
   configurationFailure: ConfigurationFailure | null;
   /** `null` under a configuration notice with no Round to show. */
   content: PinContent | null;
@@ -171,23 +171,16 @@ export function createSession(transport: Transport): Session {
   async function startRound(input: Input) {
     const controller = (inFlight = new AbortController());
     try {
-      const { settings, keySources, proxyPassword, roundConfigurationRevision } = await latestSettings();
+      const { roundReadiness, roundReadinessRevision } = await latestSettings();
       if (controller.signal.aborted) return;
-      const resolved = providerConfiguration(settings, keySources(settings.activePreset), proxyPassword);
-      if ("error" in resolved) {
-        publish(snapshot.round, { configurationFailure: resolved.error });
+      if ("failure" in roundReadiness) {
+        publish(snapshot.round, { configurationFailure: roundReadiness.failure });
         return;
       }
-      const provider = resolved.configuration;
       currentInputSent = true;
       const id = ++lastRoundId;
       let completed: ShownRound | null = null;
-      for await (const state of run(
-        client,
-        input,
-        { provider, targetLanguage: settings.targetLanguage },
-        controller.signal,
-      )) {
+      for await (const state of run(client, input, roundReadiness.configuration, controller.signal)) {
         // A newer Round has replaced this one.
         if (controller.signal.aborted) return;
         completed = { id, state };
@@ -196,7 +189,7 @@ export function createSession(transport: Transport): Session {
       if (
         !controller.signal.aborted &&
         // A Round configuration change also invalidates a result still being produced with older settings.
-        roundConfigurationRevision === settingsSnapshot().roundConfigurationRevision &&
+        roundReadinessRevision === settingsSnapshot().roundReadinessRevision &&
         completed &&
         (completed.state.outcome === "done" || completed.state.outcome === "no-text")
       ) {
@@ -212,7 +205,7 @@ export function createSession(transport: Transport): Session {
 
   return {
     async start() {
-      onRoundConfigurationChange(() => {
+      onRoundReadinessChange(() => {
         lastSuccessful = null;
         // A notice's advice is stale once its configuration changes; the user's next copy or show runs a Round (#112).
         if (snapshot.configurationFailure) publish(snapshot.round, { configurationFailure: null });

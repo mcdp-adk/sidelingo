@@ -1,12 +1,17 @@
 import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { Proxy } from "@tauri-apps/plugin-http";
 import {
   changedSettings,
+  connectionOf,
   DEFAULT_SETTINGS,
   parseSettings,
-  roundConfiguration,
+  proxyConfiguration,
+  roundReadiness,
   SCHEMA_VERSION,
+  type Connection,
+  type RoundReadiness,
   type Settings,
   type SettingsChange,
 } from "./settings";
@@ -21,14 +26,20 @@ import {
 } from "../provider/credentials";
 import { strings } from "../i18n";
 
-/** One document's Settings with the credentials decrypted from it, published together. */
+/** One document's Settings with what is resolved from them and the credentials decrypted from it, published together. */
 export interface SettingsSnapshot {
   settings: Settings;
-  /** The entered key and launch environment key for `preset`; none without a Preset. */
-  keySources(preset: Preset | null): KeySourcesSnapshot;
+  /** The entered key and launch environment key for `preset`. */
+  keySources(preset: Preset): KeySourcesSnapshot;
   proxyPassword: string | null;
-  /** Changes exactly when the Round configuration changes. */
-  roundConfigurationRevision: number;
+  /** The selected proxy, with its decrypted password; none follows the System proxy. */
+  proxy: Proxy | undefined;
+  /** How to reach each Preset's Provider. A Preset's value is a new object exactly when its connection changes. */
+  connections: Record<Preset, Connection>;
+  /** The Round configuration for the active Preset, or the failure that stops a Round. */
+  roundReadiness: RoundReadiness;
+  /** Changes exactly when `roundReadiness` changes. */
+  roundReadinessRevision: number;
 }
 
 let keyEnvironment: KeyEnvironmentSnapshot = Object.fromEntries(
@@ -40,7 +51,7 @@ let snapshot = snapshotOf(
   DEFAULT_SETTINGS,
   Object.fromEntries(PRESETS.map((preset) => [preset, null])) as EnteredKeys,
   null,
-  0,
+  null,
 );
 /** How many documents `accept` has started on, so an older, slower decryption can't win. */
 let accepting = 0;
@@ -48,26 +59,45 @@ let accepting = 0;
 let takenRevision = -1;
 let pending = Promise.resolve();
 const subscribers = new Set<() => void>();
-const roundConfigurationSubscribers = new Set<() => void>();
+const roundReadinessSubscribers = new Set<() => void>();
 
+/** `next`, or `previous` when it holds the same values, so an unchanged value keeps its identity. */
+function kept<T>(previous: T | undefined, next: T): T {
+  return previous !== undefined && JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+}
+
+/** The snapshot of `settings`, keeping from `previous` every resolved value that hasn't changed. */
 function snapshotOf(
   settings: Settings,
   enteredKeys: EnteredKeys,
   proxyPassword: string | null,
-  roundConfigurationRevision: number,
+  previous: SettingsSnapshot | null,
 ): SettingsSnapshot {
   const environment = keyEnvironment;
+  const keySources = (preset: Preset): KeySourcesSnapshot => {
+    const variable = PRESET_REGISTRY[preset].keyVariable;
+    return {
+      enteredKey: enteredKeys[preset],
+      ...(variable ? { environment: { [variable]: environment[variable] } } : {}),
+    };
+  };
+  const proxy = proxyConfiguration(settings, proxyPassword);
+  const connections = Object.fromEntries(
+    PRESETS.map((preset) => [
+      preset,
+      kept(previous?.connections[preset], connectionOf(settings, preset, keySources(preset), proxy)),
+    ]),
+  ) as Record<Preset, Connection>;
+  const readiness = kept(previous?.roundReadiness, roundReadiness(settings, connections));
+  const changed = previous !== null && readiness !== previous.roundReadiness;
   return {
     settings,
-    keySources(preset) {
-      const variable = preset ? PRESET_REGISTRY[preset].keyVariable : null;
-      return {
-        enteredKey: preset ? enteredKeys[preset] : null,
-        ...(variable ? { environment: { [variable]: environment[variable] } } : {}),
-      };
-    },
+    keySources,
     proxyPassword,
-    roundConfigurationRevision,
+    proxy,
+    connections,
+    roundReadiness: readiness,
+    roundReadinessRevision: (previous?.roundReadinessRevision ?? 0) + (changed ? 1 : 0),
   };
 }
 
@@ -79,11 +109,12 @@ function accept(document: unknown): Promise<void> {
     ([keys, password]) => {
       // A later document must not be replaced by an older, slower decryption.
       if (current !== accepting) return;
-      const changed =
-        JSON.stringify(roundConfiguration(next)) !== JSON.stringify(roundConfiguration(snapshot.settings));
-      snapshot = snapshotOf(next, keys, password, snapshot.roundConfigurationRevision + (changed ? 1 : 0));
+      const previous = snapshot;
+      snapshot = snapshotOf(next, keys, password, previous);
       for (const notify of subscribers) notify();
-      if (changed) for (const notify of roundConfigurationSubscribers) notify();
+      if (snapshot.roundReadinessRevision !== previous.roundReadinessRevision) {
+        for (const notify of roundReadinessSubscribers) notify();
+      }
     },
   );
   return pending;
@@ -173,10 +204,10 @@ export function subscribeSettings(notify: () => void): () => void {
   return () => subscribers.delete(notify);
 }
 
-/** Calls `notify` after each snapshot whose Round configuration changed, until the returned function unsubscribes. */
-export function onRoundConfigurationChange(notify: () => void): () => void {
-  roundConfigurationSubscribers.add(notify);
-  return () => roundConfigurationSubscribers.delete(notify);
+/** Calls `notify` after each snapshot whose `roundReadiness` changed, until the returned function unsubscribes. */
+export function onRoundReadinessChange(notify: () => void): () => void {
+  roundReadinessSubscribers.add(notify);
+  return () => roundReadinessSubscribers.delete(notify);
 }
 
 export function useSettings(): SettingsSnapshot {

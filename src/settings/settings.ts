@@ -1,6 +1,7 @@
 import { initialTargetLanguage, TARGET_LANGUAGES, type TargetLanguage } from "../languages";
-import type { ProviderConfiguration } from "../provider/provider";
-import type { KeySourcesSnapshot } from "../provider/credentials";
+import type { ProviderConnection } from "../provider/provider";
+import { undecryptable, type KeySourcesSnapshot } from "../provider/credentials";
+import type { RoundConfiguration } from "../round/round";
 import type { Proxy } from "@tauri-apps/plugin-http";
 import { isReasoningEffort, PRESET_REGISTRY, PRESETS, type Preset, type ReasoningEffort } from "../provider/presets";
 
@@ -198,58 +199,57 @@ export function parseSettings(document: unknown): Settings | null {
   };
 }
 
-/** The settings a Round runs with; the Display mode, hotkey and update checks change nothing it sends. */
-export function roundConfiguration({ activePreset, presets, proxy, targetLanguage }: Settings) {
-  return { activePreset, presets, proxy, targetLanguage };
-}
-
-/**
- * How to reach the active Preset's Provider, or why a Round can't send anything.
- * The connection producer selects credentials before either Provider operation sends.
- */
-export function providerConfiguration(
-  settings: Settings,
-  keySources?: KeySourcesSnapshot,
-  proxyPassword: string | null = null,
-): { configuration: ProviderConfiguration } | { error: ConfigurationFailure } {
-  const preset = settings.activePreset;
-  if (preset && !settings.presets[preset].model) return { error: { kind: "missing-model" } };
-  return resolveProviderConnection(settings, keySources, proxyPassword);
-}
-
+/** Why a Preset's Provider can't be reached. */
 export type ConnectionFailure =
-  | { kind: "no-provider" }
   | { kind: "missing-base-url" }
   | { kind: "missing-key"; cause: "environment-unset"; variable: KeyVariable }
   | { kind: "missing-key"; cause: "saved-key-could-not-decrypt"; variable: KeyVariable | null };
 
-export type ConfigurationFailure = ConnectionFailure | { kind: "missing-model" };
+/** Why a Round can't send anything. */
+export type ConfigurationFailure = { kind: "no-provider" } | { kind: "missing-model" } | ConnectionFailure;
 
-/** Connection readiness shared by Rounds and model lists; a list needs no selected model. */
-export function resolveProviderConnection(
+/** How to reach a Preset's Provider, or why it can't be reached. */
+export type Connection = { connection: ProviderConnection } | { failure: ConnectionFailure };
+
+/** The Round configuration, or the failure that stops a Round. */
+export type RoundReadiness = { configuration: RoundConfiguration } | { failure: ConfigurationFailure };
+
+/** How to reach `preset`'s Provider with its key sources and the selected proxy; a model list needs no model. */
+export function connectionOf(
   settings: Settings,
-  keySources?: KeySourcesSnapshot,
-  proxyPassword: string | null = null,
-): { configuration: ProviderConfiguration } | { error: ConnectionFailure } {
-  const preset = settings.activePreset;
-  if (!preset) return { error: { kind: "no-provider" } };
+  preset: Preset,
+  keySources: KeySourcesSnapshot,
+  proxy: Proxy | undefined,
+): Connection {
   const variable = PRESET_REGISTRY[preset].keyVariable;
   const baseUrl = PRESET_REGISTRY[preset].baseUrl ?? settings.presets.custom.baseUrl;
-  if (!baseUrl) return { error: { kind: "missing-base-url" } };
-  const savedKeyCiphertext = settings.presets[preset].keyCiphertext;
-  const enteredKey = keySources?.enteredKey;
-  if (savedKeyCiphertext !== null && enteredKey == null) {
-    return { error: { kind: "missing-key", cause: "saved-key-could-not-decrypt", variable } };
+  if (!baseUrl) return { failure: { kind: "missing-base-url" } };
+  const { enteredKey, environment } = keySources;
+  if (undecryptable(settings.presets[preset].keyCiphertext, enteredKey)) {
+    return { failure: { kind: "missing-key", cause: "saved-key-could-not-decrypt", variable } };
   }
-  const key = enteredKey || (variable ? keySources?.environment?.[variable] : null);
-  if (variable && !key) return { error: { kind: "missing-key", cause: "environment-unset", variable } };
+  const key = enteredKey || (variable ? environment?.[variable] : null);
+  if (variable && !key) return { failure: { kind: "missing-key", cause: "environment-unset", variable } };
+  return { connection: { preset, baseUrl, key, proxy } };
+}
+
+/** What a Round runs with on the active Preset's connection, or why it can't send anything. */
+export function roundReadiness(settings: Settings, connections: Record<Preset, Connection>): RoundReadiness {
+  const preset = settings.activePreset;
+  if (!preset) return { failure: { kind: "no-provider" } };
   const { model, reasoningEffort } = settings.presets[preset];
+  if (!model) return { failure: { kind: "missing-model" } };
+  const connection = connections[preset];
+  if ("failure" in connection) return connection;
   return {
-    configuration: { preset, baseUrl, model, reasoningEffort, key, proxy: proxyConfiguration(settings, proxyPassword) },
+    configuration: {
+      provider: { ...connection.connection, model, reasoningEffort },
+      targetLanguage: settings.targetLanguage,
+    },
   };
 }
 
-/** The selected global proxy, carrying this connection's decrypted password. */
+/** The selected global proxy, carrying its decrypted password. */
 export function proxyConfiguration(settings: Settings, password: string | null): Proxy | undefined {
   if (settings.proxy.mode === "system") return undefined;
   const { url, username } = settings.proxy;

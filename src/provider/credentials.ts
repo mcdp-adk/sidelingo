@@ -35,6 +35,11 @@ export async function unprotectSecret(ciphertext: string | null): Promise<string
   return ciphertext ? invoke<string | null>("unprotect_secret", { ciphertext }) : null;
 }
 
+/** A secret is saved but can't be decrypted for this Windows user, so it is unusable rather than absent. */
+export function undecryptable(ciphertext: string | null, plaintext: string | null): boolean {
+  return ciphertext !== null && plaintext === null;
+}
+
 export async function protectSecret(secret: string): Promise<string | null> {
   return secret ? invoke<string>("protect_secret", { secret }) : null;
 }

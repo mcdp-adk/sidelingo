@@ -15,7 +15,7 @@ One pass of processing, from an Input through Structuring to a finished Translat
 _Avoid_: Request, job (a Round may involve several model requests)
 
 **Round configuration** (Round 配置):
-The settings that decide what a Round sends and where: which Preset is active, every Preset's Provider details, the proxy, and the Target language. When it changes, an earlier result is no longer reused.
+What a Round runs with, resolved from the settings: the active Preset's Provider address, model and reasoning effort, the key and proxy that reach it, and the Target language. A change to a Preset that isn't active leaves it unchanged. When it changes, an earlier result is no longer reused.
 _Avoid_: Round settings
 
 **Structuring** (整理):

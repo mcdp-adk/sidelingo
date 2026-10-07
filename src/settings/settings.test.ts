@@ -316,6 +316,54 @@ describe("Saving a settings change", () => {
   });
 });
 
+interface ConnectionRow {
+  name: string;
+  /** The document Rust writes next, over a ready Custom Preset. */
+  changedTo: unknown;
+  /** Whether the Custom Preset's published connection is still the same value, so its model list isn't fetched again. */
+  same: boolean;
+}
+
+const connectionChanges: ConnectionRow[] = [
+  { name: "a model change keeps the connection", changedTo: customSettings({ model: "other-model" }), same: true },
+  {
+    name: "a reasoning effort change keeps the connection",
+    changedTo: customSettings({ reasoningEffort: "high" }),
+    same: true,
+  },
+  {
+    name: "a URL left under the System proxy keeps the connection",
+    changedTo: customSettings({}, { proxy: { url: "http://unused.test:8080" } }),
+    same: true,
+  },
+  {
+    name: "a Base URL change changes the connection",
+    changedTo: customSettings({ baseUrl: "https://next.test/v1" }),
+    same: false,
+  },
+  {
+    name: "a saved key changes the connection",
+    changedTo: customSettings({ keyCiphertext: "saved-ciphertext" }),
+    same: false,
+  },
+  {
+    name: "a Manual proxy changes the connection",
+    changedTo: customSettings({}, { proxy: { mode: "manual", url: "http://proxy.test:8080" } }),
+    same: false,
+  },
+];
+
+describe("The connection the Settings window lists models on", () => {
+  it.each(connectionChanges)("$name", async ({ changedTo, same }) => {
+    const core = await startCore({ secrets: { "saved-ciphertext": "saved-key" } });
+    const before = settingsSnapshot().connections.custom;
+    await core.changeSettings(changedTo);
+    await settle();
+    expect(settingsSnapshot().settings).toMatchObject(changedTo as object);
+    expect(settingsSnapshot().connections.custom === before).toBe(same);
+  });
+});
+
 describe("The UI language", () => {
   afterEach(() => {
     vi.stubGlobal("navigator", { language: "en-US" });
