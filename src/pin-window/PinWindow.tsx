@@ -37,7 +37,7 @@ import { Markdown } from "../look/Markdown";
 import type { RoundError, RoundErrorHint, RoundStage } from "../round/round";
 import { usePinView, type PinContent, type Session } from "../session/session";
 import { DISPLAY_MODES, type ConfigurationFailure, type DisplayMode } from "../settings/settings";
-import { patchSettings, useSettings } from "../settings/settings-store";
+import { saveSettings, useSettings } from "../settings/settings-store";
 
 /** How far the pointer travels before a plain drag moves the window, like Windows' own SM_CXDRAG. */
 const DRAG_THRESHOLD = 4;
@@ -62,7 +62,7 @@ const hintLabels: Record<RoundErrorHint, string> = {
 };
 // The Pin window has no room for a notice, and a tab that doesn't change says nothing of why.
 const selectMode = (displayMode: DisplayMode) =>
-  void patchSettings({ displayMode }).catch((reason) => {
+  void saveSettings({ displayMode }).catch((reason) => {
     console.error("Display mode was not saved:", reason);
     void invoke("show_native_notification", {
       title: strings.settingsNotSaved,

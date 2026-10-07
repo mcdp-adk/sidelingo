@@ -1,7 +1,7 @@
 import { Field } from "@fluentui/react-components";
 import { strings } from "../i18n";
 import { ChoiceDropdown } from "../look/ChoiceDropdown";
-import type { Settings } from "../settings/settings";
+import type { Settings, SettingsChange } from "../settings/settings";
 import { useSettings } from "../settings/settings-store";
 import { SecretField } from "./SecretField";
 import { TextSetting } from "./TextSetting";
@@ -23,7 +23,7 @@ export function NetworkSettings({
   commit,
 }: {
   settings: Settings;
-  commit: (patch: Record<string, unknown>) => Promise<void>;
+  commit: (change: SettingsChange) => Promise<void>;
 }) {
   const proxy = settings.proxy;
   const { proxyPassword } = useSettings();
