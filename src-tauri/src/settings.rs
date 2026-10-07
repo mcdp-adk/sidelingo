@@ -6,7 +6,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::sync::Mutex;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 use windows::core::PCWSTR;
@@ -38,6 +38,31 @@ pub struct Held {
     /// patch would write over it.
     #[serde(skip)]
     rejected: bool,
+    /// The file's text as last read or written, so a set-aside can tell it still holds
+    /// what the front end judged; none when there is no file or it couldn't be read.
+    #[serde(skip)]
+    text: Option<String>,
+}
+
+/// Why the front end judged the held document broken, named as it crosses the seam.
+#[derive(Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BrokenReason {
+    /// The file isn't JSON.
+    InvalidJson,
+    /// The document is JSON the schema rejects.
+    Schema,
+}
+
+impl BrokenReason {
+    /// Whether `read` is the status this reason judges.
+    fn names(self, read: &SettingsRead) -> bool {
+        matches!(
+            (self, read),
+            (Self::InvalidJson, SettingsRead::InvalidJson)
+                | (Self::Schema, SettingsRead::Document(_))
+        )
+    }
 }
 
 /// The JSON document as last read or written, with its file and parse status.
@@ -47,30 +72,36 @@ pub struct SettingsDocument(Mutex<Held>);
 /// only when this read failed.
 pub fn load(app: &AppHandle) -> tauri::Result<()> {
     let path = app.path().app_data_dir()?.join(FILE);
+    let (read, text) = read(&path);
     app.manage(SettingsDocument(Mutex::new(Held {
-        read: read(&path),
+        read,
         revision: 0,
         rejected: false,
+        text,
     })));
     Ok(())
 }
 
-fn read(path: &Path) -> SettingsRead {
+/// The file's status and document, with the text it was read from.
+fn read(path: &Path) -> (SettingsRead, Option<String>) {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return SettingsRead::Missing,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return (SettingsRead::Missing, None)
+        }
         Err(error) => {
             eprintln!("failed to read {}: {error}", path.display());
-            return SettingsRead::Unreadable;
+            return (SettingsRead::Unreadable, None);
         }
     };
-    match serde_json::from_str(&text) {
+    let read = match serde_json::from_str(&text) {
         Ok(document) => SettingsRead::Document(document),
         Err(error) => {
             eprintln!("failed to parse {}: {error}", path.display());
             SettingsRead::InvalidJson
         }
-    }
+    };
+    (read, Some(text))
 }
 
 #[tauri::command]
@@ -82,57 +113,40 @@ pub fn read_settings(document: State<SettingsDocument>) -> Result<Held, String> 
         .map_err(|error| error.to_string())
 }
 
-/// Sets aside a settings file that the TypeScript settings model rejected.
+/// Sets aside the settings file the front end judged broken at `revision`, when Rust
+/// still holds that revision with the status `reason` names and the file still holds
+/// the text it was read from; otherwise answers false and changes nothing.
 #[tauri::command]
 pub fn set_aside_broken_settings(
     app: AppHandle,
     document: State<SettingsDocument>,
-    reason: String,
-    expected_document: Value,
+    revision: u64,
+    reason: BrokenReason,
 ) -> Result<bool, String> {
     let mut held = document.0.lock().map_err(|error| error.to_string())?;
+    if held.revision != revision || !reason.names(&held.read) {
+        return Ok(false);
+    }
     let path = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join(FILE);
-    if reason == "invalidJson" {
-        let text = match std::fs::read_to_string(&path) {
-            Ok(text) => text,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => return Err(error.to_string()),
-        };
-        if serde_json::from_str::<Value>(&text).is_ok() {
-            return Ok(false);
-        }
-    } else if reason == "schema" {
-        if !matches!(&held.read, SettingsRead::Document(current) if current == &expected_document) {
-            return Ok(false);
-        }
-        let text = match std::fs::read_to_string(&path) {
-            Ok(text) => text,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => {
-                held.rejected = true;
-                return Err(error.to_string());
-            }
-        };
-        if serde_json::from_str::<Value>(&text).ok().as_ref() != Some(&expected_document) {
-            return Ok(false);
-        }
-    } else {
-        return Err("Unknown settings recovery reason".into());
-    }
-    let broken = path.with_file_name("settings.json.broken");
-    match std::fs::rename(&path, broken) {
+    let result = match std::fs::read_to_string(&path) {
+        Ok(text) if Some(&text) != held.text.as_ref() => return Ok(false),
+        Ok(_) => std::fs::rename(&path, path.with_file_name("settings.json.broken")),
+        Err(error) => Err(error),
+    };
+    match result {
         Ok(()) => {
             held.read = SettingsRead::Missing;
+            held.text = None;
             held.rejected = false;
             Ok(true)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(error) => {
-            held.rejected = reason == "schema";
+            held.rejected = reason == BrokenReason::Schema;
             Err(error.to_string())
         }
     }
@@ -164,7 +178,7 @@ pub fn patch_settings(
         );
     }
     let current = match &held.read {
-        SettingsRead::InvalidJson | SettingsRead::Unreadable => read(&path),
+        SettingsRead::InvalidJson | SettingsRead::Unreadable => read(&path).0,
         current => current.clone(),
     };
     let mut next = match current {
@@ -176,11 +190,13 @@ pub fn patch_settings(
         ),
     };
     merge(&mut next, patch);
-    write_atomically(&path, &next).map_err(|error| error.to_string())?;
+    let text = serde_json::to_string_pretty(&next).map_err(|error| error.to_string())?;
+    write_atomically(&path, &text).map_err(|error| error.to_string())?;
     *held = Held {
         read: SettingsRead::Document(next),
         revision: held.revision + 1,
         rejected: false,
+        text: Some(text),
     };
     if let Err(error) = app.emit("settings-document-changed", &*held) {
         eprintln!("failed to broadcast settings document: {error}");
@@ -202,12 +218,12 @@ fn merge(document: &mut Value, patch: Value) {
     }
 }
 
-fn write_atomically(path: &Path, document: &Value) -> Result<(), Box<dyn std::error::Error>> {
+fn write_atomically(path: &Path, text: &str) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(path.parent().ok_or("Settings path has no parent")?)?;
     let temporary = path.with_extension("json.tmp");
     let result = (|| {
         let mut file = std::fs::File::create(&temporary)?;
-        file.write_all(&serde_json::to_vec_pretty(document)?)?;
+        file.write_all(text.as_bytes())?;
         file.sync_all()?;
         drop(file);
         let wide = |path: &Path| {
@@ -299,12 +315,13 @@ mod tests {
             patch_settings(self.app.handle().clone(), self.app.state(), patch)
         }
 
-        fn set_aside(&self, reason: &str, expected: Value) -> Result<bool, String> {
+        /// The front end's verdict on the document read at `revision`, its reason named as it crosses the seam.
+        fn set_aside(&self, reason: &str, revision: u64) -> Result<bool, String> {
             set_aside_broken_settings(
                 self.app.handle().clone(),
                 self.app.state(),
-                reason.into(),
-                expected,
+                revision,
+                serde_json::from_value(json!(reason)).unwrap(),
             )
         }
 
@@ -523,7 +540,7 @@ mod tests {
     #[test]
     fn invalid_json_is_set_aside_with_its_text_and_then_reads_as_missing() {
         let app = TestApp::start(Some("{bad json"));
-        assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(true));
+        assert_eq!(app.set_aside("invalidJson", 0), Ok(true));
         assert_eq!(
             app.text("settings.json.broken").as_deref(),
             Some("{bad json")
@@ -536,8 +553,7 @@ mod tests {
     fn a_rejected_document_is_set_aside_when_it_is_still_the_one_read() {
         for text in [r#"{"schemaVersion":99}"#, "null"] {
             let app = TestApp::start(Some(text));
-            let read: Value = serde_json::from_str(text).unwrap();
-            assert_eq!(app.set_aside("schema", read), Ok(true), "{text}");
+            assert_eq!(app.set_aside("schema", 0), Ok(true), "{text}");
             assert_eq!(app.text("settings.json.broken").as_deref(), Some(text));
             assert_eq!(app.read(), json!({ "status": "missing" }));
         }
@@ -546,45 +562,75 @@ mod tests {
     #[test]
     fn the_next_patch_after_setting_aside_writes_a_fresh_file() {
         let app = TestApp::start(Some(r#"{"schemaVersion":99,"stale":true}"#));
-        app.set_aside("schema", json!({ "schemaVersion": 99, "stale": true }))
-            .unwrap();
+        app.set_aside("schema", 0).unwrap();
         app.patch(json!({ "schemaVersion": 1 })).unwrap();
         assert_eq!(app.written(), json!({ "schemaVersion": 1 }));
     }
 
     #[test]
-    fn a_file_rewritten_since_it_was_read_is_not_set_aside() {
-        // Another window set the broken file aside and patched before this window set it aside.
-        let app = TestApp::start(Some("{bad json"));
-        assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(true));
-        app.patch(json!({ "schemaVersion": 1 })).unwrap();
-        assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(false));
-
+    fn a_verdict_on_an_older_revision_is_refused() {
+        // The other window patched after this one read the rejected document.
         let app = TestApp::start(Some(r#"{"schemaVersion":99}"#));
         app.patch(json!({ "schemaVersion": 1 })).unwrap();
-        assert_eq!(
-            app.set_aside("schema", json!({ "schemaVersion": 99 })),
-            Ok(false)
-        );
+        assert_eq!(app.set_aside("schema", 0), Ok(false));
+        assert_eq!(app.written(), json!({ "schemaVersion": 1 }));
 
-        // A patch was written, then the rejected document was put back from outside sidelingo.
-        let app = TestApp::start(Some(r#"{"schemaVersion":99}"#));
-        app.patch(json!({ "schemaVersion": 1 })).unwrap();
+        // Then the rejected document was put back from outside sidelingo.
         std::fs::write(app.file(FILE), r#"{"schemaVersion":99}"#).unwrap();
-        assert_eq!(
-            app.set_aside("schema", json!({ "schemaVersion": 99 })),
-            Ok(false)
-        );
-
-        // Something outside sidelingo rewrote the file.
-        let app = TestApp::start(Some(r#"{"schemaVersion":99}"#));
-        std::fs::write(app.file(FILE), r#"{"schemaVersion":98}"#).unwrap();
-        assert_eq!(
-            app.set_aside("schema", json!({ "schemaVersion": 99 })),
-            Ok(false)
-        );
-        assert_eq!(app.written(), json!({ "schemaVersion": 98 }));
+        assert_eq!(app.set_aside("schema", 0), Ok(false));
+        assert_eq!(app.written(), json!({ "schemaVersion": 99 }));
         assert!(!app.file("settings.json.broken").exists());
+    }
+
+    #[test]
+    fn a_second_verdict_on_the_same_revision_after_a_set_aside_is_refused() {
+        // Both windows judged the same broken file, which came back from outside sidelingo in between.
+        for (text, reason) in [
+            ("{bad json", "invalidJson"),
+            (r#"{"schemaVersion":99}"#, "schema"),
+        ] {
+            let app = TestApp::start(Some(text));
+            assert_eq!(app.set_aside(reason, 0), Ok(true), "{reason}");
+            std::fs::write(app.file(FILE), text).unwrap();
+            assert_eq!(app.set_aside(reason, 0), Ok(false), "{reason}");
+            assert_eq!(app.text(FILE).as_deref(), Some(text), "{reason}");
+        }
+    }
+
+    #[test]
+    fn a_file_edited_to_different_content_after_the_read_is_kept() {
+        for (text, edited, reason) in [
+            ("{bad json", "{other bad json", "invalidJson"),
+            (
+                r#"{"schemaVersion":99}"#,
+                r#"{"schemaVersion":98}"#,
+                "schema",
+            ),
+            // Different text holding the same document is an edit too.
+            (
+                r#"{"schemaVersion":99}"#,
+                r#"{ "schemaVersion": 99 }"#,
+                "schema",
+            ),
+        ] {
+            let app = TestApp::start(Some(text));
+            std::fs::write(app.file(FILE), edited).unwrap();
+            assert_eq!(app.set_aside(reason, 0), Ok(false), "{edited}");
+            assert_eq!(app.text(FILE).as_deref(), Some(edited));
+            assert!(!app.file("settings.json.broken").exists());
+        }
+    }
+
+    #[test]
+    fn a_written_document_judged_rejected_is_set_aside() {
+        // The front end judges each document Rust writes as it judges the one read at startup.
+        let app = TestApp::start(None);
+        app.patch(json!({ "schemaVersion": 99 })).unwrap();
+        assert_eq!(app.set_aside("schema", 1), Ok(true));
+        assert_eq!(
+            serde_json::from_str::<Value>(&app.text("settings.json.broken").unwrap()).unwrap(),
+            json!({ "schemaVersion": 99 })
+        );
     }
 
     #[test]
@@ -598,9 +644,7 @@ mod tests {
                 .share_mode(share_mode)
                 .open(app.file(FILE))
                 .unwrap();
-            assert!(app
-                .set_aside("schema", serde_json::from_str(rejected).unwrap())
-                .is_err());
+            assert!(app.set_aside("schema", 0).is_err());
             drop(held);
             assert!(app
                 .patch(json!({ "schemaVersion": 1, "displayMode": "both" }))
@@ -608,10 +652,7 @@ mod tests {
             assert_eq!(app.text(FILE).as_deref(), Some(rejected), "{share_mode}");
 
             // The other window's start sets it aside, and patches write a fresh file again.
-            assert_eq!(
-                app.set_aside("schema", serde_json::from_str(rejected).unwrap()),
-                Ok(true)
-            );
+            assert_eq!(app.set_aside("schema", 0), Ok(true));
             assert_eq!(app.text("settings.json.broken").as_deref(), Some(rejected));
             app.patch(json!({ "schemaVersion": 1, "displayMode": "both" }))
                 .unwrap();
@@ -623,17 +664,30 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_file_is_not_set_aside() {
-        let app = TestApp::start(None);
-        assert_eq!(app.set_aside("invalidJson", Value::Null), Ok(false));
-        assert_eq!(app.set_aside("schema", Value::Null), Ok(false));
-        assert!(!app.file("settings.json.broken").exists());
+    fn a_verdict_whose_reason_names_another_status_is_refused() {
+        for (text, reason) in [
+            (None, "invalidJson"),
+            (None, "schema"),
+            (Some(r#"{"schemaVersion":99}"#), "invalidJson"),
+            (Some("{bad json"), "schema"),
+        ] {
+            let app = TestApp::start(text);
+            assert_eq!(app.set_aside(reason, 0), Ok(false), "{text:?} {reason}");
+            assert_eq!(app.text(FILE).as_deref(), text);
+            assert!(!app.file("settings.json.broken").exists());
+        }
     }
 
     #[test]
-    fn an_unknown_reason_is_refused_and_keeps_the_file() {
-        let app = TestApp::start(Some("{bad json"));
-        assert!(app.set_aside("tooOld", Value::Null).is_err());
-        assert_eq!(app.text(FILE).as_deref(), Some("{bad json"));
+    fn only_the_reasons_the_front_end_names_deserialize() {
+        for (name, reason) in [
+            ("invalidJson", BrokenReason::InvalidJson),
+            ("schema", BrokenReason::Schema),
+        ] {
+            assert!(serde_json::from_value::<BrokenReason>(json!(name)).ok() == Some(reason));
+        }
+        for name in ["tooOld", "InvalidJson", "invalid_json"] {
+            assert!(serde_json::from_value::<BrokenReason>(json!(name)).is_err());
+        }
     }
 }

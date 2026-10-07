@@ -132,6 +132,13 @@ export async function startCore(options: CoreOptions = {}): Promise<Core> {
       await emit("settings-document-changed", held);
       return null;
     },
+    // Rust sets a broken file aside only while it holds the revision judged, with the status the reason names.
+    set_aside_broken_settings: ({ revision, reason }) => {
+      const named = held.status === (reason === "invalidJson" ? "invalidJson" : "document");
+      if (held.revision !== revision || !named) return false;
+      held = { status: "missing", revision: held.revision };
+      return true;
+    },
     unprotect_secret: ({ ciphertext }) => options.secrets?.[ciphertext as string] ?? null,
     pin_window_ready: () => null,
     // The updater finds no update unless a test plays otherwise.

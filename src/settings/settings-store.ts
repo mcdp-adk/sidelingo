@@ -125,9 +125,10 @@ export async function startSettingsStore(): Promise<void> {
     }
     let quarantined = false;
     if (brokenReason) {
+      // Rust sets the file aside only while it still holds the revision judged here.
       quarantined = await invoke<boolean>("set_aside_broken_settings", {
+        revision: stored.revision,
         reason: brokenReason,
-        expectedDocument: stored.status === "document" ? stored.document : null,
       }).catch((error) => {
         console.error("Could not set aside broken settings:", error);
         return false;
