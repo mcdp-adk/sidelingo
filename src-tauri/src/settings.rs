@@ -34,6 +34,10 @@ pub struct Held {
     /// from one whose broadcast arrives late. Setting a broken file aside writes no
     /// document, so it keeps the revision.
     revision: u64,
+    /// The front end rejected the held document and it couldn't be set aside, so a
+    /// patch would write over it.
+    #[serde(skip)]
+    rejected: bool,
 }
 
 /// The JSON document as last read or written, with its file and parse status.
@@ -46,6 +50,7 @@ pub fn load(app: &AppHandle) -> tauri::Result<()> {
     app.manage(SettingsDocument(Mutex::new(Held {
         read: read(&path),
         revision: 0,
+        rejected: false,
     })));
     Ok(())
 }
@@ -107,7 +112,10 @@ pub fn set_aside_broken_settings(
         let text = match std::fs::read_to_string(&path) {
             Ok(text) => text,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => return Err(error.to_string()),
+            Err(error) => {
+                held.rejected = true;
+                return Err(error.to_string());
+            }
         };
         if serde_json::from_str::<Value>(&text).ok().as_ref() != Some(&expected_document) {
             return Ok(false);
@@ -119,16 +127,21 @@ pub fn set_aside_broken_settings(
     match std::fs::rename(&path, broken) {
         Ok(()) => {
             held.read = SettingsRead::Missing;
+            held.rejected = false;
             Ok(true)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error.to_string()),
+        Err(error) => {
+            held.rejected = reason == "schema";
+            Err(error.to_string())
+        }
     }
 }
 
 /// Serializes patches from both windows. A failed write changes neither the held
 /// document nor the document other windows receive. A file that couldn't be read
 /// is read again rather than replaced, and the patch is refused while it still can't.
+/// A document the front end rejected is never patched; it must be set aside first.
 #[tauri::command]
 pub fn patch_settings(
     app: AppHandle,
@@ -144,6 +157,12 @@ pub fn patch_settings(
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join(FILE);
+    if held.rejected {
+        return Err(
+            "settings.json holds settings this version can't use and couldn't be set aside, so this change wasn't saved over it"
+                .into(),
+        );
+    }
     let current = match &held.read {
         SettingsRead::InvalidJson | SettingsRead::Unreadable => read(&path),
         current => current.clone(),
@@ -161,6 +180,7 @@ pub fn patch_settings(
     *held = Held {
         read: SettingsRead::Document(next),
         revision: held.revision + 1,
+        rejected: false,
     };
     if let Err(error) = app.emit("settings-document-changed", &*held) {
         eprintln!("failed to broadcast settings document: {error}");
@@ -565,6 +585,41 @@ mod tests {
         );
         assert_eq!(app.written(), json!({ "schemaVersion": 98 }));
         assert!(!app.file("settings.json.broken").exists());
+    }
+
+    #[test]
+    fn a_rejected_document_that_could_not_be_set_aside_takes_no_patch_until_it_is() {
+        let rejected = r#"{"schemaVersion":99,"newer":true}"#;
+        // Held so it can't be read, then so it can be read but not moved (FILE_SHARE_READ).
+        for share_mode in [0, 1] {
+            let app = TestApp::start(Some(rejected));
+            let held = std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(share_mode)
+                .open(app.file(FILE))
+                .unwrap();
+            assert!(app
+                .set_aside("schema", serde_json::from_str(rejected).unwrap())
+                .is_err());
+            drop(held);
+            assert!(app
+                .patch(json!({ "schemaVersion": 1, "displayMode": "both" }))
+                .is_err());
+            assert_eq!(app.text(FILE).as_deref(), Some(rejected), "{share_mode}");
+
+            // The other window's start sets it aside, and patches write a fresh file again.
+            assert_eq!(
+                app.set_aside("schema", serde_json::from_str(rejected).unwrap()),
+                Ok(true)
+            );
+            assert_eq!(app.text("settings.json.broken").as_deref(), Some(rejected));
+            app.patch(json!({ "schemaVersion": 1, "displayMode": "both" }))
+                .unwrap();
+            assert_eq!(
+                app.written(),
+                json!({ "schemaVersion": 1, "displayMode": "both" })
+            );
+        }
     }
 
     #[test]
